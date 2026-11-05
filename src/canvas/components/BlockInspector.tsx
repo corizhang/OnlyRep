@@ -21,7 +21,16 @@ import { useFormulaVariables } from '../formula/FormulaInput';
 import { groupVariables } from '../formula/variableEnv';
 import { matchQuery } from '../formula/pinyin';
 import { insertVarIntoText } from '../formula/varInsert';
-import { InputNumber } from 'antd';
+import { Collapse, Dropdown, InputNumber, Segmented } from 'antd';
+import {
+  AlignCenterOutlined,
+  AlignLeftOutlined,
+  AlignRightOutlined,
+  CopyOutlined,
+  DeleteOutlined,
+  EllipsisOutlined,
+  HolderOutlined,
+} from '@ant-design/icons';
 import { DisconnectOutlined, LinkOutlined } from '@ant-design/icons';
 import BindingPicker from './BindingPicker';
 import { Btn, Check, ColorInput, Field, NumberInput, Section, Select, SliderBar, Textarea, TextInput } from './ui';
@@ -125,6 +134,7 @@ export default function BlockInspector({ block }: { block: CanvasBlock }) {
           tableOptions={tableOptions}
           colOptions={colOptions}
           tableCols={currentTable?.columns.map((c) => ({ key: c.key, label: c.rawName || c.key })) ?? []}
+          colMetas={currentTable?.columns.map((c) => ({ key: c.key, type: c.type })) ?? []}
         />
       )}
 
@@ -624,21 +634,232 @@ function ChartInspector({
 }
 
 // ---------- 表格 ----------
+/** 按数据源列类型推断新列的格式与对齐（文本/日期→左对齐，数值/百分比→右对齐） */
+function inferColDefaults(metaType?: string): { format: TableColumnConfig['format']; align: TableColumnConfig['align'] } {
+  switch (metaType) {
+    case 'number':
+      return { format: 'number', align: 'right' };
+    case 'percent':
+      return { format: 'percent', align: 'right' };
+    default:
+      return { format: 'text', align: 'left' };
+  }
+}
+
+const FORMAT_LABEL: Record<TableColumnConfig['format'], string> = { text: '文本', number: '数值', percent: '百分比', ratio: '比率' };
+
 function TableInspector({
   cfg,
   onChange,
   tableOptions,
   colOptions,
   tableCols,
+  colMetas = [],
 }: {
   cfg: DataTableConfig;
   onChange: (p: Partial<DataTableConfig>) => void;
   tableOptions: { value: string; label: string }[];
   colOptions: { value: string; label: string }[];
   tableCols: { key: string; label: string }[];
+  /** 上游表格列类型元信息（做类型推断用） */
+  colMetas?: { key: string; type: string }[];
 }) {
   const cols = cfg.columns;
   const setCols = (next: TableColumnConfig[]) => onChange({ columns: next });
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const dragIdx = useRef<number | null>(null);
+
+  const colMetaOf = (key: string): string | undefined => colMetas.find((m) => m.key === key)?.type;
+  const rawLabelOf = (key: string): string => colOptions.find((o) => o.value === key)?.label ?? '';
+
+  const addCol = (): void => {
+    // 自动预填第一个未使用的列 + 按类型推断格式/对齐
+    const used = new Set(cols.map((c) => c.col));
+    const free = colOptions.find((o) => !used.has(o.value));
+    const t = inferColDefaults(free ? colMetaOf(free.value) : undefined);
+    setCols([...cols, { col: free?.value ?? '', label: free?.label ?? '', ...t, decimals: 'auto' }]);
+    setActiveIdx(cols.length);
+  };
+
+  const fillAll = (): void => {
+    setCols(tableCols.slice(0, 8).map((c) => ({ col: c.key, label: c.label, ...inferColDefaults(colMetaOf(c.key)), decimals: 'auto' })));
+    setActiveIdx(null);
+  };
+
+  const moveCol = (from: number, target: number): void => {
+    if (from === target) return;
+    const next = [...cols];
+    const [moved] = next.splice(from, 1);
+    next.splice(target, 0, moved);
+    setCols(next);
+    // 展开态跟随移动
+    if (activeIdx !== null) {
+      if (activeIdx === from) setActiveIdx(target);
+      else if (from < activeIdx && activeIdx <= target) setActiveIdx(activeIdx - 1);
+      else if (target <= activeIdx && activeIdx < from) setActiveIdx(activeIdx + 1);
+    }
+  };
+
+  const dragProps = (i: number) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      dragIdx.current = i;
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (dragIdx.current !== null) e.preventDefault();
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (dragIdx.current !== null) moveCol(dragIdx.current, i);
+      dragIdx.current = null;
+    },
+    onDragEnd: () => {
+      dragIdx.current = null;
+    },
+  });
+
+  const items = cols.map((c, i) => {
+    const menuItems = [
+      {
+        key: 'dup',
+        icon: <CopyOutlined />,
+        label: '复制此列',
+        onClick: () => {
+          const next = [...cols];
+          next.splice(i + 1, 0, JSON.parse(JSON.stringify(c)) as TableColumnConfig);
+          setCols(next);
+          setActiveIdx(i + 1);
+        },
+      },
+      {
+        key: 'del',
+        icon: <DeleteOutlined />,
+        label: '删除',
+        danger: true,
+        onClick: () => {
+          setCols(cols.filter((_, j) => j !== i));
+          if (activeIdx === i) setActiveIdx(null);
+          else if (activeIdx !== null && activeIdx > i) setActiveIdx(activeIdx - 1);
+        },
+      },
+    ];
+    return {
+      key: String(i),
+      label: (
+        <div
+          className="group flex min-w-0 flex-1 items-center gap-1.5"
+          {...dragProps(i)}
+        >
+          <HolderOutlined className="shrink-0 cursor-grab text-[12px] text-slate-300 hover:text-slate-500" />
+          <span className="min-w-0 truncate text-[12.5px] text-slate-700">{c.label || rawLabelOf(c.col) || '未选列'}</span>
+          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-px text-[10.5px] text-slate-500">{FORMAT_LABEL[c.format]}</span>
+          <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: menuItems }}>
+            <button
+              type="button"
+              className="ml-auto shrink-0 text-[13px] leading-none text-slate-300 opacity-0 transition-opacity hover:text-slate-600 group-hover:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <EllipsisOutlined />
+            </button>
+          </Dropdown>
+        </div>
+      ),
+      children: (
+        <div className="space-y-2 pt-0.5">
+          <Field label="数据列">
+            <Select
+              value={c.col}
+              placeholder="选择列"
+              options={colOptions}
+              onChange={(v) => {
+                // 切换数据列时同步类型推断；显示名未定制过则跟随新列名
+                const t = inferColDefaults(colMetaOf(v));
+                const label = !c.label || rawLabelOf(c.col) === c.label ? rawLabelOf(v) : c.label;
+                setCols(cols.map((x, j) => (j === i ? { ...x, col: v, label, ...t } : x)));
+              }}
+            />
+          </Field>
+          <Field label="显示名（表头）">
+            <TextInput
+              value={c.label}
+              placeholder={rawLabelOf(c.col) || '默认同数据列名'}
+              onChange={(v) => setCols(cols.map((x, j) => (j === i ? { ...x, label: v } : x)))}
+            />
+          </Field>
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <Field label="类型">
+                <Select
+                  value={c.format}
+                  options={[
+                    { value: 'text', label: '文本' },
+                    { value: 'number', label: '数值' },
+                    { value: 'percent', label: '百分比' },
+                    { value: 'ratio', label: '比率（两列）' },
+                  ]}
+                  onChange={(v) => setCols(cols.map((x, j) => (j === i ? { ...x, format: v as TableColumnConfig['format'] } : x)))}
+                />
+              </Field>
+            </div>
+            <Field label="对齐">
+              <Segmented
+                size="small"
+                value={c.align}
+                onChange={(v) => setCols(cols.map((x, j) => (j === i ? { ...x, align: v as TableColumnConfig['align'] } : x)))}
+                options={[
+                  { value: 'left', icon: <AlignLeftOutlined />, title: '左对齐' },
+                  { value: 'center', icon: <AlignCenterOutlined />, title: '居中' },
+                  { value: 'right', icon: <AlignRightOutlined />, title: '右对齐' },
+                ]}
+              />
+            </Field>
+          </div>
+          {(c.format === 'ratio' || c.totalAgg === 'weighted') && (
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <Field label="分子">
+                  <Select
+                    value={c.ratioNum ?? ''}
+                    placeholder="选择列"
+                    options={colOptions}
+                    onChange={(v) => setCols(cols.map((x, j) => (j === i ? { ...x, ratioNum: v } : x)))}
+                  />
+                </Field>
+              </div>
+              <div className="min-w-0 flex-1">
+                <Field label="分母">
+                  <Select
+                    value={c.ratioDen ?? ''}
+                    placeholder="选择列"
+                    options={colOptions}
+                    onChange={(v) => setCols(cols.map((x, j) => (j === i ? { ...x, ratioDen: v } : x)))}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+          {cfg.totalRow && c.format !== 'text' && (
+            <Field label="合计">
+              <Select
+                value={c.totalAgg ?? 'auto'}
+                options={[
+                  { value: 'auto', label: '智能（数值求和 / 百分比平均）' },
+                  { value: 'sum', label: '求和' },
+                  { value: 'avg', label: '平均' },
+                  ...(c.format === 'percent' ? [{ value: 'weighted', label: '加权平均（分子合计÷分母合计）' }] : []),
+                  { value: 'max', label: '最大' },
+                  { value: 'min', label: '最小' },
+                  { value: 'none', label: '不参与合计' },
+                ]}
+                onChange={(v) => setCols(cols.map((x, j) => (j === i ? { ...x, totalAgg: v as TableColumnConfig['totalAgg'] } : x)))}
+              />
+            </Field>
+          )}
+        </div>
+      ),
+    };
+  });
 
   return (
     <>
@@ -649,142 +870,62 @@ function TableInspector({
         <Select value={cfg.table.nodeRef} placeholder="选择表格节点" options={tableOptions} onChange={(v) => onChange({ table: { nodeRef: v } })} />
       </Field>
 
+      {/* 列：手风琴（默认折叠单行摘要，点开展开编辑），支持拖拽排序 */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium text-slate-500">列</span>
+          <span className="text-[12px] font-medium tracking-wide text-slate-500">列（{cols.length}）</span>
           {cols.length === 0 && (
-            <Btn size="xs" onClick={() => setCols(tableCols.slice(0, 8).map((c) => ({ col: c.key, label: c.label, align: 'right', format: 'number', decimals: 'auto' })))}>
+            <Btn size="xs" onClick={fillAll}>
               用全部列
             </Btn>
           )}
         </div>
-        {cols.map((c, i) => (
-          <div key={i} className="rounded border border-slate-200 p-1.5">
-            <div className="flex gap-1">
-              <select
-                className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                value={c.col}
-                onChange={(e) => setCols(cols.map((x, j) => (j === i ? { ...x, col: e.target.value } : x)))}
-              >
-                <option value="">列</option>
-                {colOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="w-16 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                value={c.label}
-                placeholder="表头"
-                onChange={(e) => setCols(cols.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
-              />
-              <button type="button" className="text-slate-400 hover:text-red-500" onClick={() => setCols(cols.filter((_, j) => j !== i))}>
-                ×
-              </button>
-            </div>
-            <div className="mt-1 flex gap-1">
-              <select
-                className="rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                value={c.format}
-                onChange={(e) => setCols(cols.map((x, j) => (j === i ? { ...x, format: e.target.value as TableColumnConfig['format'] } : x)))}
-              >
-                <option value="text">文本</option>
-                <option value="number">数值</option>
-                <option value="percent">百分比</option>
-                <option value="ratio">比率（两列）</option>
-              </select>
-              <select
-                className="rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                value={c.align}
-                onChange={(e) => setCols(cols.map((x, j) => (j === i ? { ...x, align: e.target.value as TableColumnConfig['align'] } : x)))}
-              >
-                <option value="left">左</option>
-                <option value="center">中</option>
-                <option value="right">右</option>
-              </select>
-              {(c.format === 'ratio' || c.totalAgg === 'weighted') && (
-                <>
-                  <select
-                    className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                    value={c.ratioNum ?? ''}
-                    onChange={(e) => setCols(cols.map((x, j) => (j === i ? { ...x, ratioNum: e.target.value } : x)))}
-                  >
-                    <option value="">分子</option>
-                    {colOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                    value={c.ratioDen ?? ''}
-                    onChange={(e) => setCols(cols.map((x, j) => (j === i ? { ...x, ratioDen: e.target.value } : x)))}
-                  >
-                    <option value="">分母</option>
-                    {colOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-            </div>
-            {cfg.totalRow && c.format !== 'text' && (
-              <div className="mt-1 flex items-center gap-1">
-                <span className="shrink-0 text-[11.5px] text-slate-400">合计</span>
-                <select
-                  className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                  value={c.totalAgg ?? 'auto'}
-                  onChange={(e) =>
-                    setCols(cols.map((x, j) => (j === i ? { ...x, totalAgg: e.target.value as TableColumnConfig['totalAgg'] } : x)))
-                  }
-                >
-                  <option value="auto">智能（数值求和 / 百分比平均）</option>
-                  <option value="sum">求和</option>
-                  <option value="avg">平均</option>
-                  {c.format === 'percent' && <option value="weighted">加权平均（分子合计÷分母合计）</option>}
-                  <option value="max">最大</option>
-                  <option value="min">最小</option>
-                  <option value="none">不参与合计</option>
-                </select>
-              </div>
-            )}
-          </div>
-        ))}
-        <Btn size="xs" onClick={() => setCols([...cols, { col: '', label: '', align: 'right', format: 'number', decimals: 'auto' }])}>
-          + 列
+        {cols.length > 0 && (
+          <Collapse
+            accordion
+            ghost
+            size="small"
+            activeKey={activeIdx === null ? [] : [String(activeIdx)]}
+            onChange={(keys) => setActiveIdx(keys.length ? Number(keys[keys.length - 1]) : null)}
+            className="[&_.ant-collapse-body]:!px-0 [&_.ant-collapse-body]:!pb-2 [&_.ant-collapse-body]:!pt-1 [&_.ant-collapse-header]:!px-0 [&_.ant-collapse-header]:!py-1.5 [&_.ant-collapse-item:not(:last-child)]:!border-b [&_.ant-collapse-item]:!border-slate-100"
+            items={items}
+          />
+        )}
+        <Btn size="xs" onClick={addCol}>
+          + 添加列
         </Btn>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Check checked={cfg.zebra} label="斑马纹" onChange={(v) => onChange({ zebra: v })} />
-        <Check checked={cfg.showHeader} label="表头" onChange={(v) => onChange({ showHeader: v })} />
-        <Check checked={cfg.headerBold} label="表头加粗" onChange={(v) => onChange({ headerBold: v })} />
-        <Check checked={cfg.totalRow} label="合计行" onChange={(v) => onChange({ totalRow: v })} />
-        <Check checked={cfg.showIndex} label="序号列" onChange={(v) => onChange({ showIndex: v })} />
-      </div>
-      {cfg.totalRow && (
-        <Field
-          label="合计行文案"
-          hint={`说明文字可用 {{${cfg.title || '表格'}_列名}} 引用合计值；多个表格标题相同时按先后顺序加序号（表格2_列名…），建议给每个表格起不同标题`}
-        >
-          <TextInput value={cfg.totalLabel} onChange={(v) => onChange({ totalLabel: v })} />
-        </Field>
-      )}
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="行数上限（0=全部）">
-          <NumberInput value={cfg.maxRows} min={0} onChange={(v) => onChange({ maxRows: v })} />
-        </Field>
-        <Field label="字号倍数">
-          <NumberInput value={cfg.fontSizeScale} min={0.6} max={1.4} step={0.02} onChange={(v) => onChange({ fontSizeScale: v })} />
-        </Field>
+      {/* 样式区：两列复选 + 合计文案（勾选才出现）+ 行数/字号 */}
+      <div className="space-y-1.5">
+        <span className="text-[12px] font-medium tracking-wide text-slate-500">样式</span>
+        <div className="grid grid-cols-2 gap-y-1">
+          <Check checked={cfg.zebra} label="斑马纹" onChange={(v) => onChange({ zebra: v })} />
+          <Check checked={cfg.showHeader} label="表头" onChange={(v) => onChange({ showHeader: v })} />
+          <Check checked={cfg.headerBold} label="表头加粗" onChange={(v) => onChange({ headerBold: v })} />
+          <Check checked={cfg.totalRow} label="合计行" onChange={(v) => onChange({ totalRow: v })} />
+          <Check checked={cfg.showIndex} label="序号列" onChange={(v) => onChange({ showIndex: v })} />
+        </div>
+        {cfg.totalRow && (
+          <Field
+            label="合计行文案"
+            hint={`说明文字可用 {{${cfg.title || '表格'}_列名}} 引用合计值；多个表格标题相同时按先后顺序加序号（表格2_列名…），建议给每个表格起不同标题`}
+          >
+            <TextInput value={cfg.totalLabel} onChange={(v) => onChange({ totalLabel: v })} />
+          </Field>
+        )}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <Field label="行数上限（0=全部）">
+            <NumberInput value={cfg.maxRows} min={0} onChange={(v) => onChange({ maxRows: v })} />
+          </Field>
+          <Field label="字号倍数">
+            <NumberInput value={cfg.fontSizeScale} min={0.6} max={1.4} step={0.02} onChange={(v) => onChange({ fontSizeScale: v })} />
+          </Field>
+        </div>
       </div>
 
       <div className="space-y-1">
-        <span className="text-[12px] font-medium text-slate-500">整行高亮规则</span>
+        <span className="text-[12px] font-medium tracking-wide text-slate-500">整行高亮规则</span>
         {cfg.highlightRules.map((r, i) => (
           <div key={i} className="flex gap-1">
             <select
