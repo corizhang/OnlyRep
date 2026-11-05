@@ -4,6 +4,7 @@ import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
 import BlockLibrary from './BlockLibrary';
+import NodeLibrary from './NodeLibrary';
 import BlockInspector from './BlockInspector';
 import VariablePanel from './VariablePanel';
 import CanvasSettings from './CanvasSettings';
@@ -84,10 +85,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
         {isCanvas ? (
           <BlockLibrary />
         ) : (
-          <aside className="flex h-full w-[300px] shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-slate-50 p-2.5">
-            <DataSourcePanel />
-            <StepChainPanel />
-          </aside>
+          <NodeLibrary />
         )}
 
         <section className="flex min-w-0 flex-1 flex-col">

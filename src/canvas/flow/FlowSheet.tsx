@@ -7,6 +7,7 @@ import { computeFlowLayout, edgePath, NODE_H, NODE_W, type FlowPos } from './lay
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
+import { createSourceOfKind, createStepNode } from './nodeOps';
 import { ImportEditor, FormEditor, ManualEditor } from '../components/DataSourcePanel';
 import { createImportSource, createManualTableSource, newId, uniqueName } from '../datasource/registry';
 import type { DataSource } from '../types';
@@ -45,6 +46,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const [pan, setPan] = useState<FlowPos>({ x: 28, y: 28 });
   const [delta, setDelta] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [hint, setHint] = useState('');
+  const [dropHover, setDropHover] = useState(false);
   const selectedId = flowSelectedId;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,16 +78,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       setTimeout(() => setHint(''), 3500);
       return;
     }
-    const label = type === 'formula' ? '计算字段' : STEP_TYPES.find((s) => s.type === type)?.label ?? '步骤';
-    const dup = config.pipeline.nodes.filter((n) => n.name === label || n.name.startsWith(`${label} `)).length;
-    const node: PipelineNode = {
-      id: newId('n'),
-      type,
-      name: dup > 0 ? `${label} ${dup + 1}` : label,
-      inputs: type === 'formula' ? [] : [inputId as string],
-      params: defaultParams(type),
-      enabled: true,
-    };
+    const node = createStepNode(config.pipeline.nodes, type, inputId);
     addNodeToStore(node);
     setFlowSelectedId(node.id);
   };
@@ -99,13 +92,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
 
   /** 添加数据源（与左侧面板同一套创建逻辑）；节点 id 约定为 n_<sourceId> */
   const addSourceOfKind = (kind: DataSource['kind']): void => {
-    const base = { import: '导入数据', manualTable: '手填表格', form: '口径参数', constant: '常量' }[kind];
-    const name = uniqueName(config.dataSources, base);
-    let source: DataSource;
-    if (kind === 'import') source = createImportSource(name);
-    else if (kind === 'manualTable') source = createManualTableSource(name);
-    else if (kind === 'form') source = { id: newId('ds'), name, kind: 'form', entries: [{ key: '参数1', value: '0' }] };
-    else source = { id: newId('ds'), name, kind: 'constant', value: '0' };
+    const source = createSourceOfKind(config.dataSources, kind);
     addSource(source);
     setFlowSelectedId(`n_${source.id}`);
   };
@@ -196,6 +183,67 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     panRef.current = null;
   };
 
+  // ---- 节点库拖放：数据源落任意位置；处理节点落到表格节点上自动连为下游 ----
+  const isLibDrag = (e: React.DragEvent): boolean =>
+    e.dataTransfer.types.includes('text/x-new-source') || e.dataTransfer.types.includes('text/x-new-node');
+
+  const onLibDragOver = (e: React.DragEvent): void => {
+    if (!isLibDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dropHover) setDropHover(true);
+  };
+
+  /** 指针位置命中的节点（用于处理节点建立连线） */
+  const hitNodeAt = (px: number, py: number): string | null => {
+    for (const [id, pos] of Object.entries(layout.byId)) {
+      if (px >= pos.x && px <= pos.x + NODE_W && py >= pos.y && py <= pos.y + NODE_H) return id;
+    }
+    return null;
+  };
+
+  const showHint = (text: string): void => {
+    setHint(text);
+    setTimeout(() => setHint(''), 3500);
+  };
+
+  const onLibDrop = (e: React.DragEvent): void => {
+    const srcKind = e.dataTransfer.getData('text/x-new-source');
+    const nodeType = e.dataTransfer.getData('text/x-new-node');
+    setDropHover(false);
+    if (!srcKind && !nodeType) return;
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const px = (e.clientX - rect.left - pan.x) / zoom;
+    const py = (e.clientY - rect.top - pan.y) / zoom;
+
+    if (srcKind) {
+      const source = createSourceOfKind(config.dataSources, srcKind as DataSource['kind']);
+      addSource(source);
+      setFlowPos(`n_${source.id}`, { x: Math.round(px - NODE_W / 2), y: Math.round(py - NODE_H / 2) });
+      setFlowSelectedId(`n_${source.id}`);
+      return;
+    }
+
+    const type = nodeType as NodeType;
+    const hitId = hitNodeAt(px, py);
+    const hitOk = hitId && isTableOut(hitId) ? hitId : null;
+    const inputId = type === 'formula' ? null : hitOk ?? (flowSelectedId && isTableOut(flowSelectedId) ? flowSelectedId : null);
+    if (type !== 'formula' && !inputId) {
+      showHint('处理节点请拖到表格节点上（自动连为下游），或先点选一个表格节点');
+      return;
+    }
+    const node = createStepNode(config.pipeline.nodes, type, inputId);
+    addNodeToStore(node);
+    // 命中节点时放在其右侧下游位；否则放在落点居中
+    const pos = hitOk
+      ? { x: Math.round((layout.byId[hitOk]?.x ?? px) + NODE_W + 48), y: Math.round(layout.byId[hitOk]?.y ?? py) }
+      : { x: Math.round(px - NODE_W / 2), y: Math.round(py - NODE_H / 2) };
+    setFlowPos(node.id, pos);
+    setFlowSelectedId(node.id);
+  };
+
   return (
     <div className={embedded ? 'flex h-full min-w-0 flex-1 flex-col bg-[#f7f9fc]' : 'fixed inset-0 z-50 flex flex-col bg-[#f7f9fc]'}>
       {!embedded && (
@@ -235,7 +283,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       {embedded && (
         <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
           <span className="text-[11.5px] text-slate-400">
-            {config.pipeline.nodes.length} 个节点 · 点选节点后在右侧修改配置 · 拖动微调 · 滚轮缩放
+            {config.pipeline.nodes.length} 个节点 · 从左侧节点库拖入 · 点选节点后在右侧修改配置 · 滚轮缩放
           </span>
           <div className="ml-auto flex items-center gap-2">
             <AddNodeMenu selected={selected} isTableOut={isTableOut} onAddSource={addSourceOfKind} onAddNode={addNodeOfType} />
@@ -261,7 +309,15 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
+          onDragOver={onLibDragOver}
+          onDragLeave={(e) => {
+            if (isLibDrag(e) && e.target === containerRef.current) setDropHover(false);
+          }}
+          onDrop={onLibDrop}
+          data-drop-hover={dropHover ? '1' : undefined}
         >
+          {dropHover && <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/30" />}
+
           <div
             className="absolute left-0 top-0"
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: layout.width, height: layout.height }}
