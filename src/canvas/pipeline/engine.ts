@@ -267,7 +267,7 @@ export function runGraph(graph: PipelineGraph, ctx: EngineContext): RunResult {
     }
   }
 
-  return { outputs, env, errors, ms: Date.now() - started };
+  return { outputs, env, errors, warnings, ms: Date.now() - started };
 }
 
 /** 标量节点输出写入全局环境 */
@@ -281,11 +281,15 @@ function collectEnv(
   if (out.kind === 'scalar') {
     const name = node.name.trim();
     if (name === '') return;
-    if (Object.prototype.hasOwnProperty.call(env, name)) warn(`变量名「${name}」重复，后者覆盖前者`);
+    if (Object.prototype.hasOwnProperty.call(env, name)) {
+      warn(`变量名「${name}」重复：「${node.name}」的输出覆盖了同名变量，被覆盖方的修改不会生效`);
+    }
     env[name] = out.value;
   } else if (out.kind === 'scalars') {
     for (const [k, v] of Object.entries(out.values)) {
-      if (Object.prototype.hasOwnProperty.call(env, k)) warn(`变量名「${k}」重复，后者覆盖前者`);
+      if (Object.prototype.hasOwnProperty.call(env, k)) {
+        warn(`变量名「${k}」重复：被「${node.name}」的输出覆盖，被覆盖方的修改不会生效`);
+      }
       env[k] = v;
     }
   } else if (out.kind === 'error' && out.message !== '待导入数据文件') {

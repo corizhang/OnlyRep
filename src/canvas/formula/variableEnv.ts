@@ -1,4 +1,5 @@
 import type { CanvasConfig, NodeOutput, ScalarValue } from '../types';
+import { parseScalar } from '../pipeline/engine';
 import { BUILTIN_VAR_DEFS, builtinVars } from './builtinVars';
 
 /**
@@ -30,19 +31,25 @@ export function collectVariables(
   blockTotals?: FormulaVariable[],
 ): FormulaVariable[] {
   const out: FormulaVariable[] = [];
-  const seen = new Set<string>();
+  const seen = new Map<string, number>();
   const push = (name: string, group: VarGroup, value: ScalarValue | undefined, hint: string): void => {
     const n = name.trim();
-    if (n === '' || seen.has(n)) return;
-    seen.add(n);
+    if (n === '') return;
+    const idx = seen.get(n);
+    if (idx !== undefined) {
+      // 同名冲突：env 实际是「后者覆盖前者」，变量树是先到先得 —— 在先出现的变量上标注冲突，避免「改了值却不生效」无从排查
+      out[idx].hint = `${out[idx].hint}（⚠ 与${group}组同名冲突，运行时实际以后定义者为准）`;
+      return;
+    }
+    seen.set(n, out.length);
     out.push({ name: n, group, value, hint });
   };
 
   for (const s of config.dataSources) {
     if (s.kind === 'form') {
-      for (const e of s.entries) push(e.key, '参数', undefined, `表单 · ${s.name}`);
+      for (const e of s.entries) push(e.key, '参数', parseScalar(e.value), `表单 · ${s.name}`);
     } else if (s.kind === 'constant') {
-      push(s.name, '常量', undefined, '常量源');
+      push(s.name, '常量', parseScalar(s.value), '常量源');
     }
   }
   for (const n of config.pipeline.nodes) {

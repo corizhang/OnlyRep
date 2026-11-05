@@ -84,11 +84,12 @@ describe('变量收集与分组', () => {
     expect(groups.map((g) => g.group)).toEqual(['参数', '常量', '取数', '计算字段', '系统']);
   });
 
-  it('变量值展示', () => {
+  it('变量值展示（表单/常量条目也回显当前值）', () => {
     const vars = collectVariables(config, outputs).filter((v) => v.group !== '系统');
+    expect(displayVarValue(vars[0])).toBe('420000');
+    expect(displayVarValue(vars[1])).toBe('100');
     expect(displayVarValue(vars[2])).toBe('1204');
     expect(displayVarValue(vars[3])).toBe('0.756');
-    expect(displayVarValue(vars[0])).toBe('');
   });
 });
 

@@ -171,7 +171,7 @@ export const useCanvasStore = create<CanvasStore>()(
           env: { ...result.env, ...totals.env },
           blockTotalVars: totals.vars,
           errors: result.errors,
-          warnings: result.errors.length === 0 ? [] : result.errors,
+          warnings: result.warnings ?? [],
           lastRunMs: result.ms,
         });
       };

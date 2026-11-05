@@ -121,6 +121,8 @@ export interface RunResult {
   /** 全局标量环境（公式与文案模板可直接引用） */
   env: NamedScalars;
   errors: string[];
+  /** 非致命提示（如变量名冲突被覆盖），必须返回给 UI 否则用户无从排查 */
+  warnings: string[];
   /** 节点执行耗时（ms），性能自查用 */
   ms: number;
 }
