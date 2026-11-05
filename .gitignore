@@ -2,3 +2,6 @@ node_modules/
 dist/
 .tmp-vitest/
 e2e/screenshots/
+.tmp-vt2/
+.shots/
+node-compile-cache/
