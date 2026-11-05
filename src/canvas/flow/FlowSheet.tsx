@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dropdown } from 'antd';
+import { DeleteOutlined, PlusOutlined, PoweroffOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { NodeOutput, NodeType, PipelineNode } from '../types';
 import { computeFlowLayout, edgePath, NODE_H, NODE_W, type FlowPos } from './layout';
+import FlowNodeCard from './FlowNodeCard';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
@@ -38,6 +40,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const updateNodeInStore = useCanvasStore((s) => s.updateNode);
   const addSource = useCanvasStore((s) => s.addSource);
   const removeSource = useCanvasStore((s) => s.removeSource);
+  const removeNode = useCanvasStore((s) => s.removeNode);
   const sourcesRt = useCanvasStore((s) => s.sources);
   const flowSelectedId = useCanvasStore((s) => s.flowSelectedId);
   const setFlowSelectedId = useCanvasStore((s) => s.setFlowSelectedId);
@@ -47,7 +50,14 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const [delta, setDelta] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [hint, setHint] = useState('');
   const [dropHover, setDropHover] = useState(false);
+  const [heights, setHeights] = useState<Record<string, number>>({});
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const selectedId = flowSelectedId;
+
+  /** 节点高度上报（ResizeObserver 测量）：连线锚点与自动布局按实际高度计算 */
+  const handleHeight = useCallback((id: string, h: number): void => {
+    setHeights((prev) => (Math.abs((prev[id] ?? 0) - h) < 1 ? prev : { ...prev, [id]: h }));
+  }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -56,12 +66,39 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   zoomRef.current = zoom;
 
   const layout = useMemo(
-    () => computeFlowLayout(config.pipeline.nodes, config.flowPos ?? {}),
-    [config.pipeline.nodes, config.flowPos],
+    () => computeFlowLayout(config.pipeline.nodes, config.flowPos ?? {}, heights),
+    [config.pipeline.nodes, config.flowPos, heights],
   );
 
   const nodeById = useMemo(() => new Map(config.pipeline.nodes.map((n) => [n.id, n])), [config.pipeline.nodes]);
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
+
+  // 切换选中节点时收起「添加下游」浮层
+  useEffect(() => {
+    setAddMenuOpen(false);
+  }, [selectedId]);
+
+  const toggleSelectedEnabled = (): void => {
+    if (selected) updateNodeInStore(selected.id, { enabled: !selected.enabled });
+  };
+
+  const deleteSelectedNode = (): void => {
+    if (!selected) return;
+    if (selected.type === 'source') {
+      const srcDef = config.dataSources.find((d) => d.id === String(selected.params.sourceId ?? ''));
+      if (srcDef) removeSource(srcDef.id);
+      else removeNode(selected.id);
+    } else {
+      removeNode(selected.id);
+    }
+    setFlowSelectedId(null);
+  };
+
+  const addDownstream = (type: NodeType): void => {
+    if (!selectedId) return;
+    addNodeOfType(type, selectedId);
+    setAddMenuOpen(false);
+  };
 
   /** 该节点的输出是否为表格（source 未执行时也按表格对待，便于先连线后导数据） */
   const isTableOut = (id: string): boolean => {
@@ -194,10 +231,11 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     if (!dropHover) setDropHover(true);
   };
 
-  /** 指针位置命中的节点（用于处理节点建立连线） */
+  /** 指针位置命中的节点（用于处理节点建立连线），高度用实测值 */
   const hitNodeAt = (px: number, py: number): string | null => {
     for (const [id, pos] of Object.entries(layout.byId)) {
-      if (px >= pos.x && px <= pos.x + NODE_W && py >= pos.y && py <= pos.y + NODE_H) return id;
+      const h = heights[id] ?? NODE_H;
+      if (px >= pos.x && px <= pos.x + NODE_W && py >= pos.y && py <= pos.y + h) return id;
     }
     return null;
   };
@@ -331,10 +369,10 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 return (
                   <path
                     key={`${e.from}->${e.to}`}
-                    d={edgePath(withDelta(from, delta), withDelta(to, delta))}
+                    d={edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H)}
                     fill="none"
-                    stroke={bad ? '#f87171' : '#94a3b8'}
-                    strokeWidth={1.5}
+                    stroke={bad ? '#f87171' : '#7c8ba1'}
+                    strokeWidth={2}
                   />
                 );
               })}
@@ -343,22 +381,42 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             {layout.nodes.map((n) => {
               const node = nodeById.get(n.id);
               if (!node) return null;
-              const out = outputs[n.id];
               const pos = withDelta(n, delta);
+              const srcId = node.type === 'source' ? String(node.params.sourceId ?? '') : '';
               return (
-                <NodeCard
+                <FlowNodeCard
                   key={n.id}
                   node={node}
+                  output={outputs[n.id]}
+                  srcDef={srcId ? config.dataSources.find((d) => d.id === srcId) : undefined}
+                  srcRt={srcId ? sourcesRt[srcId] : undefined}
                   x={pos.x}
                   y={pos.y}
-                  summary={summarize(out)}
-                  bad={out?.kind === 'error'}
                   selected={selectedId === n.id}
                   dragging={delta?.id === n.id}
                   onPointerDown={(e) => onNodeDown(e, n.id, { x: n.x, y: n.y })}
+                  onHeight={handleHeight}
                 />
               );
             })}
+
+            {/* 选中节点浮动工具条：添加下游 / 启用停用 / 删除（随缩放反向缩放保持可点面积） */}
+            {selected && layout.byId[selected.id] && (
+              <SelectionToolbar
+                anchor={withDelta(layout.byId[selected.id], delta)}
+                zoom={zoom}
+                node={selected}
+                outIsTable={selected.type === 'source' || outputs[selected.id]?.kind === 'table'}
+                addMenuOpen={addMenuOpen}
+                onToggleAddMenu={() => {
+                  if (selected.type === 'source' || outputs[selected.id]?.kind === 'table') setAddMenuOpen((v) => !v);
+                  else showHint('该节点的输出不是表格，无法再接处理节点');
+                }}
+                onAddDownstream={addDownstream}
+                onToggleEnabled={toggleSelectedEnabled}
+                onDelete={deleteSelectedNode}
+              />
+            )}
           </div>
 
           <Legend />
@@ -500,91 +558,114 @@ function withDelta(pos: FlowPos & { id?: string }, delta: { id: string; dx: numb
   return { x: pos.x, y: pos.y };
 }
 
-function toneOf(node: PipelineNode, bad: boolean): string {
-  if (bad) return 'border-red-300 bg-red-50';
-  if (!node.enabled) return 'border-slate-200 bg-slate-100';
-  switch (node.type) {
-    case 'source':
-      return 'border-blue-300 bg-blue-50/80';
-    case 'scalarOut':
-    case 'formula':
-      return 'border-emerald-300 bg-emerald-50/70';
-    default:
-      return 'border-slate-300 bg-white';
-  }
-}
-
-function NodeCard({
+/** 选中节点的浮动工具条：锚在节点顶部居中上方，随缩放反向缩放 */
+function SelectionToolbar({
+  anchor,
+  zoom,
   node,
-  x,
-  y,
-  summary,
-  bad,
-  selected,
-  dragging,
-  onPointerDown,
+  outIsTable,
+  addMenuOpen,
+  onToggleAddMenu,
+  onAddDownstream,
+  onToggleEnabled,
+  onDelete,
 }: {
+  anchor: FlowPos;
+  zoom: number;
   node: PipelineNode;
-  x: number;
-  y: number;
-  summary: string;
-  bad: boolean;
-  selected: boolean;
-  dragging: boolean;
-  onPointerDown: (e: React.PointerEvent) => void;
+  outIsTable: boolean;
+  addMenuOpen: boolean;
+  onToggleAddMenu: () => void;
+  onAddDownstream: (type: NodeType) => void;
+  onToggleEnabled: () => void;
+  onDelete: () => void;
 }) {
+  const inv = 1 / Math.max(0.5, Math.min(1.8, zoom));
   return (
-    <div
-      onPointerDown={onPointerDown}
-      style={{ left: x, top: y, width: NODE_W, height: NODE_H }}
-      className={`absolute select-none rounded-lg border px-2.5 py-1.5 shadow-sm transition-shadow ${toneOf(node, bad)} ${
-        selected ? 'ring-2 ring-blue-500' : ''
-      } ${dragging ? 'cursor-grabbing shadow-lg' : 'cursor-grab'} ${node.enabled ? '' : 'opacity-70'}`}
-    >
-      <div className="flex items-center gap-1">
-        <span className="rounded border border-slate-200 bg-white/80 px-1 text-[9px] text-slate-500">
-          {NODE_TYPE_LABELS[node.type]}
-        </span>
-        {!node.enabled && <span className="text-[9px] text-slate-400">已停用</span>}
-        <span className={`ml-auto text-[9px] ${bad ? 'text-red-600' : 'text-slate-400'}`}>
-          {node.inputs.length > 1 ? `${node.inputs.length} 入` : ''}
-        </span>
-      </div>
-      <div className="mt-0.5 truncate text-[12px] font-medium text-slate-800" title={node.name}>
-        {node.name}
-      </div>
-      <div className={`truncate text-[10px] ${bad ? 'text-red-600' : 'text-slate-500'}`} title={summary}>
-        {summary}
+    <div className="absolute" style={{ left: anchor.x + NODE_W / 2, top: anchor.y, width: 0, height: 0 }}>
+      {/* 添加下游浮层：列出全部处理节点类型 */}
+      {addMenuOpen && outIsTable && (
+        <div
+          className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[#3b4757] bg-[#111826]/95 px-2 py-1.5 shadow-lg backdrop-blur"
+          style={{ bottom: 44, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="pr-0.5 text-[10px] text-slate-500">添加下游</span>
+          {STEP_TYPES.map((s) => (
+            <button
+              key={s.type}
+              type="button"
+              title={s.hint}
+              onClick={() => onAddDownstream(s.type)}
+              className="rounded-full border border-[#46536a] bg-[#333d4e] px-2 py-[3px] text-[10.5px] text-slate-200 transition-colors hover:border-blue-500/70 hover:bg-[#3d495c] hover:text-white"
+            >
+              {s.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            title="公式产出新变量"
+            onClick={() => onAddDownstream('formula')}
+            className="rounded-full border border-emerald-500/50 bg-emerald-500/15 px-2 py-[3px] text-[10.5px] text-emerald-300 transition-colors hover:bg-emerald-500/25"
+          >
+            ƒ 计算字段
+          </button>
+        </div>
+      )}
+
+      <div
+        className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[#3b4757] bg-[#111826]/95 px-1.5 py-1 shadow-lg backdrop-blur"
+        style={{ bottom: 10, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          title={outIsTable ? '添加下游节点' : '该节点输出不是表格'}
+          onClick={onToggleAddMenu}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-blue-400 transition-colors hover:bg-blue-500/20"
+        >
+          <PlusOutlined style={{ fontSize: 13 }} />
+        </button>
+        <button
+          type="button"
+          title={node.enabled ? '停用该节点' : '启用该节点'}
+          onClick={onToggleEnabled}
+          className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
+            node.enabled ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-slate-500 hover:bg-slate-500/20'
+          }`}
+        >
+          <PoweroffOutlined style={{ fontSize: 13 }} />
+        </button>
+        <button
+          type="button"
+          title="删除节点"
+          onClick={onDelete}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-red-400 transition-colors hover:bg-red-500/20"
+        >
+          <DeleteOutlined style={{ fontSize: 13 }} />
+        </button>
       </div>
     </div>
   );
-}
-
-function summarize(out: NodeOutput | undefined): string {
-  if (!out) return '未执行';
-  if (out.kind === 'table') return `${out.table.rows.length} 行 × ${out.table.columns.length} 列`;
-  if (out.kind === 'scalar') return out.value === null ? '空值' : String(out.value);
-  if (out.kind === 'scalars') return `${Object.keys(out.values).length} 个参数`;
-  return out.message;
 }
 
 function Legend() {
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-white/90 px-2.5 py-1.5 text-[10px] text-slate-500 shadow-sm">
       <span className="flex items-center gap-1">
-        <i className="inline-block h-2 w-2 rounded-sm border border-blue-300 bg-blue-50" />
+        <i className="inline-block h-2 w-2 rounded-sm bg-blue-500" />
         数据源
       </span>
       <span className="flex items-center gap-1">
-        <i className="inline-block h-2 w-2 rounded-sm border border-slate-300 bg-white" />
+        <i className="inline-block h-2 w-2 rounded-sm bg-slate-500" />
         表格处理
       </span>
       <span className="flex items-center gap-1">
-        <i className="inline-block h-2 w-2 rounded-sm border border-emerald-300 bg-emerald-50" />
+        <i className="inline-block h-2 w-2 rounded-sm bg-emerald-500" />
         数值 / 公式
       </span>
       <span className="flex items-center gap-1">
-        <i className="inline-block h-2 w-2 rounded-sm border border-red-300 bg-red-50" />
+        <i className="inline-block h-2 w-2 rounded-sm bg-red-500" />
         错误
       </span>
     </div>

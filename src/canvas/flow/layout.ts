@@ -8,7 +8,8 @@ import type { PipelineNode } from '../types';
  * 纯函数、无 DOM 依赖，便于单测。
  */
 
-export const NODE_W = 212;
+export const NODE_W = 248;
+/** 兜底估高：节点实际高度由 DOM 测量后经 heights 覆盖 */
 export const NODE_H = 78;
 const GAP_X = 104;
 const GAP_Y = 26;
@@ -62,9 +63,15 @@ export function depthOf(nodeId: string, byId: Map<string, PipelineNode>, memo = 
 export function computeFlowLayout(
   nodes: PipelineNode[],
   overrides: Record<string, FlowPos> = {},
+  heights: Record<string, number> = {},
 ): LayoutResult {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const memo = new Map<string, number>();
+  /** 节点实际高度：DOM 测量值优先，兜底 NODE_H */
+  const hOf = (id: string): number => {
+    const h = heights[id];
+    return typeof h === 'number' && Number.isFinite(h) && h > 20 ? h : NODE_H;
+  };
 
   // 1) 分层
   const layers = new Map<number, PipelineNode[]>();
@@ -75,19 +82,23 @@ export function computeFlowLayout(
     layers.set(d, list);
   }
 
-  // 2) 同层纵向排列 + 整体垂直居中（以最高层为基准）
-  const maxCount = Math.max(1, ...Array.from(layers.values(), (l) => l.length));
-  const contentHeight = maxCount * NODE_H + (maxCount - 1) * GAP_Y;
+  // 2) 同层纵向排列 + 整体垂直居中（层高按实际高度累加）
+  const contentHeight = Math.max(
+    1,
+    ...Array.from(layers.values(), (l) => l.reduce((s, n) => s + hOf(n.id), 0) + (l.length - 1) * GAP_Y),
+  );
 
   const out: LayoutNode[] = [];
   for (const depth of Array.from(layers.keys()).sort((a, b) => a - b)) {
     const list = layers.get(depth)!;
-    const layerHeight = list.length * NODE_H + (list.length - 1) * GAP_Y;
+    const layerHeight = list.reduce((s, n) => s + hOf(n.id), 0) + (list.length - 1) * GAP_Y;
     const offsetY = Math.max(0, (contentHeight - layerHeight) / 2);
     list.forEach((node, row) => {
+      // 同层纵向：累计前序节点的实际高度（配置内嵌后高度不再固定）
+      const yOff = list.slice(0, row).reduce((s, m) => s + hOf(m.id), 0) + row * GAP_Y;
       const auto: FlowPos = {
         x: depth * (NODE_W + GAP_X),
-        y: offsetY + row * (NODE_H + GAP_Y),
+        y: offsetY + yOff,
       };
       const manual = overrides[node.id];
       const pos = manual && Number.isFinite(manual.x) && Number.isFinite(manual.y) ? manual : auto;
@@ -109,18 +120,18 @@ export function computeFlowLayout(
   for (const n of out) {
     byIdPos[n.id] = n;
     maxX = Math.max(maxX, n.x + NODE_W);
-    maxY = Math.max(maxY, n.y + NODE_H);
+    maxY = Math.max(maxY, n.y + hOf(n.id));
   }
 
   return { nodes: out, edges, byId: byIdPos, width: maxX, height: maxY };
 }
 
-/** 边的三次贝塞尔路径（左右连接，中段走水平切线） */
-export function edgePath(from: FlowPos, to: FlowPos): string {
+/** 边的三次贝塞尔路径（左右连接，中段走水平切线）；高度传 DOM 实测值，默认兜底 NODE_H */
+export function edgePath(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH: number = NODE_H): string {
   const x1 = from.x + NODE_W;
-  const y1 = from.y + NODE_H / 2;
+  const y1 = from.y + Math.max(20, fromH) / 2;
   const x2 = to.x;
-  const y2 = to.y + NODE_H / 2;
+  const y2 = to.y + Math.max(20, toH) / 2;
   const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
