@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.tmp-vitest/
+e2e/screenshots/

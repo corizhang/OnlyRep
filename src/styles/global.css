@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 系统字体栈（铁律：不加载 web font，保证离线可用） */
+  --rb-font-system: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--rb-font-system);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 海报区 CSS 变量（token 驱动，第二阶段由 PreviewBoard 按主题展开为 inline style） */
+.rb-poster {
+  --rb-page-bg: #ffffff;
+  --rb-title-color: #0f172a;
+  --rb-accent: #2563eb;
+}
