@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { FormulaError } from '../pipeline/formula/lexer';
 import { parseFormula } from '../pipeline/formula/parser';
@@ -24,6 +24,29 @@ export const GROUP_COLOR: Record<FormulaVariable['group'], string> = {
 };
 
 const FONT_CLS = 'text-[11px] leading-5';
+/** 大字号模式（公式编辑弹窗用，飞书式） */
+const FONT_LG = 'text-[13.5px] leading-6';
+
+export interface FormulaInputHandle {
+  /** 在当前光标处插入文本并聚焦 */
+  insertText: (text: string) => void;
+  focus: () => void;
+}
+
+interface FormulaInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  /** 变量池（用 useFormulaVariables() 组装；缺省仅提示函数） */
+  variables?: FormulaVariable[];
+  /** 行公式预览样本（上游表第一行；缺省按无行上下文预览） */
+  rowSample?: Record<string, unknown>;
+  multiline?: boolean;
+  placeholder?: string;
+  /** 初始即展开 ƒx 变量/函数面板 */
+  defaultExpanded?: boolean;
+  /** sm=节点内/面板内默认；lg=公式编辑弹窗大字号 */
+  size?: 'sm' | 'lg';
+}
 
 const IDENT_RE = /[A-Za-z_\u4e00-\u9fa5][A-Za-z0-9_\u4e00-\u9fa5]*/;
 const isIdentChar = (ch: string): boolean => /[A-Za-z0-9_\u4e00-\u9fa5]/.test(ch);
@@ -87,7 +110,7 @@ interface AcItem {
   title: string;
 }
 
-export default function FormulaInput({
+export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(function FormulaInput({
   value,
   onChange,
   variables = [],
@@ -95,18 +118,8 @@ export default function FormulaInput({
   multiline = false,
   placeholder = '输入公式，如：已完成/全年目标',
   defaultExpanded = false,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  /** 变量池（用 useFormulaVariables() 组装；缺省仅提示函数） */
-  variables?: FormulaVariable[];
-  /** 行公式预览样本（上游表第一行；缺省按无行上下文预览） */
-  rowSample?: Record<string, unknown>;
-  multiline?: boolean;
-  placeholder?: string;
-  /** 初始即展开 ƒx 变量/函数面板（公式编辑弹窗用） */
-  defaultExpanded?: boolean;
-}) {
+  size = 'sm',
+}, ref) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
@@ -235,6 +248,22 @@ export default function FormulaInput({
     [value, applyInsert],
   );
 
+  // 供外部（公式编辑弹窗）在光标处插入变量/函数
+  useImperativeHandle(
+    ref,
+    () => ({
+      insertText: (text: string) => insertAtCaret(text),
+      focus: () => {
+        const ta = taRef.current;
+        if (!ta) return;
+        ta.focus();
+        // 光标落到末尾，弹窗一打开就能接着输入/插入
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+      },
+    }),
+    [insertAtCaret],
+  );
+
   const syncScroll = (): void => {
     if (hlRef.current && taRef.current) {
       hlRef.current.scrollTop = taRef.current.scrollTop;
@@ -279,13 +308,15 @@ export default function FormulaInput({
   };
 
   const showErrorLine = validation !== null;
+  const font = size === 'lg' ? FONT_LG : FONT_CLS;
+  const pad = size === 'lg' ? 'px-3 py-2.5' : 'px-2 py-1';
 
   return (
     <div className="rounded border border-slate-300 bg-white focus-within:border-blue-400">
       {/* 输入区：高亮层 + 透明 textarea */}
       <div className="relative flex items-start">
-        <div className="relative min-h-[24px] flex-1 overflow-hidden">
-          <div ref={hlRef} className={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap px-2 py-1 ${FONT_CLS}`} aria-hidden>
+        <div className={`relative ${size === 'lg' ? 'min-h-[120px]' : 'min-h-[24px]'} flex-1 overflow-hidden`}>
+          <div ref={hlRef} className={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap ${pad} ${font}`} aria-hidden>
             {spans.map((s, i) => (
               <span
                 key={i}
@@ -304,10 +335,10 @@ export default function FormulaInput({
           <textarea
             ref={taRef}
             value={value}
-            rows={multiline ? 3 : 1}
+            rows={multiline ? (size === 'lg' ? 5 : 3) : 1}
             spellCheck={false}
             data-var-scope="expr"
-            className={`absolute inset-0 h-full w-full resize-none whitespace-pre-wrap bg-transparent px-2 py-1 text-transparent caret-slate-700 outline-none selection:bg-blue-200 ${FONT_CLS}`}
+            className={`absolute inset-0 h-full w-full resize-none whitespace-pre-wrap bg-transparent ${pad} text-transparent caret-slate-700 outline-none selection:bg-blue-200 ${font}`}
             onChange={(e) => {
               onChange(e.target.value);
               refreshAc(e.target.selectionStart ?? 0);
@@ -327,19 +358,22 @@ export default function FormulaInput({
         </div>
         {/* 预览值 */}
         {preview !== null && (
-          <span className="mt-1 shrink-0 whitespace-nowrap pr-2 text-[10px] font-medium text-emerald-600" title="按当前环境实时预览">
+          <span
+            className={`mt-1 shrink-0 whitespace-nowrap pr-2 font-medium text-emerald-600 ${size === 'lg' ? 'mt-2 pr-3 text-[13px]' : 'text-[10px]'}`}
+            title="按当前环境实时预览"
+          >
             = {preview}
           </span>
         )}
         <button
           type="button"
           title={expanded ? '收起变量与函数面板' : '展开变量与函数面板'}
-          className={`m-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${expanded ? 'bg-blue-100 text-blue-700' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+          className={`m-0.5 shrink-0 rounded px-1.5 py-0.5 font-semibold ${size === 'lg' ? 'text-[13px]' : 'text-[10px]'} ${expanded ? 'bg-blue-100 text-blue-700' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
           onClick={() => setExpanded(!expanded)}
         >
           ƒx
         </button>
-        <span ref={measureRef} className={`invisible absolute whitespace-pre ${FONT_CLS}`} aria-hidden />
+        <span ref={measureRef} className={`invisible absolute whitespace-pre ${font}`} aria-hidden />
       </div>
 
       {/* 校验信息行 */}
@@ -448,7 +482,9 @@ export default function FormulaInput({
       )}
     </div>
   );
-}
+});
+
+export default FormulaInput;
 
 /** 只读公式展示（节点内使用）：语法高亮完整公式，不可编辑；编辑请配合 FormulaEditorModal */
 export function FormulaDisplay({
