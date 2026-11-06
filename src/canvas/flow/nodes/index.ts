@@ -4,6 +4,7 @@ import { filterDef } from './steps/filter';
 import { pickRowsDef } from './steps/pickRows';
 import { sortTopNDef } from './steps/sortTopN';
 import { deriveDef } from './steps/derive';
+import { diffDef } from './steps/diff';
 import { groupAggDef } from './steps/groupAgg';
 import { scalarOutDef } from './steps/scalarOut';
 import { formulaDef } from './steps/formula';
@@ -21,7 +22,7 @@ import { manualSourceDef } from './sources/manual';
  * 引擎执行分支（engine.ts）与 NodeType 联合类型（types.ts）仍需各加一处（编译器会提示）。
  */
 
-const STEP_DEF_LIST: NodeTypeDef[] = [pickRowsDef, filterDef, sortTopNDef, groupAggDef, deriveDef, scalarOutDef, formulaDef];
+const STEP_DEF_LIST: NodeTypeDef[] = [pickRowsDef, filterDef, sortTopNDef, groupAggDef, deriveDef, diffDef, scalarOutDef, formulaDef];
 
 export const STEP_DEFS = Object.fromEntries(STEP_DEF_LIST.map((d) => [d.type, d])) as Record<string, NodeTypeDef>;
 

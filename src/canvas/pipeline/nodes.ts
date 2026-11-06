@@ -78,6 +78,8 @@ export function runNode(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunCo
       return runSortTopN(node, inputs);
     case 'groupAgg':
       return runGroupAgg(node, inputs);
+    case 'diff':
+      return runDiff(node, inputs, ctx);
     case 'scalarOut':
       return runScalarOut(node, inputs);
     case 'formula':
@@ -280,8 +282,56 @@ function runGroupAgg(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {
   return { kind: 'table', table: makeTable(rows, columns, 0) };
 }
 
-function runScalarOut(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {
+/**
+ * 行差分（较上日增加）：对数值列按日期（或现有行顺序）逐行求「本行 - 上一行」。
+ * 指定日期列时按日期升序对齐计算（乱序数据安全），输出行顺序保持与原表一致；
+ * 首日/无法配对的行为空。
+ */
+function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext): NodeOutput {
   const t = firstTable(inputs);
+  if ('error' in t) return { kind: 'error', message: t.error };
+  const col = String(node.params.col ?? '');
+  if (!col) return { kind: 'table', table: t };
+  const dateCol = String(node.params.dateCol ?? '');
+  const as = String(node.params.as ?? '').trim() || `${col}较上日`;
+
+  // 1) 计算每行的时间键：有日期列按日期升序，否则按现有行顺序
+  let bad = 0;
+  const keys = t.rows.map((r, i) => {
+    if (!dateCol) return i;
+    const d = parseDateValue(getVal(r, dateCol));
+    if (!d) {
+      bad += 1;
+      return Number.MAX_SAFE_INTEGER - (t.rows.length - i); // 解析失败的排最后，保持相对稳定
+    }
+    return d.getTime();
+  });
+  const order = t.rows.map((_, i) => i).sort((a, b) => keys[a] - keys[b]);
+
+  // 2) 按时间序逐行差分（前后任一方非数值则留空），写回原行
+  const diffs: (number | null)[] = t.rows.map(() => null);
+  let prev: number | null = null;
+  for (const i of order) {
+    const v = getVal(t.rows[i], col);
+    const num = typeof v === 'number' ? v : null;
+    diffs[i] = num !== null && prev !== null ? num - prev : null;
+    if (num !== null) prev = num;
+  }
+
+  const rows: CleanRow[] = t.rows.map((r, i) => ({
+    ...r,
+    [as]: diffs[i],
+    [`${as}#raw`]: diffs[i] === null ? '' : String(diffs[i]),
+  }));
+
+  if (bad > 0) ctx.warn(`日期列「${dateCol}」有 ${bad} 行解析失败，差分按末尾处理`);
+  const columns = t.columns.some((c) => c.key === as)
+    ? t.columns.map((c) => (c.key === as ? { ...c, type: 'number' as const } : c))
+    : [...t.columns, makeColumn(as, as)];
+  return { kind: 'table', table: makeTable(rows, columns, t.excludedCount) };
+}
+
+function runScalarOut(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {  const t = firstTable(inputs);
   if ('error' in t) return { kind: 'error', message: t.error };
   const col = String(node.params.col ?? '');
   const method = String(node.params.method ?? 'sum') as AggMethod;

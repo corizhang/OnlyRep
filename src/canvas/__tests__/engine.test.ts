@@ -210,4 +210,52 @@ describe('DAG 引擎', () => {
     const r2 = runGraph(graph, { sourceDefs: defsB, sources: {}, cache });
     expect(r2.env['全年目标']).toBe(323033);
   });
+
+  it('差分：按日期列对齐（乱序安全），首日留空', () => {
+    const res = runGraph(
+      {
+        nodes: [
+          n('src', 'source', '看板', [], { sourceId: 'ds_board' }),
+          n('d', 'diff', '较上日', ['src'], { col: '累计绑卡', dateCol: '数据日期', as: '较上日增加' }),
+        ],
+      },
+      { sourceDefs: sources, sources: runtime },
+    );
+    const out = res.outputs['d'];
+    if (out?.kind !== 'table') throw new Error('diff 应输出表格');
+    const vals = out.table.rows.map((r) => r['较上日增加']);
+    // 时间升序 7984 → 8496 → 9083：diff = null, 512, 587；写回原行序（10-29, 10-28, 10-27）
+    expect(vals).toEqual([587, 512, null]);
+  });
+
+  it('差分：不选日期列时按现有行顺序', () => {
+    const res = runGraph(
+      {
+        nodes: [
+          n('src', 'source', '看板', [], { sourceId: 'ds_board' }),
+          n('d', 'diff', '差分', ['src'], { col: '全量当日新增', dateCol: '', as: '' }),
+        ],
+      },
+      { sourceDefs: sources, sources: runtime },
+    );
+    const out = res.outputs['d'];
+    if (out?.kind !== 'table') throw new Error('diff 应输出表格');
+    // 默认列名 = 数值列 + 较上日
+    expect(out.table.rows.map((r) => r['全量当日新增较上日'])).toEqual([null, -159, 82]);
+  });
+
+  it('差分标量链路：差分 → 取最新日 → 取数', () => {
+    const res = runGraph(
+      {
+        nodes: [
+          n('src', 'source', '看板', [], { sourceId: 'ds_board' }),
+          n('d', 'diff', '较上日', ['src'], { col: '累计绑卡', dateCol: '数据日期', as: '较上日增加' }),
+          n('latest', 'pickRows', '最新', ['d'], { mode: 'latestDate', dateCol: '数据日期' }),
+          n('v', 'scalarOut', '较上日增加', ['latest'], { col: '较上日增加', method: 'sum' }),
+        ],
+      },
+      { sourceDefs: sources, sources: runtime },
+    );
+    expect(res.env['较上日增加']).toBe(587);
+  });
 });

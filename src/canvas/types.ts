@@ -87,6 +87,7 @@ export type NodeType =
   | 'derive'
   | 'sortTopN'
   | 'groupAgg'
+  | 'diff'
   | 'scalarOut'
   | 'formula';
 
