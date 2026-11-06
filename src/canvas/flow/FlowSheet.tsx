@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dropdown } from 'antd';
-import { DeleteOutlined, PlusOutlined, PoweroffOutlined } from '@ant-design/icons';
+import { DeleteOutlined, MoonOutlined, PlusOutlined, PoweroffOutlined, SunOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { NodeOutput, NodeType, PipelineNode } from '../types';
 import { computeFlowLayout, edgePath, NODE_H, NODE_W, type FlowPos } from './layout';
 import FlowNodeCard from './FlowNodeCard';
+import { nodeThemeVars, type NodeTheme } from './nodeTheme';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
@@ -44,6 +45,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const sourcesRt = useCanvasStore((s) => s.sources);
   const flowSelectedId = useCanvasStore((s) => s.flowSelectedId);
   const setFlowSelectedId = useCanvasStore((s) => s.setFlowSelectedId);
+  const nodeTheme = useCanvasStore((s) => s.nodeTheme);
+  const setNodeTheme = useCanvasStore((s) => s.setNodeTheme);
 
   const [zoom, setZoom] = useState(0.85);
   const [pan, setPan] = useState<FlowPos>({ x: 28, y: 28 });
@@ -283,7 +286,10 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   };
 
   return (
-    <div className={embedded ? 'flex h-full min-w-0 flex-1 flex-col bg-[#f7f9fc]' : 'fixed inset-0 z-50 flex flex-col bg-[#f7f9fc]'}>
+    <div
+      className={embedded ? 'flex h-full min-w-0 flex-1 flex-col bg-[#f7f9fc]' : 'fixed inset-0 z-50 flex flex-col bg-[#f7f9fc]'}
+      style={nodeThemeVars(nodeTheme)}
+    >
       {!embedded && (
         <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-2.5">
           <div className="flex items-baseline gap-2">
@@ -306,6 +312,13 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             </Btn>
             <Btn size="xs" onClick={() => { resetFlowPos(); setDelta(null); setTimeout(fit, 20); }}>
               自动排列
+            </Btn>
+            <Btn
+              size="xs"
+              title={nodeTheme === 'dark' ? '切换为浅色节点（浅灰卡+深灰头）' : '切换为深色节点（ComfyUI 深色）'}
+              onClick={() => setNodeTheme((nodeTheme === 'dark' ? 'light' : 'dark') as NodeTheme)}
+            >
+              {nodeTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
             </Btn>
             <Btn size="xs" onClick={() => setShowFlow(false)}>
               关闭
@@ -330,6 +343,13 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             </Btn>
             <Btn size="xs" onClick={() => { resetFlowPos(); setDelta(null); setTimeout(fit, 20); }}>
               自动排列
+            </Btn>
+            <Btn
+              size="xs"
+              title={nodeTheme === 'dark' ? '切换为浅色节点（浅灰卡+深灰头）' : '切换为深色节点（ComfyUI 深色）'}
+              onClick={() => setNodeTheme((nodeTheme === 'dark' ? 'light' : 'dark') as NodeTheme)}
+            >
+              {nodeTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
             </Btn>
           </div>
         </div>
@@ -371,7 +391,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                     key={`${e.from}->${e.to}`}
                     d={edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H)}
                     fill="none"
-                    stroke={bad ? '#f87171' : '#7c8ba1'}
+                    stroke={bad ? 'var(--nb-edge-bad)' : 'var(--nb-edge)'}
                     strokeWidth={2}
                   />
                 );
@@ -586,18 +606,18 @@ function SelectionToolbar({
       {/* 添加下游浮层：列出全部处理节点类型 */}
       {addMenuOpen && outIsTable && (
         <div
-          className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[#3b4757] bg-[#111826]/95 px-2 py-1.5 shadow-lg backdrop-blur"
+          className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--nb-pop-border)] bg-[var(--nb-pop-surface)] px-2 py-1.5 shadow-lg backdrop-blur"
           style={{ bottom: 44, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <span className="pr-0.5 text-[10px] text-slate-500">添加下游</span>
+          <span className="pr-0.5 text-[10px] text-[var(--nb-text-faint)]">添加下游</span>
           {STEP_TYPES.map((s) => (
             <button
               key={s.type}
               type="button"
               title={s.hint}
               onClick={() => onAddDownstream(s.type)}
-              className="rounded-full border border-[#46536a] bg-[#333d4e] px-2 py-[3px] text-[10.5px] text-slate-200 transition-colors hover:border-blue-500/70 hover:bg-[#3d495c] hover:text-white"
+              className="rounded-full border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-2 py-[3px] text-[10.5px] text-[var(--nb-pop-text)] transition-colors hover:border-blue-500/70 hover:bg-[var(--nb-control-hover)] hover:text-blue-500"
             >
               {s.label}
             </button>
@@ -614,7 +634,7 @@ function SelectionToolbar({
       )}
 
       <div
-        className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[#3b4757] bg-[#111826]/95 px-1.5 py-1 shadow-lg backdrop-blur"
+        className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--nb-pop-border)] bg-[var(--nb-pop-surface)] px-1.5 py-1 shadow-lg backdrop-blur"
         style={{ bottom: 10, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
         onPointerDown={(e) => e.stopPropagation()}
       >

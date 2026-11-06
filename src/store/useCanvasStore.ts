@@ -68,6 +68,9 @@ export interface CanvasStore {
   /** 组件库栏是否收起（收起为竖条） */
   libCollapsed: boolean;
   setLibCollapsed: (v: boolean) => void;
+  /** 节点画布 UI 主题（dark=ComfyUI 深色 / light=浅灰卡深灰头；仅节点画布域，App 外壳恒浅色） */
+  nodeTheme: 'dark' | 'light';
+  setNodeTheme: (v: 'dark' | 'light') => void;
 
   setShowFlow: (v: boolean) => void;
   /** 记录/清除节点在流程视图中的手动位置 */
@@ -202,6 +205,8 @@ export const useCanvasStore = create<CanvasStore>()(
         setFlowSelectedId: (id) => set({ flowSelectedId: id }),
         libCollapsed: false,
         setLibCollapsed: (v) => set({ libCollapsed: v }),
+        nodeTheme: 'dark',
+        setNodeTheme: (v) => set({ nodeTheme: v }),
 
         setShowFlow: (v) => set({ showFlow: v }),
 
