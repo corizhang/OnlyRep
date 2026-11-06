@@ -7,6 +7,7 @@ import type { NodeOutput, NodeType, PipelineNode } from '../types';
 import { computeFlowLayout, edgePath, NODE_H, NODE_W, type FlowPos } from './layout';
 import FlowNodeCard from './FlowNodeCard';
 import { nodeThemeVars, type NodeTheme } from './nodeTheme';
+import { stepDef } from './nodes';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
@@ -55,6 +56,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const [dropHover, setDropHover] = useState(false);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  /** 端口连线拖拽：from=源节点，start=输出端口坐标，cur=指针画布坐标，hover=命中的合法目标 */
+  const [connect, setConnect] = useState<{ from: string; start: FlowPos; cur: FlowPos; hover: string | null } | null>(null);
   const selectedId = flowSelectedId;
 
   /** 节点高度上报（ResizeObserver 测量）：连线锚点与自动布局按实际高度计算 */
@@ -110,6 +113,43 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     if (n.type === 'source') return true;
     return outputs[id]?.kind === 'table';
   };
+
+  /** 是否显示左侧输入端口（需要表格上游的步骤节点） */
+  const acceptsInput = (n: PipelineNode): boolean => stepDef(n.type)?.needsTableInput === true;
+  /** 是否显示右侧输出端口（取数/计算字段产出标量，不能作表格上游） */
+  const hasOutPort = (n: PipelineNode): boolean => n.type !== 'formula' && n.type !== 'scalarOut';
+
+  /** 连线校验：返回 null 表示可连，否则为不可连原因 */
+  const connectError = (from: string, to: string): string | null => {
+    if (from === to) return '不能连接到自己';
+    const tn = nodeById.get(to);
+    if (!tn || !acceptsInput(tn)) return '该节点没有表格输入端口';
+    if (dependsOn(config.pipeline.nodes, from, to)) return '会形成循环依赖';
+    return null;
+  };
+
+  /** 输出端口按下：开始连线拖拽 */
+  const onPortDown = (e: React.PointerEvent, id: string): void => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    const pos = layout.byId[id];
+    if (!pos) return;
+    const p = withDelta(pos, delta);
+    const h = heights[id] ?? NODE_H;
+    const start = { x: p.x + NODE_W, y: p.y + h / 2 };
+    containerRef.current?.setPointerCapture(e.pointerId);
+    setConnect({ from: id, start, cur: start, hover: null });
+  };
+
+  // Esc 取消连线
+  useEffect(() => {
+    if (!connect) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setConnect(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [connect]);
 
   /** 添加节点：表格类步骤需指定上游表格节点；formula（计算字段）无需输入 */
   const addNodeOfType = (type: NodeType, inputId: string | null): void => {
@@ -200,6 +240,16 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   };
 
   const onMove = (e: React.PointerEvent): void => {
+    if (connect) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const px = (e.clientX - rect.left - pan.x) / zoom;
+        const py = (e.clientY - rect.top - pan.y) / zoom;
+        const hit = hitNodeAt(px, py);
+        setConnect({ ...connect, cur: { x: px, y: py }, hover: hit !== null && connectError(connect.from, hit) === null ? hit : null });
+      }
+      return;
+    }
     const d = dragRef.current;
     if (d) {
       const dx = (e.clientX - d.startX) / zoom;
@@ -213,6 +263,21 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   };
 
   const onUp = (): void => {
+    if (connect) {
+      if (connect.hover) {
+        // 建立连线：目标节点改接本输出（单输入，替换既有上游）
+        updateNodeInStore(connect.hover, { inputs: [connect.from] });
+        setFlowSelectedId(connect.hover);
+      } else {
+        const hit = hitNodeAt(connect.cur.x, connect.cur.y);
+        if (hit && hit !== connect.from) showHint(`无法连接：${connectError(connect.from, hit) ?? '目标不可用'}`);
+      }
+      setConnect(null);
+      dragRef.current = null;
+      panRef.current = null;
+      setDelta(null);
+      return;
+    }
     const d = dragRef.current;
     if (d) {
       if (d.moved && delta) setFlowPos(d.id, { x: Math.round(d.origin.x + delta.dx), y: Math.round(d.origin.y + delta.dy) });
@@ -381,21 +446,40 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: layout.width, height: layout.height }}
           >
             <svg width={layout.width} height={layout.height} className="pointer-events-none absolute left-0 top-0 overflow-visible">
+              <defs>
+                <marker id="nb-arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                  <path d="M0,0 L9,4.5 L0,9 z" style={{ fill: 'var(--nb-edge)' }} />
+                </marker>
+                <marker id="nb-arrow-bad" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                  <path d="M0,0 L9,4.5 L0,9 z" style={{ fill: 'var(--nb-edge-bad)' }} />
+                </marker>
+                <marker id="nb-arrow-active" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                  <path d="M0,0 L9,4.5 L0,9 z" fill="#2563eb" />
+                </marker>
+              </defs>
               {layout.edges.map((e) => {
                 const from = layout.byId[e.from];
                 const to = layout.byId[e.to];
                 if (!from || !to) return null;
                 const bad = outputs[e.to]?.kind === 'error';
+                // 选中节点时高亮其上下游连线，其余淡出
+                const active = selectedId !== null && (e.from === selectedId || e.to === selectedId);
                 return (
                   <path
                     key={`${e.from}->${e.to}`}
                     d={edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H)}
                     fill="none"
-                    stroke={bad ? 'var(--nb-edge-bad)' : 'var(--nb-edge)'}
-                    strokeWidth={2}
+                    stroke={bad ? 'var(--nb-edge-bad)' : active ? '#2563eb' : 'var(--nb-edge)'}
+                    strokeWidth={active ? 2.5 : 2}
+                    opacity={selectedId !== null && !active ? 0.35 : 1}
+                    markerEnd={bad ? 'url(#nb-arrow-bad)' : active ? 'url(#nb-arrow-active)' : 'url(#nb-arrow)'}
                   />
                 );
               })}
+              {/* 连线拖拽的 ghost 虚线 */}
+              {connect && (
+                <path d={ghostPath(connect.start, connect.cur)} fill="none" stroke="#2563eb" strokeWidth={2} strokeDasharray="6 4" />
+              )}
             </svg>
 
             {layout.nodes.map((n) => {
@@ -417,6 +501,45 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                   onPointerDown={(e) => onNodeDown(e, n.id, { x: n.x, y: n.y })}
                   onHeight={handleHeight}
                 />
+              );
+            })}
+
+            {/* 连接端口：右侧输出点（可拖到下游建立连线）、左侧输入点（放置目标高亮） */}
+            {layout.nodes.map((n) => {
+              const node = nodeById.get(n.id);
+              if (!node) return null;
+              const pos = withDelta(n, delta);
+              const h = heights[n.id] ?? NODE_H;
+              const cy = pos.y + h / 2;
+              const canIn = acceptsInput(node);
+              const canOut = hasOutPort(node);
+              if (!canIn && !canOut) return null;
+              const isHoverTarget = connect?.hover === n.id;
+              // 连线拖拽中：不可连目标的输入端口淡出
+              const inDimmed = connect !== null && connect.from !== n.id && canIn && connectError(connect.from, n.id) !== null;
+              return (
+                <div key={`ports-${n.id}`} className="pointer-events-none absolute left-0 top-0">
+                  {canOut && (
+                    <div
+                      onPointerDown={(e) => onPortDown(e, n.id)}
+                      title="按住拖到下游节点建立连线"
+                      className="pointer-events-auto absolute h-3 w-3 cursor-crosshair rounded-full border-2 bg-[var(--nb-surface)] transition-transform hover:scale-125"
+                      style={{ left: pos.x + NODE_W - 6, top: cy - 6, borderColor: connect?.from === n.id ? '#2563eb' : 'var(--nb-edge)' }}
+                    />
+                  )}
+                  {canIn && (
+                    <div
+                      className={`pointer-events-auto absolute h-3 w-3 rounded-full border-2 bg-[var(--nb-surface)] transition-transform ${isHoverTarget ? 'scale-150' : ''}`}
+                      style={{
+                        left: pos.x - 6,
+                        top: cy - 6,
+                        borderColor: isHoverTarget ? '#2563eb' : 'var(--nb-edge)',
+                        opacity: inDimmed ? 0.3 : 1,
+                        boxShadow: isHoverTarget ? '0 0 0 5px rgba(37,99,235,0.25)' : undefined,
+                      }}
+                    />
+                  )}
+                </div>
               );
             })}
 
@@ -576,6 +699,12 @@ function AddNodeMenu({
 function withDelta(pos: FlowPos & { id?: string }, delta: { id: string; dx: number; dy: number } | null): FlowPos {
   if (delta && pos.id === delta.id) return { x: pos.x + delta.dx, y: pos.y + delta.dy };
   return { x: pos.x, y: pos.y };
+}
+
+/** 连线拖拽 ghost 线的贝塞尔路径（从输出端口到指针） */
+function ghostPath(from: FlowPos, to: FlowPos): string {
+  const dx = Math.max(30, Math.abs(to.x - from.x) * 0.45);
+  return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
 }
 
 /** 选中节点的浮动工具条：锚在节点顶部居中上方，随缩放反向缩放 */
