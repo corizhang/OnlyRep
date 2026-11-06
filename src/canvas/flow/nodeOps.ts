@@ -1,25 +1,14 @@
 import { createImportSource, createManualTableSource, newId, uniqueName } from '../datasource/registry';
-import { defaultParams, STEP_TYPES } from '../components/StepChainPanel';
+import { defaultParams, NODE_TYPE_LABELS, stepDef } from './nodes';
 import type { DataSource, NodeType, PipelineNode } from '../types';
 
 /**
  * 节点库共用的创建逻辑（FlowSheet 拖放 / NodeLibrary 点选都走这里）。
  * 纯函数：只负责造对象，不入 store。
+ * 节点/数据源的展示元信息来自注册表 flow/nodes（此处只做 re-export 兼容）。
  */
 
-/** 节点库「数据源」分组元信息 */
-export const SOURCE_KIND_META: { kind: DataSource['kind']; label: string; desc: string; icon: string }[] = [
-  { kind: 'import', label: '文件', desc: '导入 xlsx / csv', icon: '⇪' },
-  { kind: 'manualTable', label: '手填表', desc: '可编辑网格', icon: '▦' },
-  { kind: 'form', label: '表单', desc: '名称 + 数值口径参数', icon: '≡' },
-  { kind: 'constant', label: '常量', desc: '单个数值', icon: 'π' },
-];
-
-/** 节点库「处理节点」分组元信息（STEP_TYPES + 计算字段） */
-export const NODE_TYPE_META: { type: NodeType; label: string; desc: string; icon: string }[] = [
-  ...STEP_TYPES.map((s) => ({ type: s.type as NodeType, label: s.label, desc: s.hint, icon: '⚙' })),
-  { type: 'formula' as NodeType, label: '计算字段', desc: '公式产出新变量', icon: 'ƒ' },
-];
+export { NODE_TYPE_META, SOURCE_KIND_META } from './nodes';
 
 /** 按类型创建数据源（名称自动去重） */
 export function createSourceOfKind(dataSources: DataSource[], kind: DataSource['kind']): DataSource {
@@ -33,7 +22,8 @@ export function createSourceOfKind(dataSources: DataSource[], kind: DataSource['
 
 /** 按类型创建处理节点（名称自动去重）；表格类步骤需已校验 inputId 合法 */
 export function createStepNode(nodes: PipelineNode[], type: NodeType, inputId: string | null): PipelineNode {
-  const label = type === 'formula' ? '计算字段' : STEP_TYPES.find((s) => s.type === type)?.label ?? '步骤';
+  const def = stepDef(type);
+  const label = def?.label ?? NODE_TYPE_LABELS[type] ?? '步骤';
   const dup = nodes.filter((n) => n.name === label || n.name.startsWith(`${label} `)).length;
   return {
     id: newId('n'),

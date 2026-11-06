@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Checkbox, ConfigProvider, Input, InputNumber, Select, theme as antdTheme } from 'antd';
+import { ConfigProvider, theme as antdTheme } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
-import { supportsFileSystemAccess } from '../datasource/sourceCache';
-import { AGG_LABELS, NODE_TYPE_LABELS } from './NodeFields';
-import { FormulaDisplay, useFormulaVariables } from '../formula/FormulaInput';
-import FormulaEditorModal from '../formula/FormulaEditorModal';
-import { ManualEditor } from '../components/DataSourcePanel';
 import { getVal } from '../../parser/clean';
 import { NODE_W } from './layout';
 import { NODE_TOKENS } from './nodeTheme';
-import type { AggMethod, ConstantDataSource, DataSource, FormDataSource, ImportDataSource, NodeOutput, PipelineNode, SourceRuntime } from '../types';
+import { NoTableHint } from './nodes/controls';
+import { NODE_TYPE_LABELS, SOURCE_DEFS, stepDef } from './nodes';
+import type { NodeOutput, PipelineNode, DataSource, SourceRuntime } from '../types';
 
 /**
  * ComfyUI 风格节点卡片（数据节点视图）：
- * - 深色外壳，头部为拖拽手柄 + 类型徽标 + 名称
- * - 配置项直接内嵌在节点体内（原右侧属性栏的表单下沉到节点）
+ * - 深色/浅色外壳（--nb-* token），头部为拖拽手柄 + 类型徽标 + 可改名
+ * - 配置区按注册表渲染：处理节点查 STEP_DEFS、数据源查 SOURCE_DEFS，
+ *   新增节点类型无需改本文件
  * - 底部固定「结果预览」区：表格前几行 / 数值 / 错误信息
  * - 高度随内容自适应，经 onHeight 上报给 FlowSheet 用于连线与布局
  * - 交互规则：表单控件区域不触发节点拖拽（可正常输入），其余区域按住拖动
@@ -41,8 +39,6 @@ function accentOf(node: PipelineNode, bad: boolean): string {
   return 'bg-slate-500/70 text-[var(--nb-header-text)]';
 }
 
-// ---- 节点内控件：antd 紧凑实现（主题吃 --nb-* 同一套 token，随节点主题切换） ----
-
 /** 嵌套 ConfigProvider 的 antd 主题：dark→darkAlgorithm，light→默认算法；token 与 nodeTheme.ts 对齐 */
 function useNodeAntdTheme() {
   const nodeTheme = useCanvasStore((s) => s.nodeTheme);
@@ -67,406 +63,23 @@ function useNodeAntdTheme() {
   }, [nodeTheme]);
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[54px_1fr] items-center gap-1.5">
-      <span className="truncate text-[10.5px] text-[var(--nb-text-dim)]" title={label}>
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
-
-function DarkSelect({
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-}) {
-  return (
-    <Select
-      size="small"
-      className="w-full min-w-0"
-      value={value === '' ? undefined : value}
-      placeholder={placeholder}
-      options={options}
-      onChange={(v) => onChange(v ?? '')}
-    />
-  );
-}
-
-function DarkInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return <Input size="small" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
-}
-
-function DarkNum({ value, min = 0, onChange }: { value: number; min?: number; onChange: (v: number) => void }) {
-  return (
-    <InputNumber
-      size="small"
-      className="w-full"
-      value={Number.isFinite(value) ? value : 0}
-      min={min}
-      onChange={(v) => onChange(Math.max(min, v ?? 0))}
-    />
-  );
-}
-
-function DarkCheck({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <Checkbox checked={checked} onChange={(e) => onChange(e.target.checked)}>
-      <span className="text-[10.5px] text-[var(--nb-text)]">{label}</span>
-    </Checkbox>
-  );
-}
-
-function DarkBtn({
-  children,
-  onClick,
-  tone = 'default',
-  title,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  tone?: 'default' | 'primary' | 'danger';
-  title?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <Button
-      size="small"
-      type={tone === 'primary' ? 'primary' : 'default'}
-      danger={tone === 'danger'}
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  );
-}
-
-// ---- 数据源内嵌编辑器（深色紧凑版，逻辑与 DataSourcePanel 同一套 store 动作） ----
-
-function ImportInline({ srcDef, srcRt }: { srcDef: ImportDataSource; srcRt?: SourceRuntime }) {
-  const loadFileForSource = useCanvasStore((s) => s.loadFileForSource);
-  const pickFileForSource = useCanvasStore((s) => s.pickFileForSource);
-  const rereadSourceFile = useCanvasStore((s) => s.rereadSourceFile);
-  const setSourceSheet = useCanvasStore((s) => s.setSourceSheet);
-  const setSourceCacheEnabled = useCanvasStore((s) => s.setSourceCacheEnabled);
-  const clearSourceCache = useCanvasStore((s) => s.clearSourceCache);
-  const ref = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const fsAccess = supportsFileSystemAccess();
-  const cacheData = srcDef.cacheData !== false;
-  const sheets = srcRt?.sheets ?? [];
-
-  return (
-    <div className="no-drag space-y-1.5">
-      <input
-        ref={ref}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (!f) return;
-          setBusy(true);
-          await loadFileForSource(srcDef.id, f);
-          setBusy(false);
-          e.target.value = '';
-        }}
-      />
-      <div className="flex gap-1.5">
-        <DarkBtn
-          tone="primary"
-          disabled={busy}
-          onClick={() => {
-            if (fsAccess) {
-              setBusy(true);
-              void pickFileForSource(srcDef.id).finally(() => setBusy(false));
-            } else {
-              ref.current?.click();
-            }
-          }}
-        >
-          {busy ? '解析中…' : '⇪ 选择文件'}
-        </DarkBtn>
-        {srcRt?.hasHandle && (
-          <DarkBtn
-            disabled={busy}
-            title="从磁盘重新读取已记住的文件（获取最新数据）"
-            onClick={() => {
-              setBusy(true);
-              void rereadSourceFile(srcDef.id).finally(() => setBusy(false));
-            }}
-          >
-            ↻ 重读文件
-          </DarkBtn>
-        )}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <DarkCheck checked={cacheData} label="自动恢复数据" onChange={(v) => setSourceCacheEnabled(srcDef.id, v)} />
-        {cacheData && <DarkBtn onClick={() => void clearSourceCache(srcDef.id)} title="删除本地缓存的数据快照">清除缓存</DarkBtn>}
-      </div>
-      {sheets.length > 1 && (
-        <FieldRow label="工作表">
-          <DarkSelect value={srcDef.sheetName} options={sheets.map((s) => ({ value: s.name, label: s.name }))} onChange={(v) => void setSourceSheet(srcDef.id, v)} />
-        </FieldRow>
-      )}
-      <p className="text-[10px] leading-snug text-[var(--nb-text-faint)]">xlsx / csv 数据只在本地解析{fsAccess ? '，刷新后可一键重读' : ''}。</p>
-    </div>
-  );
-}
-
-function FormInline({ srcDef }: { srcDef: FormDataSource }) {
-  const updateSource = useCanvasStore((s) => s.updateSource);
-  const entries = srcDef.entries;
-  return (
-    <div className="no-drag space-y-1">
-      {entries.map((e, i) => (
-        <div key={i} className="flex gap-1">
-          <Input
-            size="small"
-            className="w-[42%]"
-            value={e.key}
-            placeholder="名称"
-            onChange={(ev) => updateSource(srcDef.id, { entries: entries.map((x, j) => (j === i ? { ...x, key: ev.target.value } : x)) })}
-          />
-          <Input
-            size="small"
-            className="min-w-0 flex-1"
-            value={e.value}
-            placeholder="数值"
-            onChange={(ev) => updateSource(srcDef.id, { entries: entries.map((x, j) => (j === i ? { ...x, value: ev.target.value } : x)) })}
-          />
-          <button type="button" className="px-0.5 text-[11px] text-[var(--nb-text-faint)] hover:text-[var(--nb-err)]" onClick={() => updateSource(srcDef.id, { entries: entries.filter((_, j) => j !== i) })}>
-            ×
-          </button>
-        </div>
-      ))}
-      <DarkBtn onClick={() => updateSource(srcDef.id, { entries: [...entries, { key: '', value: '' }] })}>+ 添加参数</DarkBtn>
-      <p className="text-[10px] leading-snug text-[var(--nb-text-faint)]">参数名即公式变量名，如「已完成/全年目标」。</p>
-    </div>
-  );
-}
-
-function ConstantInline({ srcDef }: { srcDef: ConstantDataSource }) {
-  const updateSource = useCanvasStore((s) => s.updateSource);
-  return (
-    <div className="no-drag">
-      <FieldRow label="常量值">
-        <DarkInput value={srcDef.value} onChange={(v) => updateSource(srcDef.id, { value: v })} />
-      </FieldRow>
-    </div>
-  );
-}
-
-// ---- 处理节点内嵌配置（与 NodeFields 同一套字段逻辑，深色紧凑版） ----
-
-function StepFields({ node }: { node: PipelineNode }) {
+/** 处理节点配置区：查注册表渲染；needsTableInput 且未接表格上游时给通用提示 */
+function StepConfig({ node }: { node: PipelineNode }) {
   const updateNode = useCanvasStore((s) => s.updateNode);
   const outputs = useCanvasStore((s) => s.outputs);
-  const set = (patch: Partial<PipelineNode>): void => updateNode(node.id, patch);
-  const setParam = (patch: Record<string, unknown>): void => set({ params: { ...node.params, ...patch } });
+  const setParam = (patch: Record<string, unknown>): void => updateNode(node.id, { params: { ...node.params, ...patch } });
 
   const upOutput = node.inputs[0] ? outputs[node.inputs[0]] : undefined;
   const cols = upOutput && upOutput.kind === 'table' ? upOutput.table.columns.map((c) => ({ value: c.key, label: c.rawName || c.key })) : [];
   const rowColumns = cols.map((c) => ({ key: c.value, label: c.label }));
-  const rowSample = upOutput && upOutput.kind === 'table' ? upOutput.table.rows[0] : undefined;
+  const rowSample = upOutput && upOutput.kind === 'table' ? (upOutput.table.rows[0] as Record<string, unknown> | undefined) : undefined;
 
-  if (node.type !== 'formula' && cols.length === 0) {
-    return <p className="text-[10.5px] leading-snug text-[var(--nb-warn)]">尚未连上表格节点：先把本节点接到数据源或上游表格之后，再配置列。</p>;
-  }
-
+  const def = stepDef(node.type);
+  if (!def) return null;
+  if (def.needsTableInput && cols.length === 0) return <NoTableHint />;
   return (
     <div className="no-drag space-y-1.5">
-      {node.type === 'filter' && (
-        <>
-          <FieldRow label="列"><DarkSelect value={String(node.params.col ?? '')} placeholder="选择列" options={cols} onChange={(v) => setParam({ col: v })} /></FieldRow>
-          <FieldRow label="条件">
-            <DarkSelect
-              value={String(node.params.op ?? 'contains')}
-              options={[
-                { value: 'contains', label: '包含' },
-                { value: 'eq', label: '等于' },
-                { value: 'ne', label: '不等于' },
-                { value: 'gt', label: '大于' },
-                { value: 'gte', label: '大于等于' },
-                { value: 'lt', label: '小于' },
-                { value: 'lte', label: '小于等于' },
-                { value: 'notEmpty', label: '非空' },
-                { value: 'empty', label: '为空' },
-              ]}
-              onChange={(v) => setParam({ op: v })}
-            />
-          </FieldRow>
-          <FieldRow label="值"><DarkInput value={String(node.params.value ?? '')} onChange={(v) => setParam({ value: v })} /></FieldRow>
-        </>
-      )}
-
-      {node.type === 'pickRows' && (
-        <>
-          <FieldRow label="取行">
-            <DarkSelect
-              value={String(node.params.mode ?? 'latestDate')}
-              options={[
-                { value: 'latestDate', label: '最新日期全部行' },
-                { value: 'firstN', label: '前 N 行' },
-                { value: 'lastN', label: '后 N 行' },
-                { value: 'all', label: '全部行' },
-              ]}
-              onChange={(v) => setParam({ mode: v })}
-            />
-          </FieldRow>
-          <FieldRow label="日期列"><DarkSelect value={String(node.params.dateCol ?? '')} placeholder="选择列" options={cols} onChange={(v) => setParam({ dateCol: v })} /></FieldRow>
-          {node.params.mode === 'firstN' || node.params.mode === 'lastN' ? (
-            <FieldRow label="N"><DarkNum value={Number(node.params.n ?? 1)} min={1} onChange={(v) => setParam({ n: v })} /></FieldRow>
-          ) : null}
-        </>
-      )}
-
-      {node.type === 'sortTopN' && (
-        <>
-          <FieldRow label="排序列"><DarkSelect value={String(node.params.col ?? '')} placeholder="选择列" options={cols} onChange={(v) => setParam({ col: v })} /></FieldRow>
-          <FieldRow label="方向">
-            <DarkSelect
-              value={String(node.params.dir ?? 'desc')}
-              options={[
-                { value: 'desc', label: '降序' },
-                { value: 'asc', label: '升序' },
-              ]}
-              onChange={(v) => setParam({ dir: v })}
-            />
-          </FieldRow>
-          <FieldRow label="前 N 行"><DarkNum value={Number(node.params.n ?? 0)} min={0} onChange={(v) => setParam({ n: v })} /></FieldRow>
-          <DarkCheck checked={node.params.asDate === true} label="按日期排序" onChange={(v) => setParam({ asDate: v })} />
-        </>
-      )}
-
-      {node.type === 'derive' && (
-        <>
-          <FieldRow label="新列名"><DarkInput value={String(node.params.name ?? '')} onChange={(v) => setParam({ name: v })} /></FieldRow>
-          <FormulaRow node={node} label="行公式" rowColumns={rowColumns} rowSample={rowSample as Record<string, unknown> | undefined} />
-        </>
-      )}
-
-      {node.type === 'groupAgg' && (
-        <>
-          <FieldRow label="分组列"><DarkSelect value={String(node.params.groupCol ?? '')} placeholder="选择列" options={cols} onChange={(v) => setParam({ groupCol: v })} /></FieldRow>
-          <AggInline node={node} cols={cols} />
-        </>
-      )}
-
-      {node.type === 'scalarOut' && (
-        <>
-          <FieldRow label="取数列"><DarkSelect value={String(node.params.col ?? '')} placeholder="选择列" options={cols} onChange={(v) => setParam({ col: v })} /></FieldRow>
-          <FieldRow label="聚合">
-            <DarkSelect
-              value={String(node.params.method ?? 'sum')}
-              options={(Object.keys(AGG_LABELS) as AggMethod[]).map((m) => ({ value: m, label: AGG_LABELS[m] }))}
-              onChange={(v) => setParam({ method: v })}
-            />
-          </FieldRow>
-        </>
-      )}
-
-      {node.type === 'formula' && <FormulaRow node={node} label="公式" />}
-    </div>
-  );
-}
-
-/**
- * 公式行：节点内只做完整公式的只读高亮展示（节点内地方太小，不适合直接编辑），
- * 点右侧 ƒx 按钮打开飞书/Notion 式公式编辑弹窗（大输入区 + 变量/函数面板 + 实时预览）。
- */
-function FormulaRow({
-  node,
-  label,
-  rowColumns,
-  rowSample,
-}: {
-  node: PipelineNode;
-  label: string;
-  rowColumns?: { key: string; label: string }[];
-  rowSample?: Record<string, unknown>;
-}) {
-  const updateNode = useCanvasStore((s) => s.updateNode);
-  const variables = useFormulaVariables(rowColumns);
-  const [open, setOpen] = useState(false);
-  const expr = String(node.params.expr ?? '');
-  return (
-    <>
-      <FieldRow label={label}>
-        <div className="flex min-w-0 items-start gap-1">
-          <FormulaDisplay value={expr} variables={variables} />
-          <button
-            type="button"
-            title="打开公式编辑面板"
-            className="shrink-0 rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1.5 py-[3px] text-[10px] font-semibold text-emerald-300 hover:bg-[var(--nb-control-hover)]"
-            onClick={() => setOpen(true)}
-          >
-            ƒx
-          </button>
-        </div>
-      </FieldRow>
-      <FormulaEditorModal
-        open={open}
-        title={node.name}
-        value={expr}
-        rowColumns={rowColumns}
-        rowSample={rowSample}
-        onOk={(next) => updateNode(node.id, { params: { ...node.params, expr: next } })}
-        onClose={() => setOpen(false)}
-      />
-    </>
-  );
-}
-
-function AggInline({ node, cols }: { node: PipelineNode; cols: { value: string; label: string }[] }) {
-  const updateNode = useCanvasStore((s) => s.updateNode);
-  const aggs = Array.isArray(node.params.aggs) ? (node.params.aggs as { col: string; method: AggMethod; as: string }[]) : [];
-  const set = (next: typeof aggs): void => updateNode(node.id, { params: { ...node.params, aggs: next } });
-
-  return (
-    <div className="space-y-1">
-      <span className="text-[10.5px] text-[var(--nb-text-dim)]">聚合列</span>
-      {aggs.map((a, i) => (
-        <div key={i} className="flex gap-1">
-          <Select
-            size="small"
-            className="min-w-0 flex-1"
-            placeholder="列"
-            value={a.col === '' ? undefined : a.col}
-            options={cols}
-            onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, col: v ?? '', as: x.as || v || '' } : x)))}
-          />
-          <Select
-            size="small"
-            className="w-[78px] shrink-0"
-            value={a.method}
-            options={(Object.keys(AGG_LABELS) as AggMethod[]).map((m) => ({ value: m, label: AGG_LABELS[m] }))}
-            onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, method: v as AggMethod } : x)))}
-          />
-          <Input
-            size="small"
-            className="w-14 shrink-0"
-            value={a.as}
-            placeholder="命名"
-            onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, as: e.target.value } : x)))}
-          />
-          <button type="button" className="text-[11px] text-[var(--nb-text-faint)] hover:text-[var(--nb-err)]" onClick={() => set(aggs.filter((_, j) => j !== i))}>
-            ×
-          </button>
-        </div>
-      ))}
-      <DarkBtn onClick={() => set([...aggs, { col: '', method: 'sum', as: '' }])}>+ 聚合列</DarkBtn>
+      <def.Config node={node} cols={cols} rowColumns={rowColumns} rowSample={rowSample} setParam={setParam} />
     </div>
   );
 }
@@ -606,7 +219,7 @@ function NodeName({ node }: { node: PipelineNode }) {
 
 export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, selected, dragging, onPointerDown, onHeight }: FlowNodeCardProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const antdTheme = useNodeAntdTheme();
+  const antdThemeCfg = useNodeAntdTheme();
 
   // 高度自适应：上报给 FlowSheet 供连线锚点与自动布局使用
   useEffect(() => {
@@ -628,9 +241,10 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
   };
 
   const bad = output?.kind === 'error';
+  const SrcConfig = node.type === 'source' && srcDef ? SOURCE_DEFS[srcDef.kind]?.Config : undefined;
 
   return (
-    <ConfigProvider theme={antdTheme}>
+    <ConfigProvider theme={antdThemeCfg}>
       <div
         ref={ref}
         onPointerDown={onShellDown}
@@ -647,35 +261,27 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
           {!node.enabled && <span className="text-[9px] text-[var(--nb-header-warn)]">已停用</span>}
         </div>
 
-        {/* 主体：内嵌配置项 */}
+        {/* 主体：配置区（注册表渲染） */}
         <div className="space-y-2 px-3 py-2.5">
-          {node.type === 'source' && srcDef ? (
-            srcDef.kind === 'import' ? (
-              <ImportInline srcDef={srcDef} srcRt={srcRt} />
-            ) : srcDef.kind === 'form' ? (
-              <FormInline srcDef={srcDef} />
-            ) : srcDef.kind === 'constant' ? (
-              <ConstantInline srcDef={srcDef} />
-            ) : (
-              <div className="no-drag rounded bg-[var(--nb-manual-bg)] p-1.5">
-                <ManualEditor sourceId={srcDef.id} columns={srcDef.columns} rows={srcDef.rows} />
-              </div>
-            )
+          {node.type === 'source' ? (
+            srcDef && SrcConfig ? (
+              <SrcConfig srcDef={srcDef} srcRt={srcRt} />
+            ) : null
           ) : (
-            <StepFields node={node} />
+            <StepConfig node={node} />
           )}
         </div>
 
-      {/* 底部：结果预览 */}
-      <div className="rounded-b-lg border-t border-[var(--nb-header-line)] bg-[var(--nb-preview-bg)] px-2.5 py-1.5">
-        <DarkPreview node={node} output={output} srcRt={srcRt} />
-        {(node.type === 'scalarOut' || node.type === 'formula') && (
-          <div className="mt-1 truncate text-[10px] text-[var(--nb-text-faint)]">
-            变量名 <code className="rounded bg-[var(--nb-chip-bg)] px-1 text-[var(--nb-text-dim)]">{node.name}</code>
-          </div>
-        )}
+        {/* 底部：结果预览 */}
+        <div className="rounded-b-lg border-t border-[var(--nb-header-line)] bg-[var(--nb-preview-bg)] px-2.5 py-1.5">
+          <DarkPreview node={node} output={output} srcRt={srcRt} />
+          {(node.type === 'scalarOut' || node.type === 'formula') && (
+            <div className="mt-1 truncate text-[10px] text-[var(--nb-text-faint)]">
+              变量名 <code className="rounded bg-[var(--nb-chip-bg)] px-1 text-[var(--nb-text-dim)]">{node.name}</code>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     </ConfigProvider>
   );
 }

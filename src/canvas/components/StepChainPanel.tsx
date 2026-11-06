@@ -9,46 +9,11 @@ import FormulaInput, { useFormulaVariables } from '../formula/FormulaInput';
 /**
  * 处理管道（PRD R2）：每个数据源下挂一条步骤链 + 全局计算字段。
  * v1 交互 = 「每源步骤链」，底层是 DAG（v2 视觉画布可复用同一引擎）。
+ * 步骤类型/默认参数/聚合文案的单一事实来源在 flow/nodes 注册表，此处 re-export 兼容既有引用。
  */
 
-export const STEP_TYPES: { type: PipelineNode['type']; label: string; hint: string }[] = [
-  { type: 'pickRows', label: '取行', hint: '取最新日期 / 前 N 行' },
-  { type: 'filter', label: '筛选', hint: '按列值过滤行' },
-  { type: 'sortTopN', label: '排序', hint: '升降序 / 取前 N' },
-  { type: 'groupAgg', label: '分组聚合', hint: '按维度汇总' },
-  { type: 'derive', label: '派生列', hint: '行内公式新增一列' },
-  { type: 'scalarOut', label: '取数', hint: '对列聚合出一个数值' },
-];
-
-const AGG_LABELS: Record<AggMethod, string> = {
-  sum: '求和',
-  avg: '平均',
-  count: '计数',
-  countDistinct: '去重计数',
-  max: '最大',
-  min: '最小',
-};
-
-export function defaultParams(type: PipelineNode['type']): Record<string, unknown> {
-  switch (type) {
-    case 'filter':
-      return { col: '', op: 'contains', value: '' };
-    case 'pickRows':
-      return { mode: 'latestDate', dateCol: '', n: 1 };
-    case 'derive':
-      return { name: '', expr: '' };
-    case 'sortTopN':
-      return { col: '', dir: 'desc', n: 0, asDate: false };
-    case 'groupAgg':
-      return { groupCol: '', aggs: [{ col: '', method: 'sum', as: '' }] };
-    case 'scalarOut':
-      return { col: '', method: 'sum' };
-    case 'formula':
-      return { expr: '' };
-    default:
-      return {};
-  }
-}
+export { STEP_TYPES, defaultParams, AGG_LABELS } from '../flow/nodes';
+import { AGG_LABELS, defaultParams, STEP_TYPES } from '../flow/nodes';
 
 export default function StepChainPanel() {
   const config = useCanvasStore((s) => s.config);
