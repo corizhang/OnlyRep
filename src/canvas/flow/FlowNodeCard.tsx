@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Checkbox, ConfigProvider, Input, InputNumber, Select, theme as antdTheme } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { supportsFileSystemAccess } from '../datasource/sourceCache';
 import { AGG_LABELS, NODE_TYPE_LABELS } from './NodeFields';
@@ -7,6 +8,7 @@ import FormulaEditorModal from '../formula/FormulaEditorModal';
 import { ManualEditor } from '../components/DataSourcePanel';
 import { getVal } from '../../parser/clean';
 import { NODE_W } from './layout';
+import { NODE_TOKENS } from './nodeTheme';
 import type { AggMethod, ConstantDataSource, DataSource, FormDataSource, ImportDataSource, NodeOutput, PipelineNode, SourceRuntime } from '../types';
 
 /**
@@ -39,10 +41,31 @@ function accentOf(node: PipelineNode, bad: boolean): string {
   return 'bg-slate-500/70 text-[var(--nb-header-text)]';
 }
 
-// ---- 深色紧凑控件（仅节点内使用；画布内日报组件无关） ----
+// ---- 节点内控件：antd 紧凑实现（主题吃 --nb-* 同一套 token，随节点主题切换） ----
 
-const CTR =
-  'w-full min-w-0 rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1.5 py-[3px] text-[11px] leading-tight text-[var(--nb-text)] outline-none focus:border-blue-500 disabled:opacity-50';
+/** 嵌套 ConfigProvider 的 antd 主题：dark→darkAlgorithm，light→默认算法；token 与 nodeTheme.ts 对齐 */
+function useNodeAntdTheme() {
+  const nodeTheme = useCanvasStore((s) => s.nodeTheme);
+  return useMemo(() => {
+    const t = NODE_TOKENS[nodeTheme];
+    return {
+      algorithm: nodeTheme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+      token: {
+        colorPrimary: '#2563eb',
+        colorBgContainer: t.controlBg,
+        colorBgElevated: nodeTheme === 'dark' ? '#2b3444' : '#ffffff',
+        colorBorder: t.controlBorder,
+        colorText: t.text,
+        colorTextSecondary: t.textDim,
+        colorTextPlaceholder: t.textFaint,
+        fontSize: 11,
+        controlHeight: 26,
+        controlHeightSM: 22,
+        borderRadius: 4,
+      },
+    };
+  }, [nodeTheme]);
+}
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -66,40 +89,39 @@ function DarkSelect({
   options: { value: string; label: string }[];
   placeholder?: string;
 }) {
-  const merged = placeholder !== undefined ? [{ value: '', label: placeholder }, ...options] : options;
   return (
-    <select className={CTR} value={value} onChange={(e) => onChange(e.target.value)}>
-      {merged.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <Select
+      size="small"
+      className="w-full min-w-0"
+      value={value === '' ? undefined : value}
+      placeholder={placeholder}
+      options={options}
+      onChange={(v) => onChange(v ?? '')}
+    />
   );
 }
 
 function DarkInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return <input className={CTR} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
+  return <Input size="small" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function DarkNum({ value, min = 0, onChange }: { value: number; min?: number; onChange: (v: number) => void }) {
   return (
-    <input
-      type="number"
-      className={CTR}
+    <InputNumber
+      size="small"
+      className="w-full"
       value={Number.isFinite(value) ? value : 0}
       min={min}
-      onChange={(e) => onChange(Math.max(min, Number(e.target.value) || 0))}
+      onChange={(v) => onChange(Math.max(min, v ?? 0))}
     />
   );
 }
 
 function DarkCheck({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="flex cursor-pointer items-center gap-1.5 text-[10.5px] text-[var(--nb-text)]">
-      <input type="checkbox" className="accent-blue-500" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
+    <Checkbox checked={checked} onChange={(e) => onChange(e.target.checked)}>
+      <span className="text-[10.5px] text-[var(--nb-text)]">{label}</span>
+    </Checkbox>
   );
 }
 
@@ -116,16 +138,17 @@ function DarkBtn({
   title?: string;
   disabled?: boolean;
 }) {
-  const cls =
-    tone === 'primary'
-      ? 'border-blue-500/70 bg-blue-600/80 text-white hover:bg-blue-600'
-      : tone === 'danger'
-        ? 'border-red-500/50 bg-red-500/15 text-red-300 hover:bg-red-500/25'
-        : 'border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] text-[var(--nb-text)] hover:bg-[var(--nb-control-hover)]';
   return (
-    <button type="button" title={title} disabled={disabled} onClick={onClick} className={`rounded border px-2 py-[3px] text-[10.5px] transition-colors disabled:opacity-50 ${cls}`}>
+    <Button
+      size="small"
+      type={tone === 'primary' ? 'primary' : 'default'}
+      danger={tone === 'danger'}
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+    >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -209,14 +232,16 @@ function FormInline({ srcDef }: { srcDef: FormDataSource }) {
     <div className="no-drag space-y-1">
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1">
-          <input
-            className="w-[42%] rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1 py-[3px] text-[10.5px] text-[var(--nb-text)] outline-none focus:border-blue-500"
+          <Input
+            size="small"
+            className="w-[42%]"
             value={e.key}
             placeholder="名称"
             onChange={(ev) => updateSource(srcDef.id, { entries: entries.map((x, j) => (j === i ? { ...x, key: ev.target.value } : x)) })}
           />
-          <input
-            className="min-w-0 flex-1 rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1 py-[3px] text-[10.5px] text-[var(--nb-text)] outline-none focus:border-blue-500"
+          <Input
+            size="small"
+            className="min-w-0 flex-1"
             value={e.value}
             placeholder="数值"
             onChange={(ev) => updateSource(srcDef.id, { entries: entries.map((x, j) => (j === i ? { ...x, value: ev.target.value } : x)) })}
@@ -414,31 +439,24 @@ function AggInline({ node, cols }: { node: PipelineNode; cols: { value: string; 
       <span className="text-[10.5px] text-[var(--nb-text-dim)]">聚合列</span>
       {aggs.map((a, i) => (
         <div key={i} className="flex gap-1">
-          <select
-            className="min-w-0 flex-1 rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1 py-[2px] text-[10.5px] text-[var(--nb-text)] outline-none"
-            value={a.col}
-            onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, col: e.target.value, as: x.as || e.target.value } : x)))}
-          >
-            <option value="">列</option>
-            {cols.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1 py-[2px] text-[10.5px] text-[var(--nb-text)] outline-none"
+          <Select
+            size="small"
+            className="min-w-0 flex-1"
+            placeholder="列"
+            value={a.col === '' ? undefined : a.col}
+            options={cols}
+            onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, col: v ?? '', as: x.as || v || '' } : x)))}
+          />
+          <Select
+            size="small"
+            className="w-[78px] shrink-0"
             value={a.method}
-            onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, method: e.target.value as AggMethod } : x)))}
-          >
-            {(Object.keys(AGG_LABELS) as AggMethod[]).map((m) => (
-              <option key={m} value={m}>
-                {AGG_LABELS[m]}
-              </option>
-            ))}
-          </select>
-          <input
-            className="w-14 rounded border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-1 py-[2px] text-[10.5px] text-[var(--nb-text)] outline-none"
+            options={(Object.keys(AGG_LABELS) as AggMethod[]).map((m) => ({ value: m, label: AGG_LABELS[m] }))}
+            onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, method: v as AggMethod } : x)))}
+          />
+          <Input
+            size="small"
+            className="w-14 shrink-0"
             value={a.as}
             placeholder="命名"
             onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, as: e.target.value } : x)))}
@@ -588,6 +606,7 @@ function NodeName({ node }: { node: PipelineNode }) {
 
 export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, selected, dragging, onPointerDown, onHeight }: FlowNodeCardProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const antdTheme = useNodeAntdTheme();
 
   // 高度自适应：上报给 FlowSheet 供连线锚点与自动布局使用
   useEffect(() => {
@@ -598,10 +617,10 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
     return () => ro.disconnect();
   }, [node.id, onHeight]);
 
-  /** 表单控件区域不触发节点拖拽 */
+  /** 表单控件区域不触发节点拖拽（antd 各控件容器类名一并排除） */
   const onShellDown = (e: React.PointerEvent): void => {
     const t = e.target as HTMLElement | null;
-    if (t?.closest('input, textarea, select, button, a, label, .ant-select, .ant-collapse, .no-drag')) {
+    if (t?.closest('input, textarea, select, button, a, label, .ant-select, .ant-input, .ant-input-number, .ant-input-number-handler-wrap, .ant-btn, .ant-checkbox-wrapper, .ant-collapse, .no-drag')) {
       e.stopPropagation();
       return;
     }
@@ -611,40 +630,41 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
   const bad = output?.kind === 'error';
 
   return (
-    <div
-      ref={ref}
-      onPointerDown={onShellDown}
-      style={{ left: x, top: y, width: NODE_W }}
-      className={`absolute cursor-grab select-none overflow-visible rounded-lg border bg-[var(--nb-surface)] shadow-md transition-shadow ${
-        selected ? 'border-blue-500 ring-2 ring-blue-500/60' : 'border-[var(--nb-border)]'
-      } ${bad && !selected ? 'border-red-500/70' : ''} ${dragging ? 'cursor-grabbing shadow-lg' : ''} ${node.enabled ? '' : 'opacity-60'}`}
-    >
-      {/* 头部：拖拽手柄 */}
-      <div className="flex items-center gap-1.5 rounded-t-lg border-b border-[var(--nb-header-line)] bg-[var(--nb-header)] px-2 py-1.5">
-        <span className={`rounded px-1 py-px text-[9px] leading-tight ${accentOf(node, bad)}`}>{NODE_TYPE_LABELS[node.type]}</span>
-        <NodeName node={node} />
-        {node.inputs.length > 1 && <span className="text-[9px] text-[var(--nb-header-dim)]">{node.inputs.length} 入</span>}
-        {!node.enabled && <span className="text-[9px] text-[var(--nb-header-warn)]">已停用</span>}
-      </div>
+    <ConfigProvider theme={antdTheme}>
+      <div
+        ref={ref}
+        onPointerDown={onShellDown}
+        style={{ left: x, top: y, width: NODE_W }}
+        className={`absolute cursor-grab select-none overflow-visible rounded-lg border bg-[var(--nb-surface)] shadow-md transition-shadow ${
+          selected ? 'border-blue-500 ring-2 ring-blue-500/60' : 'border-[var(--nb-border)]'
+        } ${bad && !selected ? 'border-red-500/70' : ''} ${dragging ? 'cursor-grabbing shadow-lg' : ''} ${node.enabled ? '' : 'opacity-60'}`}
+      >
+        {/* 头部：拖拽手柄 */}
+        <div className="flex items-center gap-1.5 rounded-t-lg border-b border-[var(--nb-header-line)] bg-[var(--nb-header)] px-2 py-1.5">
+          <span className={`rounded px-1 py-px text-[9px] leading-tight ${accentOf(node, bad)}`}>{NODE_TYPE_LABELS[node.type]}</span>
+          <NodeName node={node} />
+          {node.inputs.length > 1 && <span className="text-[9px] text-[var(--nb-header-dim)]">{node.inputs.length} 入</span>}
+          {!node.enabled && <span className="text-[9px] text-[var(--nb-header-warn)]">已停用</span>}
+        </div>
 
-      {/* 主体：内嵌配置项 */}
-      <div className="space-y-2 px-3 py-2.5">
-        {node.type === 'source' && srcDef ? (
-          srcDef.kind === 'import' ? (
-            <ImportInline srcDef={srcDef} srcRt={srcRt} />
-          ) : srcDef.kind === 'form' ? (
-            <FormInline srcDef={srcDef} />
-          ) : srcDef.kind === 'constant' ? (
-            <ConstantInline srcDef={srcDef} />
+        {/* 主体：内嵌配置项 */}
+        <div className="space-y-2 px-3 py-2.5">
+          {node.type === 'source' && srcDef ? (
+            srcDef.kind === 'import' ? (
+              <ImportInline srcDef={srcDef} srcRt={srcRt} />
+            ) : srcDef.kind === 'form' ? (
+              <FormInline srcDef={srcDef} />
+            ) : srcDef.kind === 'constant' ? (
+              <ConstantInline srcDef={srcDef} />
+            ) : (
+              <div className="no-drag rounded bg-[var(--nb-manual-bg)] p-1.5">
+                <ManualEditor sourceId={srcDef.id} columns={srcDef.columns} rows={srcDef.rows} />
+              </div>
+            )
           ) : (
-            <div className="no-drag rounded bg-[var(--nb-manual-bg)] p-1.5">
-              <ManualEditor sourceId={srcDef.id} columns={srcDef.columns} rows={srcDef.rows} />
-            </div>
-          )
-        ) : (
-          <StepFields node={node} />
-        )}
-      </div>
+            <StepFields node={node} />
+          )}
+        </div>
 
       {/* 底部：结果预览 */}
       <div className="rounded-b-lg border-t border-[var(--nb-header-line)] bg-[var(--nb-preview-bg)] px-2.5 py-1.5">
@@ -656,5 +676,6 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
         )}
       </div>
     </div>
+    </ConfigProvider>
   );
 }
