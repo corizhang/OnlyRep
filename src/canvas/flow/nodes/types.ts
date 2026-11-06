@@ -47,6 +47,8 @@ export interface NodeTypeDef {
   hint: string;
   /** 是否必须接表格类上游（公式=false） */
   needsTableInput: boolean;
+  /** 最大输入数（默认 1；合并类节点为 2，连线时按追加处理） */
+  maxInputs?: number;
   defaultParams: () => Record<string, unknown>;
   /** 配置表单（节点内嵌 + 右侧抽屉复用；antd 控件主题随上下文） */
   Config: FC<StepConfigProps>;

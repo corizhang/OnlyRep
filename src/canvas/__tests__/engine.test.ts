@@ -258,4 +258,71 @@ describe('DAG 引擎', () => {
     );
     expect(res.env['较上日增加']).toBe(587);
   });
+
+  it('合并：两表纵向堆叠，列取并集、缺列补空', () => {
+    const t1 = makeTable([row(0, { 数据日期: '20261104', 分行: '鞍山分行', m1人数: 3 })], [col('数据日期', 'text'), col('分行', 'text'), col('m1人数')]);
+    const t2 = makeTable([row(0, { 数据日期: '20261105', 分行: '鞍山分行', m1人数: 5, 新列: 9 })], [col('数据日期', 'text'), col('分行', 'text'), col('m1人数'), col('新列')]);
+    const rt = { ds_a: { table: t1, status: 'ready', version: 1 }, ds_b: { table: t2, status: 'ready', version: 1 } } as typeof runtime;
+    const defs = [
+      { id: 'ds_a', name: 'T-1', kind: 'import', fileName: '', sheetName: '' },
+      { id: 'ds_b', name: 'T', kind: 'import', fileName: '', sheetName: '' },
+    ] as typeof sources;
+    const res = runGraph(
+      {
+        nodes: [
+          n('a', 'source', 'T-1', [], { sourceId: 'ds_a' }),
+          n('b', 'source', 'T', [], { sourceId: 'ds_b' }),
+          n('u', 'union', '合并', ['a', 'b'], {}),
+        ],
+      },
+      { sourceDefs: defs, sources: rt },
+    );
+    const out = res.outputs['u'];
+    if (out?.kind !== 'table') throw new Error('union 应输出表格');
+    expect(out.table.rows.length).toBe(2);
+    expect(out.table.columns.map((c) => c.key)).toEqual(['数据日期', '分行', 'm1人数', '新列']);
+    expect(out.table.rows[0]['新列']).toBe(null);
+    expect(out.table.rows[1]['新列']).toBe(9);
+  });
+
+  it('合并 + 分组差分：两份日报快照按分行较上日', () => {
+    const t1 = makeTable(
+      [
+        row(0, { 数据日期: '20261104', 分行: '鞍山分行', m1人数: 3, 达标人数: 6 }),
+        row(1, { 数据日期: '20261104', 分行: '阜新分行', m1人数: 6, 达标人数: 1 }),
+      ],
+      [col('数据日期', 'text'), col('分行', 'text'), col('m1人数'), col('达标人数')],
+    );
+    const t2 = makeTable(
+      [
+        row(0, { 数据日期: '20261105', 分行: '鞍山分行', m1人数: 3, 达标人数: 5 }),
+        row(1, { 数据日期: '20261105', 分行: '阜新分行', m1人数: 7, 达标人数: 1 }),
+      ],
+      [col('数据日期', 'text'), col('分行', 'text'), col('m1人数'), col('达标人数')],
+    );
+    const rt = { ds_a: { table: t1, status: 'ready', version: 1 }, ds_b: { table: t2, status: 'ready', version: 1 } } as typeof runtime;
+    const defs = [
+      { id: 'ds_a', name: 'T-1', kind: 'import', fileName: '', sheetName: '' },
+      { id: 'ds_b', name: 'T', kind: 'import', fileName: '', sheetName: '' },
+    ] as typeof sources;
+    const res = runGraph(
+      {
+        nodes: [
+          n('a', 'source', 'T-1', [], { sourceId: 'ds_a' }),
+          n('b', 'source', 'T', [], { sourceId: 'ds_b' }),
+          n('u', 'union', '合并', ['a', 'b'], {}),
+          n('d', 'diff', 'm1较上日', ['u'], { col: 'm1人数', dateCol: '数据日期', groupCol: '分行', as: 'm1较上日' }),
+          n('f', 'filter', '只看T', ['d'], { col: '数据日期', op: 'eq', value: '20261105' }),
+        ],
+      },
+      { sourceDefs: defs, sources: rt },
+    );
+    const out = res.outputs['f'];
+    if (out?.kind !== 'table') throw new Error('filter 应输出表格');
+    // 鞍山 3-3=0，阜新 7-6=1
+    expect(out.table.rows.map((r) => [r['分行'], r['m1较上日']])).toEqual([
+      ['鞍山分行', 0],
+      ['阜新分行', 1],
+    ]);
+  });
 });

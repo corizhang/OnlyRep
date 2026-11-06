@@ -265,8 +265,15 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const onUp = (): void => {
     if (connect) {
       if (connect.hover) {
-        // 建立连线：目标节点改接本输出（单输入，替换既有上游）
-        updateNodeInStore(connect.hover, { inputs: [connect.from] });
+        // 建立连线：默认替换上游；maxInputs>1 的节点（如合并）按追加处理（去重、超限时挤掉最旧）
+        const tn = nodeById.get(connect.hover);
+        const max = tn ? (stepDef(tn.type)?.maxInputs ?? 1) : 1;
+        const prevInputs = tn?.inputs ?? [];
+        const nextInputs =
+          max > 1 && prevInputs.length > 0 && !prevInputs.includes(connect.from)
+            ? [...prevInputs, connect.from].slice(-max)
+            : [connect.from];
+        updateNodeInStore(connect.hover, { inputs: nextInputs });
         setFlowSelectedId(connect.hover);
       } else {
         const hit = hitNodeAt(connect.cur.x, connect.cur.y);

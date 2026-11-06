@@ -80,6 +80,8 @@ export function runNode(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunCo
       return runGroupAgg(node, inputs);
     case 'diff':
       return runDiff(node, inputs, ctx);
+    case 'union':
+      return runUnion(inputs, ctx);
     case 'scalarOut':
       return runScalarOut(node, inputs);
     case 'formula':
@@ -285,6 +287,7 @@ function runGroupAgg(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {
 /**
  * 行差分（较上日增加）：对数值列按日期（或现有行顺序）逐行求「本行 - 上一行」。
  * 指定日期列时按日期升序对齐计算（乱序数据安全），输出行顺序保持与原表一致；
+ * 指定分组列时在每个分组内独立差分（如多日快照合并后按「分行」较上日）；
  * 首日/无法配对的行为空。
  */
 function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext): NodeOutput {
@@ -293,10 +296,12 @@ function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext):
   const col = String(node.params.col ?? '');
   if (!col) return { kind: 'table', table: t };
   const dateCol = String(node.params.dateCol ?? '');
+  const groupCol = String(node.params.groupCol ?? '');
   const as = String(node.params.as ?? '').trim() || `${col}较上日`;
 
-  // 1) 计算每行的时间键：有日期列按日期升序，否则按现有行顺序
+  // 1) 每行的排序键：分组值 + 时间键（有日期列按日期升序，否则按现有行顺序）
   let bad = 0;
+  const groups = t.rows.map((r) => (groupCol ? String(getVal(r, groupCol) ?? '(空)') : ''));
   const keys = t.rows.map((r, i) => {
     if (!dateCol) return i;
     const d = parseDateValue(getVal(r, dateCol));
@@ -306,12 +311,20 @@ function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext):
     }
     return d.getTime();
   });
-  const order = t.rows.map((_, i) => i).sort((a, b) => keys[a] - keys[b]);
+  const order = t.rows.map((_, i) => i).sort((a, b) => {
+    if (groups[a] !== groups[b]) return groups[a] < groups[b] ? -1 : 1;
+    return keys[a] - keys[b];
+  });
 
-  // 2) 按时间序逐行差分（前后任一方非数值则留空），写回原行
+  // 2) 分组内按时间序逐行差分（前后任一方非数值则留空），写回原行
   const diffs: (number | null)[] = t.rows.map(() => null);
   let prev: number | null = null;
+  let prevGroup = '';
   for (const i of order) {
+    if (groups[i] !== prevGroup) {
+      prev = null;
+      prevGroup = groups[i];
+    }
     const v = getVal(t.rows[i], col);
     const num = typeof v === 'number' ? v : null;
     diffs[i] = num !== null && prev !== null ? num - prev : null;
@@ -329,6 +342,38 @@ function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext):
     ? t.columns.map((c) => (c.key === as ? { ...c, type: 'number' as const } : c))
     : [...t.columns, makeColumn(as, as)];
   return { kind: 'table', table: makeTable(rows, columns, t.excludedCount) };
+}
+
+/**
+ * 合并（纵向堆叠）：把 2 张表按列并集拼成一张（如 T 与 T-1 两份日报快照）。
+ * 列取第一张表的顺序，第二张表多出的列追加在后；缺的列补空。
+ */
+function runUnion(inputs: NodeOutput[], ctx: NodeRunContext): NodeOutput {
+  const tables = inputs.map(asTable).filter((t): t is CleanedTable => t !== null);
+  if (tables.length === 0) return { kind: 'error', message: '合并需要至少一张上游表格' };
+  if (tables.length < inputs.length) ctx.warn('有上游不是表格输出，已在合并中跳过');
+  if (tables.length === 1) return { kind: 'table', table: tables[0] };
+
+  const columns: ColumnMeta[] = [...tables[0].columns];
+  for (const t of tables.slice(1)) {
+    for (const c of t.columns) {
+      if (!columns.some((x) => x.key === c.key)) columns.push(c);
+    }
+  }
+  const rows: CleanRow[] = [];
+  let idx = 0;
+  for (const t of tables) {
+    for (const r of t.rows) {
+      const row: CleanRow = { __idx: idx++ };
+      for (const c of columns) {
+        const v = getVal(r, c.key);
+        row[c.key] = v;
+        row[`${c.key}#raw`] = getRawText(r, c.key) || (v === null ? '' : String(v));
+      }
+      rows.push(row);
+    }
+  }
+  return { kind: 'table', table: makeTable(rows, columns, 0) };
 }
 
 function runScalarOut(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {  const t = firstTable(inputs);

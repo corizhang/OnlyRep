@@ -88,6 +88,7 @@ export type NodeType =
   | 'sortTopN'
   | 'groupAgg'
   | 'diff'
+  | 'union'
   | 'scalarOut'
   | 'formula';
 
