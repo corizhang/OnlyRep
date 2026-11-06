@@ -8,7 +8,7 @@ import type { PipelineNode } from '../types';
  * 纯函数、无 DOM 依赖，便于单测。
  */
 
-export const NODE_W = 248;
+export const NODE_W = 300;
 /** 兜底估高：节点实际高度由 DOM 测量后经 heights 覆盖 */
 export const NODE_H = 78;
 const GAP_X = 104;

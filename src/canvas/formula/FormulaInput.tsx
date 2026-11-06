@@ -94,6 +94,7 @@ export default function FormulaInput({
   rowSample,
   multiline = false,
   placeholder = '输入公式，如：已完成/全年目标',
+  defaultExpanded = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -103,6 +104,8 @@ export default function FormulaInput({
   rowSample?: Record<string, unknown>;
   multiline?: boolean;
   placeholder?: string;
+  /** 初始即展开 ƒx 变量/函数面板（公式编辑弹窗用） */
+  defaultExpanded?: boolean;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
@@ -110,7 +113,7 @@ export default function FormulaInput({
   const composingRef = useRef(false);
   const [ac, setAc] = useState<{ start: number; end: number; items: AcItem[]; index: number } | null>(null);
   const [popupLeft, setPopupLeft] = useState(0);
-  const [expanded, setExpanded] = useState(() => new URLSearchParams(window.location.search).has('fx'));
+  const [expanded, setExpanded] = useState(() => defaultExpanded || new URLSearchParams(window.location.search).has('fx'));
 
   const varMap = useMemo(() => new Map(variables.map((v) => [v.name, v])), [variables]);
   const envVars = useMemo(() => {
@@ -443,6 +446,25 @@ export default function FormulaInput({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 只读公式展示（节点内使用）：语法高亮完整公式，不可编辑；编辑请配合 FormulaEditorModal */
+export function FormulaDisplay({
+  value,
+  variables = [],
+  placeholder = '尚未填写公式',
+}: {
+  value: string;
+  variables?: FormulaVariable[];
+  placeholder?: string;
+}) {
+  const varMap = useMemo(() => new Map(variables.map((v) => [v.name, v])), [variables]);
+  const spans = useMemo(() => highlightSpans(value, varMap), [value, varMap]);
+  return (
+    <div className="w-full min-w-0 whitespace-pre-wrap break-all rounded border border-slate-300 bg-white px-2 py-1 text-[11px] leading-5 text-slate-600">
+      {value.trim() === '' ? <span className="text-slate-300">{placeholder}</span> : spans.map((s, i) => <span key={i} className={s.cls}>{s.text}</span>)}
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { supportsFileSystemAccess } from '../datasource/sourceCache';
 import { AGG_LABELS, NODE_TYPE_LABELS } from './NodeFields';
-import FormulaInput, { useFormulaVariables } from '../formula/FormulaInput';
+import { FormulaDisplay, useFormulaVariables } from '../formula/FormulaInput';
+import FormulaEditorModal from '../formula/FormulaEditorModal';
 import { ManualEditor } from '../components/DataSourcePanel';
 import { getVal } from '../../parser/clean';
 import { NODE_W } from './layout';
@@ -253,7 +254,6 @@ function StepFields({ node }: { node: PipelineNode }) {
   const upOutput = node.inputs[0] ? outputs[node.inputs[0]] : undefined;
   const cols = upOutput && upOutput.kind === 'table' ? upOutput.table.columns.map((c) => ({ value: c.key, label: c.rawName || c.key })) : [];
   const rowColumns = cols.map((c) => ({ key: c.value, label: c.label }));
-  const variables = useFormulaVariables(node.type === 'derive' ? rowColumns : undefined);
   const rowSample = upOutput && upOutput.kind === 'table' ? upOutput.table.rows[0] : undefined;
 
   if (node.type !== 'formula' && cols.length === 0) {
@@ -328,9 +328,7 @@ function StepFields({ node }: { node: PipelineNode }) {
       {node.type === 'derive' && (
         <>
           <FieldRow label="新列名"><DarkInput value={String(node.params.name ?? '')} onChange={(v) => setParam({ name: v })} /></FieldRow>
-          <FieldRow label="行公式">
-            <FormulaInput value={String(node.params.expr ?? '')} onChange={(v) => setParam({ expr: v })} variables={variables} rowSample={rowSample as Record<string, unknown> | undefined} />
-          </FieldRow>
+          <FormulaRow node={node} label="行公式" rowColumns={rowColumns} rowSample={rowSample as Record<string, unknown> | undefined} />
         </>
       )}
 
@@ -354,12 +352,55 @@ function StepFields({ node }: { node: PipelineNode }) {
         </>
       )}
 
-      {node.type === 'formula' && (
-        <FieldRow label="公式">
-          <FormulaInput value={String(node.params.expr ?? '')} onChange={(v) => setParam({ expr: v })} variables={variables} />
-        </FieldRow>
-      )}
+      {node.type === 'formula' && <FormulaRow node={node} label="公式" />}
     </div>
+  );
+}
+
+/**
+ * 公式行：节点内只做完整公式的只读高亮展示（节点内地方太小，不适合直接编辑），
+ * 点右侧 ƒx 按钮打开飞书/Notion 式公式编辑弹窗（大输入区 + 变量/函数面板 + 实时预览）。
+ */
+function FormulaRow({
+  node,
+  label,
+  rowColumns,
+  rowSample,
+}: {
+  node: PipelineNode;
+  label: string;
+  rowColumns?: { key: string; label: string }[];
+  rowSample?: Record<string, unknown>;
+}) {
+  const updateNode = useCanvasStore((s) => s.updateNode);
+  const variables = useFormulaVariables(rowColumns);
+  const [open, setOpen] = useState(false);
+  const expr = String(node.params.expr ?? '');
+  return (
+    <>
+      <FieldRow label={label}>
+        <div className="flex min-w-0 items-start gap-1">
+          <FormulaDisplay value={expr} variables={variables} />
+          <button
+            type="button"
+            title="打开公式编辑面板"
+            className="shrink-0 rounded border border-[#46536a] bg-[#333d4e] px-1.5 py-[3px] text-[10px] font-semibold text-emerald-300 hover:bg-[#3d495c]"
+            onClick={() => setOpen(true)}
+          >
+            ƒx
+          </button>
+        </div>
+      </FieldRow>
+      <FormulaEditorModal
+        open={open}
+        title={node.name}
+        value={expr}
+        rowColumns={rowColumns}
+        rowSample={rowSample}
+        onOk={(next) => updateNode(node.id, { params: { ...node.params, expr: next } })}
+        onClose={() => setOpen(false)}
+      />
+    </>
   );
 }
 
@@ -419,15 +460,15 @@ function DarkPreview({ node, output, srcRt }: { node: PipelineNode; output: Node
     return <div className="text-[10.5px] leading-snug text-red-400">{output.message}</div>;
   }
   if (output?.kind === 'table') {
-    const rows = output.table.rows.slice(0, 4);
+    const rows = output.table.rows.slice(0, 6);
     const cols = output.table.columns;
     return (
       <div>
         <div className="mb-1 text-[10px] text-slate-400">
           共 <b className="text-slate-300">{output.table.rows.length}</b> 行 × {cols.length} 列
-          {output.table.rows.length > 4 && '（预览前 4 行）'}
+          {output.table.rows.length > 6 && '（预览前 6 行）'}
         </div>
-        <div className="max-h-[96px] overflow-auto rounded border border-[#3b4757] bg-[#222b39]">
+        <div className="max-h-[150px] overflow-auto rounded border border-[#3b4757] bg-[#222b39]">
           <table className="w-full border-collapse text-[10.5px]">
             <thead>
               <tr>
@@ -444,7 +485,7 @@ function DarkPreview({ node, output, srcRt }: { node: PipelineNode; output: Node
                   {cols.map((c) => {
                     const v = getVal(r, c.key);
                     return (
-                      <td key={c.key} className="max-w-[110px] truncate whitespace-nowrap border-b border-[#2b3546] px-1.5 py-0.5 text-slate-200">
+                      <td key={c.key} className="max-w-[150px] truncate whitespace-nowrap border-b border-[#2b3546] px-1.5 py-0.5 text-slate-200">
                         {v === null ? '' : typeof v === 'number' ? v.toLocaleString('zh-CN') : String(v)}
                       </td>
                     );
@@ -496,6 +537,53 @@ function DarkPreview({ node, output, srcRt }: { node: PipelineNode; output: Node
   return <div className="text-[10.5px] text-slate-500">未执行</div>;
 }
 
+/** 头部名称：点击进入行内编辑，Enter/失焦提交，Esc 取消 */
+function NodeName({ node }: { node: PipelineNode }) {
+  const updateNode = useCanvasStore((s) => s.updateNode);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(node.name);
+
+  useEffect(() => {
+    if (!editing) setDraft(node.name);
+  }, [node.name, editing]);
+
+  const commit = (): void => {
+    setEditing(false);
+    const n = draft.trim();
+    if (n && n !== node.name) updateNode(node.id, { name: n });
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') {
+            setDraft(node.name);
+            setEditing(false);
+          }
+        }}
+        onFocus={(e) => e.target.select()}
+        className="min-w-0 flex-1 rounded border border-blue-500 bg-[#0d1219] px-1 py-px text-[12px] text-slate-100 outline-none"
+      />
+    );
+  }
+  return (
+    <span
+      className="min-w-0 flex-1 cursor-text truncate rounded px-0.5 text-[12px] font-medium text-slate-100 hover:bg-white/10"
+      title="点击修改名称"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={() => setEditing(true)}
+    >
+      {node.name}
+    </span>
+  );
+}
+
 // ---- 节点卡片主体 ----
 
 export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, selected, dragging, onPointerDown, onHeight }: FlowNodeCardProps) {
@@ -534,15 +622,13 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
       {/* 头部：拖拽手柄 */}
       <div className="flex items-center gap-1.5 rounded-t-lg border-b border-black/40 bg-[#151b26] px-2 py-1.5">
         <span className={`rounded px-1 py-px text-[9px] leading-tight ${accentOf(node, bad)}`}>{NODE_TYPE_LABELS[node.type]}</span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-slate-100" title={node.name}>
-          {node.name}
-        </span>
+        <NodeName node={node} />
         {node.inputs.length > 1 && <span className="text-[9px] text-slate-400">{node.inputs.length} 入</span>}
         {!node.enabled && <span className="text-[9px] text-amber-400/90">已停用</span>}
       </div>
 
       {/* 主体：内嵌配置项 */}
-      <div className="space-y-2 px-2.5 py-2">
+      <div className="space-y-2 px-3 py-2.5">
         {node.type === 'source' && srcDef ? (
           srcDef.kind === 'import' ? (
             <ImportInline srcDef={srcDef} srcRt={srcRt} />
