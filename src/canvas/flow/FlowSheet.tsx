@@ -11,7 +11,7 @@ import { stepDef } from './nodes';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
-import { createSourceOfKind, createStepNode } from './nodeOps';
+import { createSourceOfKind, createStepNode, spotRightOf } from './nodeOps';
 import { ImportEditor, FormEditor, ManualEditor } from '../components/DataSourcePanel';
 import { createImportSource, createManualTableSource, newId, uniqueName } from '../datasource/registry';
 import type { DataSource } from '../types';
@@ -160,7 +160,31 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     }
     const node = createStepNode(config.pipeline.nodes, type, inputId);
     addNodeToStore(node);
+    // 落点：优先放在上游节点右侧空位（重叠自动下移）；落点在视口外时平移画布显露
+    const spot = spotRightOf(config.pipeline.nodes, config.flowPos ?? {}, heights, inputId);
+    if (spot) {
+      setFlowPos(node.id, spot);
+      reveal(spot);
+    }
     setFlowSelectedId(node.id);
+  };
+
+  /** 落点在视口外时做「最小平移」：只补足缺口让新节点进入视野，不居中、尽量保住上游节点可见 */
+  const reveal = (pos: FlowPos): void => {
+    const el = containerRef.current;
+    if (!el) return;
+    const vw = el.clientWidth;
+    const vh = el.clientHeight;
+    const m = 24;
+    const sx = pos.x * zoom + pan.x;
+    const sy = pos.y * zoom + pan.y;
+    let dx = 0;
+    let dy = 0;
+    if (sx < m) dx = m - sx;
+    else if (sx + NODE_W * zoom > vw - m) dx = vw - m - (sx + NODE_W * zoom);
+    if (sy < m) dy = m - sy;
+    else if (sy + NODE_H * zoom > vh - m) dy = vh - m - (sy + NODE_H * zoom);
+    if (dx !== 0 || dy !== 0) setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
   };
 
   /** 上游候选：所有表格输出节点，排除自己与自己的下游（防成环） */

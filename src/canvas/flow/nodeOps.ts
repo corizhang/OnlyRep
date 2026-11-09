@@ -1,5 +1,6 @@
 import { createImportSource, createManualTableSource, newId, uniqueName } from '../datasource/registry';
 import { defaultParams, NODE_TYPE_LABELS, stepDef } from './nodes';
+import { computeFlowLayout, NODE_H, NODE_W, type FlowPos } from './layout';
 import type { DataSource, NodeType, PipelineNode } from '../types';
 
 /**
@@ -33,4 +34,34 @@ export function createStepNode(nodes: PipelineNode[], type: NodeType, inputId: s
     params: defaultParams(type),
     enabled: true,
   };
+}
+
+/**
+ * 新下游节点的落点：优先放在上游节点右侧（间距 48），
+ * 与既有节点重叠时沿纵向向下避让；无上上游信息时返回 null（走自动布局）。
+ * 供 FlowSheet 添加下游 / NodeLibrary 点选添加共用。
+ */
+export function spotRightOf(
+  nodes: PipelineNode[],
+  flowPos: Record<string, FlowPos>,
+  heights: Record<string, number>,
+  inputId: string | null,
+): FlowPos | null {
+  if (!inputId) return null;
+  const layout = computeFlowLayout(nodes, flowPos, heights);
+  const base = layout.byId[inputId];
+  if (!base) return null;
+
+  const hOf = (id: string): number => heights[id] ?? NODE_H;
+  const rects = layout.nodes.map((n) => ({ x: n.x, y: n.y, h: hOf(n.id) }));
+  const overlap = (p: FlowPos): boolean =>
+    rects.some((r) => p.x < r.x + NODE_W + 16 && p.x + NODE_W + 16 > r.x && p.y < r.y + r.h + 16 && p.y + NODE_H + 16 > r.y);
+
+  let cand: FlowPos = { x: base.x + NODE_W + 48, y: base.y };
+  let guard = 0;
+  while (overlap(cand) && guard < 30) {
+    cand = { x: cand.x, y: cand.y + hOf(inputId) + 24 };
+    guard += 1;
+  }
+  return cand;
 }

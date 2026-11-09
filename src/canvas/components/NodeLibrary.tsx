@@ -1,6 +1,6 @@
 import { message } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
-import { createSourceOfKind, createStepNode, NODE_TYPE_META, SOURCE_KIND_META } from '../flow/nodeOps';
+import { createSourceOfKind, createStepNode, spotRightOf, NODE_TYPE_META, SOURCE_KIND_META } from '../flow/nodeOps';
 import type { DataSource, NodeType } from '../types';
 
 /**
@@ -44,6 +44,9 @@ export default function NodeLibrary() {
     }
     const node = createStepNode(config.pipeline.nodes, type, flowSelectedId);
     addNode(node);
+    // 落点跟随上游节点（右侧空位），避免新节点跑到画布远处找不到
+    const spot = spotRightOf(config.pipeline.nodes, config.flowPos ?? {}, {}, flowSelectedId);
+    if (spot) setFlowPos(node.id, spot);
     setFlowSelectedId(node.id);
   };
 
