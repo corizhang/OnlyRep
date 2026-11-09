@@ -41,6 +41,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const outputs = useCanvasStore((s) => s.outputs);
   const setShowFlow = useCanvasStore((s) => s.setShowFlow);
   const setFlowPos = useCanvasStore((s) => s.setFlowPos);
+  const setFlowPosMany = useCanvasStore((s) => s.setFlowPosMany);
+  const transact = useCanvasStore((s) => s.transact);
   const resetFlowPos = useCanvasStore((s) => s.resetFlowPos);
   const addNodeToStore = useCanvasStore((s) => s.addNode);
   const updateNodeInStore = useCanvasStore((s) => s.updateNode);
@@ -101,19 +103,21 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     for (const id of ids) updateNodeInStore(id, { enabled });
   };
 
-  /** 批量删除（source 节点连同数据源一并删除；引擎侧会自动清下游 inputs 引用） */
+  /** 批量删除（source 节点连同数据源一并删除；引擎侧会自动清下游 inputs 引用；一次事务=一步撤销） */
   const deleteNodes = (ids: string[]): void => {
-    for (const id of ids) {
-      const n = nodeById.get(id);
-      if (!n) continue;
-      if (n.type === 'source') {
-        const srcDef = config.dataSources.find((d) => d.id === String(n.params.sourceId ?? ''));
-        if (srcDef) removeSource(srcDef.id);
-        else removeNode(id);
-      } else {
-        removeNode(id);
+    transact('del-nodes', () => {
+      for (const id of ids) {
+        const n = nodeById.get(id);
+        if (!n) continue;
+        if (n.type === 'source') {
+          const srcDef = config.dataSources.find((d) => d.id === String(n.params.sourceId ?? ''));
+          if (srcDef) removeSource(srcDef.id);
+          else removeNode(id);
+        } else {
+          removeNode(id);
+        }
       }
-    }
+    });
     setFlowSelectedIds([]);
   };
 
@@ -207,13 +211,14 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       return;
     }
     const node = createStepNode(config.pipeline.nodes, type, inputId);
-    addNodeToStore(node);
     // 落点：优先放在上游节点右侧空位（重叠自动下移）；落点在视口外时平移画布显露
     const spot = spotRightOf(config.pipeline.nodes, config.flowPos ?? {}, heights, inputId);
-    if (spot) {
-      setFlowPos(node.id, spot);
-      reveal(spot);
-    }
+    // 添加+落点合并为一步撤销
+    transact('add-node', () => {
+      addNodeToStore(node);
+      if (spot) setFlowPos(node.id, spot);
+    });
+    if (spot) reveal(spot);
     setFlowSelectedId(node.id);
   };
 
@@ -420,11 +425,15 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
         // Ctrl/Shift+点击：切换选中
         toggleFlowSelected(d.toggleOnUp);
       } else if (d.moved && delta) {
-        // 群移提交：整组按各自原始位置 + 同一 delta 落点
-        for (const id of d.ids) {
-          const o = d.origins[id];
-          if (o) setFlowPos(id, { x: Math.round(o.x + delta.dx), y: Math.round(o.y + delta.dy) });
-        }
+        // 群移提交：整组按各自原始位置 + 同一 delta 落点（一次事务=一步撤销）
+        const entries = d.ids
+          .map((id) => {
+            const o = d.origins[id];
+            return o ? { id, pos: { x: Math.round(o.x + delta.dx), y: Math.round(o.y + delta.dy) } } : null;
+          })
+          .filter((x): x is { id: string; pos: FlowPos } => x !== null);
+        if (entries.length === 1) setFlowPos(entries[0].id, entries[0].pos);
+        else if (entries.length > 1) setFlowPosMany(entries);
       } else if (!d.toggleOnUp) {
         setFlowSelectedId(d.ids[0]);
       }

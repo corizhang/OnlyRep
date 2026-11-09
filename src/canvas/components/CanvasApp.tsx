@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { Segmented } from 'antd';
+import { Segmented, Tooltip } from 'antd';
+import { RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
@@ -23,6 +24,10 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const viewMode = useCanvasStore((s) => s.viewMode);
   const setViewMode = useCanvasStore((s) => s.setViewMode);
   const bootstrap = useCanvasStore((s) => s.bootstrap);
+  const undo = useCanvasStore((s) => s.undo);
+  const redo = useCanvasStore((s) => s.redo);
+  const canUndo = useCanvasStore((s) => s.history.past.length > 0);
+  const canRedo = useCanvasStore((s) => s.history.future.length > 0);
 
   useEffect(() => {
     // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
@@ -37,6 +42,25 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
     // 仅在挂载时跑一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 全局撤销/重做：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（输入控件内交给浏览器原生行为）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === 'z' || e.key === 'Z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (e.key === 'y' || e.key === 'Y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
 
   const selected = selectedId ? findBlock(config.blocks, selectedId) : null;
   const isCanvas = viewMode === 'canvas';
@@ -56,6 +80,29 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
             ]}
           />
           <span className="text-[11.5px] text-slate-400">一次搭好，换数据即出图</span>
+          {/* 撤销/重做（config 级：节点/数据/区块/主题全部覆盖） */}
+          <span className="flex items-center gap-0.5">
+            <Tooltip title="撤销（Ctrl+Z）">
+              <button
+                type="button"
+                disabled={!canUndo}
+                onClick={undo}
+                className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <UndoOutlined style={{ fontSize: 15 }} />
+              </button>
+            </Tooltip>
+            <Tooltip title="重做（Ctrl+Shift+Z / Ctrl+Y）">
+              <button
+                type="button"
+                disabled={!canRedo}
+                onClick={redo}
+                className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <RedoOutlined style={{ fontSize: 15 }} />
+              </button>
+            </Tooltip>
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[11px] text-slate-400">管道 {lastRunMs}ms</span>

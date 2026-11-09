@@ -17,6 +17,7 @@ export default function NodeLibrary() {
   const flowSelectedId = useCanvasStore((s) => s.flowSelectedId);
   const setFlowSelectedId = useCanvasStore((s) => s.setFlowSelectedId);
   const setFlowPos = useCanvasStore((s) => s.setFlowPos);
+  const transact = useCanvasStore((s) => s.transact);
 
   /** 该节点输出是否为表格（source 未执行时也按表格对待） */
   const isTableOut = (id: string): boolean => {
@@ -43,10 +44,12 @@ export default function NodeLibrary() {
       return;
     }
     const node = createStepNode(config.pipeline.nodes, type, flowSelectedId);
-    addNode(node);
-    // 落点跟随上游节点（右侧空位），避免新节点跑到画布远处找不到
+    // 落点跟随上游节点（右侧空位），避免新节点跑到画布远处找不到；添加+落点合并为一步撤销
     const spot = spotRightOf(config.pipeline.nodes, config.flowPos ?? {}, {}, flowSelectedId);
-    if (spot) setFlowPos(node.id, spot);
+    transact('add-node', () => {
+      addNode(node);
+      if (spot) setFlowPos(node.id, spot);
+    });
     setFlowSelectedId(node.id);
   };
 

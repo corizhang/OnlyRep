@@ -80,8 +80,18 @@ export interface CanvasStore {
   setShowFlow: (v: boolean) => void;
   /** 记录/清除节点在流程视图中的手动位置 */
   setFlowPos: (nodeId: string, pos: { x: number; y: number } | null) => void;
+  /** 多节点群移：一次事务写入多个位置（撤销为一步） */
+  setFlowPosMany: (entries: { id: string; pos: { x: number; y: number } | null }[]) => void;
   /** 清除全部手动位置（自动排列） */
   resetFlowPos: () => void;
+
+  // 撤销/重做（config 快照历史，内存态不持久化）
+  /** 历史栈（past 顶=最近一次可撤销；future 顶=最近一次可重做） */
+  history: { past: HistoryEntry[]; future: HistoryEntry[] };
+  undo: () => void;
+  redo: () => void;
+  /** 把多次连续修改合并为一步历史（如添加+落点、群移、批量删除） */
+  transact: (label: string, fn: () => void) => void;
 
   // 生命周期
   bootstrap: () => void;
@@ -130,6 +140,18 @@ export interface CanvasStore {
 }
 
 type SetState = (partial: Partial<CanvasStore> | ((s: CanvasStore) => Partial<CanvasStore>)) => void;
+
+/** 撤销历史条目（label 用于连续同类修改的时间窗合并） */
+export interface HistoryEntry {
+  config: CanvasConfig;
+  label: string;
+  at: number;
+}
+
+/** 历史上限（超出丢弃最旧） */
+const HISTORY_LIMIT = 50;
+/** 同 label 连续修改的合并窗口（如连续输入/微调） */
+const HISTORY_MERGE_MS = 900;
 type GetState = () => CanvasStore;
 
 /** 模块级缓存（不进 store，避免 persist 序列化） */
@@ -184,7 +206,27 @@ export const useCanvasStore = create<CanvasStore>()(
         });
       };
 
-      const mutateConfig = (fn: (c: CanvasConfig) => CanvasConfig, rerun = false): void => {
+      // ---- 撤销历史：mutateConfig 统一推栈；transact 抑制嵌套推送 ----
+      let batchDepth = 0;
+      const pushHistory = (label: string): void => {
+        if (batchDepth > 0) return;
+        const s = get();
+        const past = s.history.past.slice();
+        const last = past[past.length - 1];
+        const now = Date.now();
+        // 同类连续修改（连续输入/微调）在时间窗内合并为一步，避免逐字符撤销
+        if (last && last.label === label && now - last.at < HISTORY_MERGE_MS) {
+          last.at = now;
+          set({ history: { past, future: [] } });
+          return;
+        }
+        past.push({ config: s.config, label, at: now });
+        if (past.length > HISTORY_LIMIT) past.shift();
+        set({ history: { past, future: [] } });
+      };
+
+      const mutateConfig = (fn: (c: CanvasConfig) => CanvasConfig, rerun = false, label = `edit:${Date.now()}`): void => {
+        pushHistory(label);
         const prev = get().config;
         const config = fn(prev);
         set({ config });
@@ -223,15 +265,55 @@ export const useCanvasStore = create<CanvasStore>()(
 
         setShowFlow: (v) => set({ showFlow: v }),
 
+        // ---- 撤销/重做 ----
+        history: { past: [], future: [] },
+        transact: (label, fn) => {
+          pushHistory(label);
+          batchDepth += 1;
+          try {
+            fn();
+          } finally {
+            batchDepth -= 1;
+          }
+        },
+        undo: () => {
+          const s = get();
+          const past = s.history.past.slice();
+          const entry = past.pop();
+          if (!entry) return;
+          const future = [{ config: s.config, label: entry.label, at: Date.now() }, ...s.history.future].slice(0, HISTORY_LIMIT);
+          set({ config: entry.config, history: { past, future } });
+          recomputeWith(entry.config, get().sources);
+        },
+        redo: () => {
+          const s = get();
+          const future = s.history.future.slice();
+          const entry = future.shift();
+          if (!entry) return;
+          const past = [...s.history.past, { config: s.config, label: entry.label, at: Date.now() }].slice(-HISTORY_LIMIT);
+          set({ config: entry.config, history: { past, future } });
+          recomputeWith(entry.config, get().sources);
+        },
+
         setFlowPos: (nodeId, pos) =>
           mutateConfig((c) => {
             const next = { ...(c.flowPos ?? {}) };
             if (pos) next[nodeId] = pos;
             else delete next[nodeId];
             return { ...c, flowPos: next };
-          }),
+          }, false, `move:${nodeId}`),
 
-        resetFlowPos: () => mutateConfig((c) => ({ ...c, flowPos: {} })),
+        setFlowPosMany: (entries) =>
+          mutateConfig((c) => {
+            const next = { ...(c.flowPos ?? {}) };
+            for (const { id, pos } of entries) {
+              if (pos) next[id] = pos;
+              else delete next[id];
+            }
+            return { ...c, flowPos: next };
+          }, false, 'move:nodes'),
+
+        resetFlowPos: () => mutateConfig((c) => ({ ...c, flowPos: {} }), false, 'resetFlowPos'),
 
         bootstrap: () => {
           const s = get();
@@ -253,7 +335,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const config = preset.create();
           engineCache.clear();
           void clearSourceSnapshots();
-          set({ config, sources: {}, selectedId: null, errors: [] });
+          set({ config, sources: {}, selectedId: null, errors: [], history: { past: [], future: [] } });
           recomputeWith(config, {});
         },
 
@@ -261,13 +343,13 @@ export const useCanvasStore = create<CanvasStore>()(
           engineCache.clear();
           void clearSourceSnapshots();
           const config = createDefaultCanvasConfig();
-          set({ config, sources: {}, selectedId: null, errors: [], warnings: [] });
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] } });
         },
 
         loadTemplate: (config) => {
           engineCache.clear();
           void clearSourceSnapshots();
-          set({ config, sources: {}, selectedId: null, errors: [], warnings: [] });
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] } });
           recomputeWith(config, {});
         },
 
@@ -394,6 +476,7 @@ export const useCanvasStore = create<CanvasStore>()(
               dataSources: c.dataSources.map((d) => (d.id === id ? ({ ...d, ...patch } as DataSource) : d)),
             }),
             true,
+            `source:${id}`,
           );
         },
 
@@ -593,6 +676,7 @@ export const useCanvasStore = create<CanvasStore>()(
               pipeline: { nodes: c.pipeline.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) },
             }),
             true,
+            `node:${id}`,
           ),
 
         removeNode: (id) =>
