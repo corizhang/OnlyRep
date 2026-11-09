@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dropdown } from 'antd';
-import { DeleteOutlined, MoonOutlined, PlusOutlined, PoweroffOutlined, SunOutlined } from '@ant-design/icons';
+import { DeleteOutlined, MoonOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, PoweroffOutlined, SunOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { NodeOutput, NodeType, PipelineNode } from '../types';
-import { computeFlowLayout, edgePath, NODE_H, NODE_W, type FlowPos } from './layout';
+import { computeFlowLayout, edgePath, NODE_H, NODE_W, rectsIntersect, type FlowPos } from './layout';
 import FlowNodeCard from './FlowNodeCard';
 import { nodeThemeVars, type NodeTheme } from './nodeTheme';
 import { stepDef } from './nodes';
@@ -25,11 +25,15 @@ import { Btn, Check, Field, TextInput } from '../components/ui';
  */
 
 interface DragState {
-  id: string;
+  /** 被拖动的全部节点（多选群移；单选时长度为 1） */
+  ids: string[];
   startX: number;
   startY: number;
-  origin: FlowPos;
+  /** 各节点拖动前位置 */
+  origins: Record<string, FlowPos>;
   moved: boolean;
+  /** Ctrl/Shift+点击：抬起时切换选中而非拖动 */
+  toggleOnUp?: string;
 }
 
 export default function FlowSheet({ embedded = false }: { embedded?: boolean }) {
@@ -46,18 +50,23 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const sourcesRt = useCanvasStore((s) => s.sources);
   const flowSelectedId = useCanvasStore((s) => s.flowSelectedId);
   const setFlowSelectedId = useCanvasStore((s) => s.setFlowSelectedId);
+  const flowSelectedIds = useCanvasStore((s) => s.flowSelectedIds);
+  const setFlowSelectedIds = useCanvasStore((s) => s.setFlowSelectedIds);
+  const toggleFlowSelected = useCanvasStore((s) => s.toggleFlowSelected);
   const nodeTheme = useCanvasStore((s) => s.nodeTheme);
   const setNodeTheme = useCanvasStore((s) => s.setNodeTheme);
 
   const [zoom, setZoom] = useState(0.85);
   const [pan, setPan] = useState<FlowPos>({ x: 28, y: 28 });
-  const [delta, setDelta] = useState<{ id: string; dx: number; dy: number } | null>(null);
+  const [delta, setDelta] = useState<{ ids: string[]; dx: number; dy: number } | null>(null);
   const [hint, setHint] = useState('');
   const [dropHover, setDropHover] = useState(false);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   /** 端口连线拖拽：from=源节点，start=输出端口坐标，cur=指针画布坐标，hover=命中的合法目标 */
   const [connect, setConnect] = useState<{ from: string; start: FlowPos; cur: FlowPos; hover: string | null } | null>(null);
+  /** 框选（Shift+背景拖拽）：画布坐标起止点 */
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
   const selectedId = flowSelectedId;
 
   /** 节点高度上报（ResizeObserver 测量）：连线锚点与自动布局按实际高度计算 */
@@ -77,27 +86,43 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   );
 
   const nodeById = useMemo(() => new Map(config.pipeline.nodes.map((n) => [n.id, n])), [config.pipeline.nodes]);
-  const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
+  const selectedIds = flowSelectedIds;
+  /** 恰好单选时才有单节点上下文（工具条/抽屉） */
+  const selected = selectedIds.length === 1 ? nodeById.get(selectedIds[0]) ?? null : null;
+  const isSel = (id: string): boolean => selectedIds.includes(id);
 
   // 切换选中节点时收起「添加下游」浮层
   useEffect(() => {
     setAddMenuOpen(false);
   }, [selectedId]);
 
+  /** 批量启用/停用（ids 为空时无操作） */
+  const setEnabledBulk = (ids: string[], enabled: boolean): void => {
+    for (const id of ids) updateNodeInStore(id, { enabled });
+  };
+
+  /** 批量删除（source 节点连同数据源一并删除；引擎侧会自动清下游 inputs 引用） */
+  const deleteNodes = (ids: string[]): void => {
+    for (const id of ids) {
+      const n = nodeById.get(id);
+      if (!n) continue;
+      if (n.type === 'source') {
+        const srcDef = config.dataSources.find((d) => d.id === String(n.params.sourceId ?? ''));
+        if (srcDef) removeSource(srcDef.id);
+        else removeNode(id);
+      } else {
+        removeNode(id);
+      }
+    }
+    setFlowSelectedIds([]);
+  };
+
   const toggleSelectedEnabled = (): void => {
     if (selected) updateNodeInStore(selected.id, { enabled: !selected.enabled });
   };
 
   const deleteSelectedNode = (): void => {
-    if (!selected) return;
-    if (selected.type === 'source') {
-      const srcDef = config.dataSources.find((d) => d.id === String(selected.params.sourceId ?? ''));
-      if (srcDef) removeSource(srcDef.id);
-      else removeNode(selected.id);
-    } else {
-      removeNode(selected.id);
-    }
-    setFlowSelectedId(null);
+    deleteNodes(selectedIds.slice());
   };
 
   const addDownstream = (type: NodeType): void => {
@@ -150,6 +175,29 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [connect]);
+
+  // 多选快捷键：Delete/Backspace 删除选中、Ctrl/Cmd+A 全选、Esc 清空选择（输入控件内不响应）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (e.key === 'Escape' && selectedIds.length > 0 && !connect) {
+        setFlowSelectedIds([]);
+        return;
+      }
+      if (selectedIds.length === 0) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteNodes(selectedIds.slice());
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setFlowSelectedIds(config.pipeline.nodes.map((n) => n.id));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, config.pipeline.nodes, connect]);
 
   /** 添加节点：表格类步骤需指定上游表格节点；formula（计算字段）无需输入 */
   const addNodeOfType = (type: NodeType, inputId: string | null): void => {
@@ -256,15 +304,38 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     const t = e.target as HTMLElement | null;
     if (t?.closest('.ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .ant-cascader-dropdown, .ant-modal-wrap, .ant-message, .ant-notification')) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    // Shift+背景拖拽 = 框选（不平移画布；Ctrl/Cmd 同按时为追加模式）
+    if (e.shiftKey) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const px = (e.clientX - rect.left - pan.x) / zoom;
+        const py = (e.clientY - rect.top - pan.y) / zoom;
+        setMarquee({ x0: px, y0: py, x1: px, y1: py, additive: e.ctrlKey || e.metaKey });
+      }
+      return;
+    }
     panRef.current = { startX: e.clientX, startY: e.clientY, ox: pan.x, oy: pan.y };
-    setFlowSelectedId(null);
+    setFlowSelectedIds([]);
   };
 
   const onNodeDown = (e: React.PointerEvent, nodeId: string, node: FlowPos): void => {
     e.stopPropagation();
     if (e.button !== 0) return;
     containerRef.current?.setPointerCapture(e.pointerId);
-    dragRef.current = { id: nodeId, startX: e.clientX, startY: e.clientY, origin: { x: node.x, y: node.y }, moved: false };
+    // Ctrl/Shift+点击：抬起时切换选中（不进入拖动）
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+      dragRef.current = { ids: [nodeId], startX: e.clientX, startY: e.clientY, origins: { [nodeId]: { x: node.x, y: node.y } }, moved: false, toggleOnUp: nodeId };
+      return;
+    }
+    // 点在已选中的节点上：整组群移；否则单选它并拖动
+    const ids = isSel(nodeId) ? selectedIds.slice() : [nodeId];
+    if (!isSel(nodeId)) setFlowSelectedId(nodeId);
+    const origins: Record<string, FlowPos> = {};
+    for (const id of ids) {
+      const p = layout.byId[id];
+      origins[id] = id === nodeId ? { x: node.x, y: node.y } : { x: p?.x ?? node.x, y: p?.y ?? node.y };
+    }
+    dragRef.current = { ids, startX: e.clientX, startY: e.clientY, origins, moved: false };
   };
 
   const onMove = (e: React.PointerEvent): void => {
@@ -278,12 +349,21 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       }
       return;
     }
+    if (marquee) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const px = (e.clientX - rect.left - pan.x) / zoom;
+        const py = (e.clientY - rect.top - pan.y) / zoom;
+        setMarquee({ ...marquee, x1: px, y1: py });
+      }
+      return;
+    }
     const d = dragRef.current;
     if (d) {
       const dx = (e.clientX - d.startX) / zoom;
       const dy = (e.clientY - d.startY) / zoom;
       if (Math.abs(dx) + Math.abs(dy) > 2) d.moved = true;
-      setDelta({ id: d.id, dx, dy });
+      setDelta({ ids: d.ids, dx, dy });
       return;
     }
     const p = panRef.current;
@@ -313,10 +393,41 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       setDelta(null);
       return;
     }
+    // 框选提交：命中矩形内所有节点（additive 时并入既有选择）
+    if (marquee) {
+      const rx = Math.min(marquee.x0, marquee.x1);
+      const ry = Math.min(marquee.y0, marquee.y1);
+      const rw = Math.abs(marquee.x1 - marquee.x0);
+      const rh = Math.abs(marquee.y1 - marquee.y0);
+      if (rw > 4 || rh > 4) {
+        const hitIds = layout.nodes
+          .filter((n) => rectsIntersect({ x: rx, y: ry, w: rw, h: rh }, { x: n.x, y: n.y, w: NODE_W, h: heights[n.id] ?? NODE_H }))
+          .map((n) => n.id);
+        const next = marquee.additive ? Array.from(new Set([...selectedIds, ...hitIds])) : hitIds;
+        setFlowSelectedIds(next);
+      } else if (!marquee.additive) {
+        setFlowSelectedIds([]);
+      }
+      setMarquee(null);
+      panRef.current = null;
+      dragRef.current = null;
+      setDelta(null);
+      return;
+    }
     const d = dragRef.current;
     if (d) {
-      if (d.moved && delta) setFlowPos(d.id, { x: Math.round(d.origin.x + delta.dx), y: Math.round(d.origin.y + delta.dy) });
-      else setFlowSelectedId(d.id);
+      if (d.toggleOnUp && !d.moved) {
+        // Ctrl/Shift+点击：切换选中
+        toggleFlowSelected(d.toggleOnUp);
+      } else if (d.moved && delta) {
+        // 群移提交：整组按各自原始位置 + 同一 delta 落点
+        for (const id of d.ids) {
+          const o = d.origins[id];
+          if (o) setFlowPos(id, { x: Math.round(o.x + delta.dx), y: Math.round(o.y + delta.dy) });
+        }
+      } else if (!d.toggleOnUp) {
+        setFlowSelectedId(d.ids[0]);
+      }
       dragRef.current = null;
       setDelta(null);
     }
@@ -497,8 +608,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 const to = layout.byId[e.to];
                 if (!from || !to) return null;
                 const bad = outputs[e.to]?.kind === 'error';
-                // 选中节点时高亮其上下游连线，其余淡出
-                const active = selectedId !== null && (e.from === selectedId || e.to === selectedId);
+                // 选中（含多选）节点时高亮其上下游连线，其余淡出
+                const active = isSel(e.from) || isSel(e.to);
                 return (
                   <path
                     key={`${e.from}->${e.to}`}
@@ -506,7 +617,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                     fill="none"
                     stroke={bad ? 'var(--nb-edge-bad)' : active ? '#2563eb' : 'var(--nb-edge)'}
                     strokeWidth={active ? 2.5 : 2}
-                    opacity={selectedId !== null && !active ? 0.35 : 1}
+                    opacity={selectedIds.length > 0 && !active ? 0.35 : 1}
                     markerEnd={bad ? 'url(#nb-arrow-bad)' : active ? 'url(#nb-arrow-active)' : 'url(#nb-arrow)'}
                   />
                 );
@@ -531,8 +642,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                   srcRt={srcId ? sourcesRt[srcId] : undefined}
                   x={pos.x}
                   y={pos.y}
-                  selected={selectedId === n.id}
-                  dragging={delta?.id === n.id}
+                  selected={isSel(n.id)}
+                  dragging={delta?.ids.includes(n.id) ?? false}
                   onPointerDown={(e) => onNodeDown(e, n.id, { x: n.x, y: n.y })}
                   onHeight={handleHeight}
                 />
@@ -595,6 +706,39 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 onDelete={deleteSelectedNode}
               />
             )}
+
+            {/* 多选工具条：整组启用/停用/删除（锚在选择集包围盒顶部居中） */}
+            {selectedIds.length > 1 &&
+              (() => {
+                const boxes = selectedIds.map((id) => layout.byId[id]).filter(Boolean);
+                if (boxes.length === 0) return null;
+                const minX = Math.min(...boxes.map((b) => b.x));
+                const minY = Math.min(...boxes.map((b) => b.y));
+                const anchor = { x: minX + (Math.max(...boxes.map((b) => b.x + NODE_W)) - minX) / 2 - NODE_W / 2, y: minY };
+                return (
+                  <MultiToolbar
+                    count={selectedIds.length}
+                    anchor={anchor}
+                    zoom={zoom}
+                    onEnable={() => setEnabledBulk(selectedIds, true)}
+                    onDisable={() => setEnabledBulk(selectedIds, false)}
+                    onDelete={() => deleteNodes(selectedIds.slice())}
+                  />
+                );
+              })()}
+
+            {/* 框选矩形（Shift+背景拖拽） */}
+            {marquee && (
+              <div
+                className="pointer-events-none absolute border border-blue-500 bg-blue-500/10"
+                style={{
+                  left: Math.min(marquee.x0, marquee.x1),
+                  top: Math.min(marquee.y0, marquee.y1),
+                  width: Math.abs(marquee.x1 - marquee.x0),
+                  height: Math.abs(marquee.y1 - marquee.y0),
+                }}
+              />
+            )}
           </div>
 
           <Legend />
@@ -621,8 +765,12 @@ export function NodeInspector() {
   const outputs = useCanvasStore((s) => s.outputs);
   const flowSelectedId = useCanvasStore((s) => s.flowSelectedId);
   const setFlowSelectedId = useCanvasStore((s) => s.setFlowSelectedId);
+  const flowSelectedIds = useCanvasStore((s) => s.flowSelectedIds);
+  const setFlowSelectedIds = useCanvasStore((s) => s.setFlowSelectedIds);
   const addNodeToStore = useCanvasStore((s) => s.addNode);
   const updateNodeInStore = useCanvasStore((s) => s.updateNode);
+  const removeNode = useCanvasStore((s) => s.removeNode);
+  const removeSource = useCanvasStore((s) => s.removeSource);
 
   const node = flowSelectedId ? config.pipeline.nodes.find((n) => n.id === flowSelectedId) ?? null : null;
 
@@ -631,6 +779,22 @@ export function NodeInspector() {
     if (!n) return false;
     if (n.type === 'source') return true;
     return outputs[id]?.kind === 'table';
+  };
+
+  /** 多选批量删除（source 连同数据源；下游 inputs 引用由引擎侧清理） */
+  const deleteNodes = (ids: string[]): void => {
+    for (const id of ids) {
+      const n = config.pipeline.nodes.find((x) => x.id === id);
+      if (!n) continue;
+      if (n.type === 'source') {
+        const srcDef = config.dataSources.find((d) => d.id === String(n.params.sourceId ?? ''));
+        if (srcDef) removeSource(srcDef.id);
+        else removeNode(id);
+      } else {
+        removeNode(id);
+      }
+    }
+    setFlowSelectedIds([]);
   };
 
   const addDownstream = (type: NodeType): void => {
@@ -656,6 +820,38 @@ export function NodeInspector() {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.pipeline.nodes, outputs, node]);
+
+  // 多选面板：批量启用/停用/删除（放在所有 hooks 之后）
+  if (flowSelectedIds.length > 1) {
+    const ids = flowSelectedIds;
+    const names = ids.map((id) => config.pipeline.nodes.find((n) => n.id === id)?.name ?? id);
+    return (
+      <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
+        <div>
+          <div className="text-[13px] font-semibold text-slate-800">已选 {ids.length} 个节点</div>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-slate-400">可整组拖动对齐位置，或批量启停、删除。按 Esc 取消选择。</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {names.map((nm, i) => (
+            <span key={ids[i]} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+              {nm}
+            </span>
+          ))}
+        </div>
+        <div className="mt-1 flex flex-col gap-2">
+          <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: true }))}>
+            全部启用
+          </button>
+          <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: false }))}>
+            全部停用
+          </button>
+          <button type="button" className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-100" onClick={() => deleteNodes(ids.slice())}>
+            删除选中节点（Delete）
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!node) {
     return (
@@ -731,9 +927,63 @@ function AddNodeMenu({
   );
 }
 
-function withDelta(pos: FlowPos & { id?: string }, delta: { id: string; dx: number; dy: number } | null): FlowPos {
-  if (delta && pos.id === delta.id) return { x: pos.x + delta.dx, y: pos.y + delta.dy };
+function withDelta(pos: FlowPos & { id?: string }, delta: { ids: string[]; dx: number; dy: number } | null): FlowPos {
+  if (delta && pos.id !== undefined && delta.ids.includes(pos.id)) return { x: pos.x + delta.dx, y: pos.y + delta.dy };
   return { x: pos.x, y: pos.y };
+}
+
+/** 多选工具条：锚在选择集包围盒顶部居中，随缩放反向缩放 */
+function MultiToolbar({
+  count,
+  anchor,
+  zoom,
+  onEnable,
+  onDisable,
+  onDelete,
+}: {
+  count: number;
+  anchor: FlowPos;
+  zoom: number;
+  onEnable: () => void;
+  onDisable: () => void;
+  onDelete: () => void;
+}) {
+  const inv = 1 / Math.max(0.5, Math.min(1.8, zoom));
+  return (
+    <div className="absolute" style={{ left: anchor.x + NODE_W / 2, top: anchor.y, width: 0, height: 0 }}>
+      <div
+        className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--nb-pop-border)] bg-[var(--nb-pop-surface)] px-2 py-1.5 shadow-lg backdrop-blur"
+        style={{ bottom: 10, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <span className="px-1 text-[10.5px] font-medium text-[var(--nb-pop-text)]">{count} 个节点</span>
+        <button
+          type="button"
+          title="全部启用"
+          onClick={onEnable}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-emerald-400 transition-colors hover:bg-emerald-500/20"
+        >
+          <PlayCircleOutlined style={{ fontSize: 13 }} />
+        </button>
+        <button
+          type="button"
+          title="全部停用"
+          onClick={onDisable}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--nb-text-dim)] transition-colors hover:bg-slate-500/20"
+        >
+          <PauseCircleOutlined style={{ fontSize: 13 }} />
+        </button>
+        <button
+          type="button"
+          title="删除选中节点（Delete）"
+          onClick={onDelete}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-red-400 transition-colors hover:bg-red-500/20"
+        >
+          <DeleteOutlined style={{ fontSize: 13 }} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** 连线拖拽 ghost 线的贝塞尔路径（从输出端口到指针） */

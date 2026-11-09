@@ -62,9 +62,14 @@ export interface CanvasStore {
   /** 主界面视图：日报画布 / 数据节点（顶部 Tab，两视图联动左栏与右栏） */
   viewMode: 'canvas' | 'node';
   setViewMode: (v: 'canvas' | 'node') => void;
-  /** 数据节点视图中选中的节点 id（节点属性栏数据源） */
+  /** 数据节点视图中选中的节点 id（节点属性栏数据源；多选时为主选中=最后点选） */
   flowSelectedId: string | null;
   setFlowSelectedId: (id: string | null) => void;
+  /** 多选集合（含主选中；单选时长度为 1） */
+  flowSelectedIds: string[];
+  setFlowSelectedIds: (ids: string[]) => void;
+  /** Ctrl/Shift+点击：切换某节点的选中状态 */
+  toggleFlowSelected: (id: string) => void;
   /** 组件库栏是否收起（收起为竖条） */
   libCollapsed: boolean;
   setLibCollapsed: (v: boolean) => void;
@@ -202,7 +207,15 @@ export const useCanvasStore = create<CanvasStore>()(
         viewMode: 'canvas',
         setViewMode: (v) => set({ viewMode: v }),
         flowSelectedId: null,
-        setFlowSelectedId: (id) => set({ flowSelectedId: id }),
+        setFlowSelectedId: (id) => set({ flowSelectedId: id, flowSelectedIds: id ? [id] : [] }),
+        flowSelectedIds: [],
+        setFlowSelectedIds: (ids) => set({ flowSelectedIds: ids, flowSelectedId: ids.length > 0 ? ids[ids.length - 1] : null }),
+        toggleFlowSelected: (id) =>
+          set((s) => {
+            const has = s.flowSelectedIds.includes(id);
+            const ids = has ? s.flowSelectedIds.filter((x) => x !== id) : [...s.flowSelectedIds, id];
+            return { flowSelectedIds: ids, flowSelectedId: ids.length > 0 ? ids[ids.length - 1] : null };
+          }),
         libCollapsed: false,
         setLibCollapsed: (v) => set({ libCollapsed: v }),
         nodeTheme: 'dark',

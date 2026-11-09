@@ -135,3 +135,11 @@ export function edgePath(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH
   const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
+
+/** 矩形相交（框选用） */
+export function rectsIntersect(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
