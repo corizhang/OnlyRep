@@ -227,6 +227,10 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
 
   const onBackgroundDown = (e: React.PointerEvent): void => {
     if (e.button !== 0) return;
+    // antd 弹层（Select 下拉/Dropdown/日期面板等）经 React portal 冒泡到本容器：
+    // 不做指针捕获（否则弹层选项的 click 被重定向丢失）、不取消选中
+    const t = e.target as HTMLElement | null;
+    if (t?.closest('.ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .ant-cascader-dropdown, .ant-modal-wrap, .ant-message, .ant-notification')) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     panRef.current = { startX: e.clientX, startY: e.clientY, ox: pan.x, oy: pan.y };
     setFlowSelectedId(null);

@@ -230,10 +230,10 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
     return () => ro.disconnect();
   }, [node.id, onHeight]);
 
-  /** 表单控件区域不触发节点拖拽（antd 各控件容器类名一并排除） */
+  /** 表单控件区域不触发节点拖拽（antd 各控件容器与弹层类名一并排除：弹层经 React portal 冒泡） */
   const onShellDown = (e: React.PointerEvent): void => {
     const t = e.target as HTMLElement | null;
-    if (t?.closest('input, textarea, select, button, a, label, .ant-select, .ant-input, .ant-input-number, .ant-input-number-handler-wrap, .ant-btn, .ant-checkbox-wrapper, .ant-collapse, .no-drag')) {
+    if (t?.closest('input, textarea, select, button, a, label, .ant-select, .ant-input, .ant-input-number, .ant-input-number-handler-wrap, .ant-btn, .ant-checkbox-wrapper, .ant-collapse, .ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .no-drag')) {
       e.stopPropagation();
       return;
     }
