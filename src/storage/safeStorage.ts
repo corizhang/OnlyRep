@@ -20,6 +20,13 @@ export interface StorageBackend {
   removeItem(key: string): void;
 }
 
+/** 异步后端（Tauri SQLite 经 IPC；zustand persist 的 StateStorage 允许 Promise 返回值） */
+export interface AsyncStorageBackend {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+  removeItem(key: string): Promise<void>;
+}
+
 /** 存储异常类型：unavailable=环境禁用（file://隐私模式等）；quota=配额写满；unknown=其他写失败 */
 export type StorageErrorKind = 'unavailable' | 'quota' | 'unknown';
 

@@ -5,3 +5,4 @@ e2e/screenshots/
 .tmp-vt2/
 .shots/
 node-compile-cache/
+src-tauri/target/

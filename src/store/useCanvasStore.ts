@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { appStorage, onStorageError } from '../storage/safeStorage';
+import { isTauri, tauriPersistStorage } from '../storage/tauriKv';
 import { genTemplateName, loadTemplateLibrary, newTemplateId, saveTemplateLibrary, type SavedTemplate } from '../canvas/templateLibrary';
 import type {
   AnyBlockConfig,
@@ -837,7 +838,8 @@ export const useCanvasStore = create<CanvasStore>()(
     {
       name: 'rankboard-canvas-v3',
       version: 3,
-      storage: createJSONStorage(() => appStorage),
+      // Tauri 桌面壳：config 落 SQLite（无 5MB 配额）；浏览器：safeStorage（探测+内存降级）
+      storage: createJSONStorage(() => (isTauri() ? tauriPersistStorage : appStorage)),
       partialize: (state) => ({ config: state.config }),
       /**
        * 老版本数据兜底：版本不匹配时 zustand 默认直接丢弃（静默丢配置）。

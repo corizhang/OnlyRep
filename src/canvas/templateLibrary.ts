@@ -1,4 +1,5 @@
 import { appStorage } from '../storage/safeStorage';
+import { initTauriMirror, isTauri, mirrorGet, mirrorSet } from '../storage/tauriKv';
 import { newId } from '../canvas/datasource/registry';
 import type { CanvasConfig } from '../canvas/types';
 
@@ -22,9 +23,14 @@ export interface TemplateLibraryData {
 
 const KEY = 'rankboard-canvas-templates-v1';
 
+/** Tauri 环境启动时调用一次：把模板库从 SQLite 载入内存镜像（此后同步读写与普通路径一致） */
+export async function initTemplateLibraryStorage(): Promise<void> {
+  if (isTauri()) await initTauriMirror([KEY]);
+}
+
 export function loadTemplateLibrary(): TemplateLibraryData {
   try {
-    const raw = appStorage.getItem(KEY);
+    const raw = isTauri() ? mirrorGet(KEY) : appStorage.getItem(KEY);
     if (!raw) return { activeId: null, items: [] };
     const data = JSON.parse(raw) as TemplateLibraryData;
     if (!Array.isArray(data.items)) return { activeId: null, items: [] };
@@ -36,7 +42,8 @@ export function loadTemplateLibrary(): TemplateLibraryData {
 
 export function saveTemplateLibrary(data: TemplateLibraryData): void {
   try {
-    appStorage.setItem(KEY, JSON.stringify(data));
+    if (isTauri()) mirrorSet(KEY, JSON.stringify(data));
+    else appStorage.setItem(KEY, JSON.stringify(data));
   } catch {
     // 存储失败由 safeStorage 监听器统一提示
   }

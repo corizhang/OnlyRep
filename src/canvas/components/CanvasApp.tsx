@@ -3,6 +3,8 @@ import { message, Segmented, Tooltip } from 'antd';
 import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
+import { initTemplateLibraryStorage } from '../templateLibrary';
+import { isTauri } from '../../storage/tauriKv';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
 import BlockLibrary from './BlockLibrary';
@@ -38,15 +40,24 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
   useEffect(() => {
-    // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
-    const preset = new URLSearchParams(window.location.search).get('preset');
-    if (preset) useCanvasStore.getState().applyPreset(preset);
-    else bootstrap();
-    // ?flow=1（兼容旧链接）/ ?view=node 直接进入数据节点视图
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('flow') === '1' || params.get('view') === 'node') {
-      useCanvasStore.getState().setViewMode('node');
-    }
+    const start = async (): Promise<void> => {
+      // Tauri：persist 为异步 SQLite 后端，先等 rehydrate 与模板库镜像就绪，再 bootstrap
+      // （否则会用默认空配置重算，随后配置换入导致结果过期）
+      if (isTauri()) {
+        await useCanvasStore.persist.rehydrate();
+        await initTemplateLibraryStorage();
+      }
+      // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
+      const preset = new URLSearchParams(window.location.search).get('preset');
+      if (preset) useCanvasStore.getState().applyPreset(preset);
+      else bootstrap();
+      // ?flow=1（兼容旧链接）/ ?view=node 直接进入数据节点视图
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('flow') === '1' || params.get('view') === 'node') {
+        useCanvasStore.getState().setViewMode('node');
+      }
+    };
+    void start();
     // 仅在挂载时跑一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
