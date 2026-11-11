@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { appStorage, onStorageError } from '../storage/safeStorage';
 import type {
   AnyBlockConfig,
   CanvasBlock,
@@ -55,6 +56,8 @@ export interface CanvasStore {
   selectedId: string | null;
   /** 刷新后配置已恢复 */
   restored: boolean;
+  /** 本地存储写失败（配额满/环境禁用）：非空时顶部显示导出备份警告条（内存降级中，刷新即丢） */
+  storageError: string | null;
   /** 导入/解析中标记 */
   busy: boolean;
   /** 流程视图是否打开（全屏抽屉，不入持久化） */
@@ -183,6 +186,18 @@ export const useCanvasStore = create<CanvasStore>()(
     (set, get) => {
       const apply = (patch: Partial<CanvasStore>): void => set(patch);
 
+      // 存储降级通知 → storageError（顶部警告条）。必须在 initializer 首行注册：
+      // persist 初始化写入发生在模块尾代码执行之前，晚了会错过首次失败；
+      // 守卫 storageError !== msg 防循环（setState→persist 写→失败→本回调）。
+      onStorageError((e) => {
+        const msg =
+          e.kind === 'quota'
+            ? '本地存储空间已满，之后的修改不会被保存（当前数据仍在内存中，刷新即丢失）'
+            : '本地存储不可用，之后的修改不会被保存（当前数据仍在内存中，刷新即丢失）';
+        const st = get();
+        if (st.storageError !== msg) set({ storageError: msg });
+      });
+
       const recomputeWith = (config: CanvasConfig, sourcesIn: Record<string, SourceRuntime>): void => {
         const sources = syncManualTables(config, sourcesIn);
         const result = runGraph(
@@ -235,6 +250,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
       return {
         config: createDefaultCanvasConfig(),
+        storageError: null,
         sources: {},
         outputs: {},
         env: {},
@@ -719,8 +735,24 @@ export const useCanvasStore = create<CanvasStore>()(
     {
       name: 'rankboard-canvas-v3',
       version: 3,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => appStorage),
       partialize: (state) => ({ config: state.config }),
+      /**
+       * 老版本数据兜底：版本不匹配时 zustand 默认直接丢弃（静默丢配置）。
+       * 这里先整份备份到 backup key，再与默认 config 浅合并尽力沿用；
+       * 结构差异过大导致异常时也不会阻断启动。
+       */
+      migrate: (persisted, version) => {
+        try {
+          if (persisted && typeof persisted === 'object') {
+            appStorage.setItem(`rankboard-canvas-backup-v${version}`, JSON.stringify(persisted));
+          }
+          const p = persisted as { config?: Partial<CanvasConfig> } | undefined;
+          return { config: { ...createDefaultCanvasConfig(), ...(p?.config ?? {}) } };
+        } catch {
+          return { config: createDefaultCanvasConfig() };
+        }
+      },
       onRehydrateStorage: () => (state) => {
         if (state) state.restored = true;
       },
@@ -801,3 +833,4 @@ export function blocksReferencing(config: CanvasConfig, ref: string): string[] {
 }
 
 export { newBlockId };
+

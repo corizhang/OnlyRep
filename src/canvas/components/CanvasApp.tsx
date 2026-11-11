@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Segmented, Tooltip } from 'antd';
 import { RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
+import { downloadCanvasTemplate } from '../template';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
 import BlockLibrary from './BlockLibrary';
@@ -28,6 +29,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const redo = useCanvasStore((s) => s.redo);
   const canUndo = useCanvasStore((s) => s.history.past.length > 0);
   const canRedo = useCanvasStore((s) => s.history.future.length > 0);
+  const storageError = useCanvasStore((s) => s.storageError);
 
   useEffect(() => {
     // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
@@ -125,6 +127,20 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
               ○ {w}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* 存储降级警告：写入 localStorage 失败（配额满/环境禁用），提示立即导出备份 */}
+      {storageError && (
+        <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-5 py-1.5 text-[12px] text-red-700">
+          <span className="min-w-0 flex-1">⚠ {storageError}</span>
+          <button
+            type="button"
+            onClick={() => downloadCanvasTemplate(config)}
+            className="shrink-0 rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-100"
+          >
+            立即导出模板备份
+          </button>
         </div>
       )}
 

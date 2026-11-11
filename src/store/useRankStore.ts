@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { appStorage } from '../storage/safeStorage';
 import type { StoreApi } from 'zustand';
 import type { BoardResult, RankConfig, RawTable } from '../types';
 import { createDefaultConfig } from '../constants/defaults';
@@ -230,7 +231,7 @@ export const useRankStore = create<RankStore>()(
       // 因此每新增配置字段必须同步升版本号，否则旧持久化会绕过补默认值（白屏事故根因）。
       name: 'rankboard:config:v1',
       version: 3,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => appStorage),
       // 白名单只含 config；且背景图 dataURL 绝不落盘（铁律 / R9）
       partialize: (state) => ({
         config: { ...state.config, backgroundImage: null },

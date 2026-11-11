@@ -11,6 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright-core');
+const { launchOptions, prepareLegacyMode } = require('./lib/browser.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const FIX = path.join(__dirname, 'fixtures');
@@ -18,10 +19,6 @@ const SHOTS = path.join(__dirname, 'screenshots');
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const BASE = 'http://localhost:4173';
-const EXEC = path.join(
-  process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local'),
-  'ms-playwright', 'chromium-1247', 'chrome-win64', 'chrome.exe',
-);
 
 const results = [];
 
@@ -42,17 +39,13 @@ function check(name, cond, detail = '') {
 }
 
 (async () => {
-  const browser = await chromium.launch({
-    executablePath: EXEC,
-    headless: true,
-    // 直连代理：绕过本机 AdGuard 等系统代理向页面注入的 content script（环境噪声，非应用行为）
-    args: ['--no-sandbox', '--disable-dev-shm-usage', "--proxy-server='direct://'", '--proxy-bypass-list=*'],
-  });
+  const browser = await chromium.launch(launchOptions());
   const context = await browser.newContext({
     viewport: { width: 1600, height: 900 },
     acceptDownloads: true,
   });
   const page = await context.newPage();
+  await prepareLegacyMode(page);
 
   // ---- 全局监听：console error / 页面异常 / 网络请求（纯本地铁律 G4） ----
   const consoleErrors = [];

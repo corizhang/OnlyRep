@@ -5,20 +5,15 @@
  */
 const path = require('path');
 const { chromium } = require('playwright-core');
+const { launchOptions, prepareLegacyMode } = require('./lib/browser.cjs');
 
 const FIX = path.join(__dirname, 'fixtures');
 const BASE = 'http://localhost:4173';
-const EXEC = path.join(
-  process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local'),
-  'ms-playwright', 'chromium-1247', 'chrome-win64', 'chrome.exe',
-);
 
 (async () => {
-  const browser = await chromium.launch({
-    executablePath: EXEC, headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage', "--proxy-server='direct://'", '--proxy-bypass-list=*'],
-  });
+  const browser = await chromium.launch(launchOptions());
   const page = await (await browser.newContext({ viewport: { width: 1600, height: 900 } })).newPage();
+  await prepareLegacyMode(page);
   const pageErrors = [];
   page.on('pageerror', (err) => pageErrors.push(String(err)));
 

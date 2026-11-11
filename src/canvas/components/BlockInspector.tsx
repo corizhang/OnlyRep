@@ -757,7 +757,8 @@ function TableInspector({
           <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: menuItems }}>
             <button
               type="button"
-              className="ml-auto shrink-0 text-[13px] leading-none text-slate-300 opacity-0 transition-opacity hover:text-slate-600 group-hover:opacity-100"
+              title="列操作（复制/删除）"
+              className="ml-auto shrink-0 rounded px-0.5 text-[13px] leading-none text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
               onClick={(e) => e.stopPropagation()}
             >
               <EllipsisOutlined />

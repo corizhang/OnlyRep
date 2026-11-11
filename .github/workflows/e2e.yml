@@ -1,0 +1,21 @@
+name: e2e
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix e2e
+      # 浏览器版本与 e2e/playwright-core 对齐；安装到默认缓存目录，run.cjs 会自动定位
+      - run: npx -y playwright@1.64.1 install --with-deps chromium
+      - run: npm test
+      - run: npm run test:e2e
