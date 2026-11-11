@@ -13,6 +13,7 @@ import CanvasSettings from './CanvasSettings';
 import CanvasStage from './CanvasStage';
 import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
 import TemplateLibraryModal from './TemplateLibraryModal';
+import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
 
 /** 日报画布主界面（v2 双视图）：顶部 Tab 切「日报画布 / 数据节点」，左栏与右栏随视图联动，变量面板共用 */
@@ -216,6 +217,9 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
       {showFlow && <FlowSheet />}
 
       <TemplateLibraryModal open={showTplLib} onClose={() => setShowTplLib(false)} />
+
+      {/* 首屏欢迎页（仅首次使用出现一次） */}
+      <WelcomeModal />
 
       {/* 快捷键帮助：右下浮动按钮 + 面板（内容随视图切换） */}
       <ShortcutsHelp viewMode={viewMode} />

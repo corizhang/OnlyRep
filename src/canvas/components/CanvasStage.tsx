@@ -6,6 +6,7 @@ import type { CanvasBlock } from '../types';
 import CanvasRenderer from '../blocks/CanvasRenderer';
 import type { RenderCtx } from '../blocks/context';
 import { exportPng } from '../../utils/exportImage';
+import EmptyGuide from './EmptyGuide';
 import { createBlock } from '../defaults';
 import { Btn } from './ui';
 
@@ -138,7 +139,7 @@ export default function CanvasStage() {
       )}
 
       <div
-        className="flex-1 overflow-auto bg-slate-200 p-6"
+        className="relative flex-1 overflow-auto bg-slate-200 p-6"
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes('text/new-block')) {
             e.preventDefault();
@@ -163,6 +164,8 @@ export default function CanvasStage() {
         }}
         onClick={() => selectBlock(null)}
       >
+        {/* 空态引导：没有区块时给出最短上手路径 */}
+        {config.blocks.length === 0 && <EmptyGuide variant="canvas" />}
         <div className={`mx-auto w-fit rounded-lg ${dropHint ? 'ring-2 ring-blue-400' : ''}`}>
           <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
             <CanvasRenderer

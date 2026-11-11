@@ -8,6 +8,7 @@ import { computeFlowLayout, edgeMid, edgePath, NODE_H, NODE_W, rectsIntersect, t
 import FlowNodeCard from './FlowNodeCard';
 import { nodeThemeVars, type NodeTheme } from './nodeTheme';
 import { stepDef } from './nodes';
+import EmptyGuide from '../components/EmptyGuide';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
@@ -621,6 +622,9 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
           data-drop-hover={dropHover ? '1' : undefined}
         >
           {dropHover && <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/30" />}
+
+          {/* 空态引导：没有任何节点时给出最短上手路径 */}
+          {config.pipeline.nodes.length === 0 && <EmptyGuide variant="node" />}
 
           <div
             className="absolute left-0 top-0"
