@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { appStorage, onStorageError } from '../storage/safeStorage';
+import { genTemplateName, loadTemplateLibrary, newTemplateId, saveTemplateLibrary, type SavedTemplate } from '../canvas/templateLibrary';
 import type {
   AnyBlockConfig,
   CanvasBlock,
@@ -100,6 +101,21 @@ export interface CanvasStore {
 
   // 生命周期
   bootstrap: () => void;
+
+  // 模板库（多模板管理：命名保存/切换/复制/删除，存档点模式保存才回写）
+  templates: SavedTemplate[];
+  activeTemplateId: string | null;
+  /** 保存当前工作区：有当前模板则覆盖，否则以 name 新建（空则自动命名）；返回模板 id */
+  saveTemplate: (name?: string) => string;
+  /** 载入库中模板覆盖当前工作区（清撤销历史，导入文件源需重新选文件） */
+  loadTemplateById: (id: string) => boolean;
+  renameTemplate: (id: string, name: string) => void;
+  duplicateTemplate: (id: string) => void;
+  deleteTemplate: (id: string) => void;
+  /** 新建空白工作区（脱离模板库当前项） */
+  newBlankWorkspace: () => void;
+  /** 当前工作区相对当前模板是否有未保存修改（载入前确认用） */
+  isTemplateDirty: () => boolean;
 
   // 画布级配置
   patchConfig: (p: Partial<CanvasConfig>) => void;
@@ -266,6 +282,8 @@ export const useCanvasStore = create<CanvasStore>()(
       return {
         config: createDefaultCanvasConfig(),
         storageError: null,
+        templates: [],
+        activeTemplateId: null,
         sources: {},
         outputs: {},
         env: {},
@@ -350,6 +368,9 @@ export const useCanvasStore = create<CanvasStore>()(
 
         bootstrap: () => {
           const s = get();
+          // 模板库载入（独立于工作区的存档点）
+          const lib = loadTemplateLibrary();
+          set({ templates: lib.items, activeTemplateId: lib.activeId });
           recomputeWith(s.config, s.sources);
           // 异步恢复导入源缓存快照（IndexedDB），完成后重算并更新提示
           void restoreImportCaches(recomputeWith, (store) => {
@@ -368,7 +389,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const config = preset.create();
           engineCache.clear();
           void clearSourceSnapshots();
-          set({ config, sources: {}, selectedId: null, errors: [], history: { past: [], future: [] } });
+          set({ config, sources: {}, selectedId: null, errors: [], history: { past: [], future: [] }, activeTemplateId: null });
           recomputeWith(config, {});
         },
 
@@ -376,14 +397,78 @@ export const useCanvasStore = create<CanvasStore>()(
           engineCache.clear();
           void clearSourceSnapshots();
           const config = createDefaultCanvasConfig();
-          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] } });
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null });
         },
 
         loadTemplate: (config) => {
           engineCache.clear();
           void clearSourceSnapshots();
-          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] } });
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null });
           recomputeWith(config, {});
+        },
+
+        // ---- 模板库 ----
+        saveTemplate: (name) => {
+          const s = get();
+          if (s.activeTemplateId) {
+            const id = s.activeTemplateId;
+            const items = s.templates.map((t) => (t.id === id ? { ...t, config: s.config, updatedAt: Date.now() } : t));
+            saveTemplateLibrary({ activeId: id, items });
+            set({ templates: items });
+            return id;
+          }
+          const id = newTemplateId();
+          const item: SavedTemplate = { id, name: name?.trim() || genTemplateName(s.templates), updatedAt: Date.now(), config: s.config };
+          const items = [...s.templates, item];
+          saveTemplateLibrary({ activeId: id, items });
+          set({ templates: items, activeTemplateId: id });
+          return id;
+        },
+
+        loadTemplateById: (id) => {
+          const t = get().templates.find((x) => x.id === id);
+          if (!t) return false;
+          get().loadTemplate(t.config);
+          set({ activeTemplateId: id });
+          saveTemplateLibrary({ activeId: id, items: get().templates });
+          return true;
+        },
+
+        renameTemplate: (id, name) => {
+          const trimmed = name.trim();
+          if (!trimmed) return;
+          const items = get().templates.map((t) => (t.id === id ? { ...t, name: trimmed, updatedAt: Date.now() } : t));
+          saveTemplateLibrary({ activeId: get().activeTemplateId, items });
+          set({ templates: items });
+        },
+
+        duplicateTemplate: (id) => {
+          const t = get().templates.find((x) => x.id === id);
+          if (!t) return;
+          const copy: SavedTemplate = { id: newTemplateId(), name: `${t.name} 副本`, updatedAt: Date.now(), config: t.config };
+          const items = [...get().templates, copy];
+          saveTemplateLibrary({ activeId: get().activeTemplateId, items });
+          set({ templates: items });
+        },
+
+        deleteTemplate: (id) => {
+          const items = get().templates.filter((t) => t.id !== id);
+          const activeId = get().activeTemplateId === id ? null : get().activeTemplateId;
+          saveTemplateLibrary({ activeId, items });
+          set({ templates: items, activeTemplateId: activeId });
+        },
+
+        newBlankWorkspace: () => {
+          get().resetCanvas();
+          set({ activeTemplateId: null });
+          saveTemplateLibrary({ activeId: null, items: get().templates });
+        },
+
+        isTemplateDirty: () => {
+          const s = get();
+          const active = s.activeTemplateId ? s.templates.find((t) => t.id === s.activeTemplateId) : undefined;
+          if (!active) return false;
+          return JSON.stringify(active.config) !== JSON.stringify(s.config);
         },
 
         // ---- 区块 ----

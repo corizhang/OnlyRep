@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { message, Segmented, Tooltip } from 'antd';
-import { QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
+import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
 import DataSourcePanel from './DataSourcePanel';
@@ -12,6 +12,7 @@ import VariablePanel from './VariablePanel';
 import CanvasSettings from './CanvasSettings';
 import CanvasStage from './CanvasStage';
 import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
+import TemplateLibraryModal from './TemplateLibraryModal';
 import { Btn } from './ui';
 
 /** 日报画布主界面（v2 双视图）：顶部 Tab 切「日报画布 / 数据节点」，左栏与右栏随视图联动，变量面板共用 */
@@ -30,6 +31,10 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const canUndo = useCanvasStore((s) => s.history.past.length > 0);
   const canRedo = useCanvasStore((s) => s.history.future.length > 0);
   const storageError = useCanvasStore((s) => s.storageError);
+  const activeTemplateId = useCanvasStore((s) => s.activeTemplateId);
+  const templates = useCanvasStore((s) => s.templates);
+  const [showTplLib, setShowTplLib] = useState(false);
+  const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
   useEffect(() => {
     // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
@@ -85,6 +90,17 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
             ]}
           />
           <span className="text-[11.5px] text-slate-400">一次搭好，换数据即出图</span>
+          {/* 模板库入口：显示当前模板名（无则"未保存的工作区"） */}
+          <Tooltip title="模板库（多模板保存/切换）">
+            <button
+              type="button"
+              onClick={() => setShowTplLib(true)}
+              className="flex max-w-[180px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-slate-600 shadow-sm hover:border-blue-300 hover:text-blue-600"
+            >
+              <FolderOpenOutlined style={{ fontSize: 12 }} />
+              <span className="truncate">{activeTplName ?? '模板库'}</span>
+            </button>
+          </Tooltip>
           {/* 撤销/重做（config 级：节点/数据/区块/主题全部覆盖） */}
           <span className="flex items-center gap-0.5">
             <Tooltip title="撤销（Ctrl+Z）">
@@ -198,6 +214,8 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
       </main>
 
       {showFlow && <FlowSheet />}
+
+      <TemplateLibraryModal open={showTplLib} onClose={() => setShowTplLib(false)} />
 
       {/* 快捷键帮助：右下浮动按钮 + 面板（内容随视图切换） */}
       <ShortcutsHelp viewMode={viewMode} />
