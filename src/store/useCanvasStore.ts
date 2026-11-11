@@ -91,8 +91,10 @@ export interface CanvasStore {
   // 撤销/重做（config 快照历史，内存态不持久化）
   /** 历史栈（past 顶=最近一次可撤销；future 顶=最近一次可重做） */
   history: { past: HistoryEntry[]; future: HistoryEntry[] };
-  undo: () => void;
-  redo: () => void;
+  /** 返回被撤销动作的可读名（无历史时 null），供调用方弹 toast */
+  undo: () => string | null;
+  /** 返回被重做动作的可读名（无历史时 null） */
+  redo: () => string | null;
   /** 把多次连续修改合并为一步历史（如添加+落点、群移、批量删除） */
   transact: (label: string, fn: () => void) => void;
 
@@ -155,6 +157,19 @@ export interface HistoryEntry {
 const HISTORY_LIMIT = 50;
 /** 同 label 连续修改的合并窗口（如连续输入/微调） */
 const HISTORY_MERGE_MS = 900;
+
+/** 历史 label → 动作可读名（undo/redo toast 用；label 是技术标识，这里统一翻译） */
+export function historyLabelOf(label: string): string {
+  if (label === 'move:nodes') return '移动多个节点';
+  if (label.startsWith('move:')) return '移动节点';
+  if (label === 'add-node') return '添加节点';
+  if (label === 'del-nodes') return '删除节点';
+  if (label === 'del-edge') return '删除连线';
+  if (label === 'resetFlowPos') return '自动排列';
+  if (label.startsWith('node:')) return '修改节点配置';
+  if (label.startsWith('source:')) return '修改数据源';
+  return '编辑';
+}
 type GetState = () => CanvasStore;
 
 /** 模块级缓存（不进 store，避免 persist 序列化） */
@@ -296,19 +311,21 @@ export const useCanvasStore = create<CanvasStore>()(
           const s = get();
           const past = s.history.past.slice();
           const entry = past.pop();
-          if (!entry) return;
+          if (!entry) return null;
           const future = [{ config: s.config, label: entry.label, at: Date.now() }, ...s.history.future].slice(0, HISTORY_LIMIT);
           set({ config: entry.config, history: { past, future } });
           recomputeWith(entry.config, get().sources);
+          return historyLabelOf(entry.label);
         },
         redo: () => {
           const s = get();
           const future = s.history.future.slice();
           const entry = future.shift();
-          if (!entry) return;
+          if (!entry) return null;
           const past = [...s.history.past, { config: s.config, label: entry.label, at: Date.now() }].slice(-HISTORY_LIMIT);
           set({ config: entry.config, history: { past, future } });
           recomputeWith(entry.config, get().sources);
+          return historyLabelOf(entry.label);
         },
 
         setFlowPos: (nodeId, pos) =>

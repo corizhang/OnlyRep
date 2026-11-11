@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Segmented, Tooltip } from 'antd';
+import { message, Segmented, Tooltip } from 'antd';
 import { QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
@@ -47,17 +47,20 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
 
   // 全局撤销/重做：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（输入控件内交给浏览器原生行为）
   useEffect(() => {
+    const toast = (name: string | null, verb: string): void => {
+      if (name) message.info({ content: `${verb}：${name}`, duration: 1.2 });
+    };
     const onKey = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
+        if (e.shiftKey) toast(redo(), '已重做');
+        else toast(undo(), '已撤销');
       } else if (e.key === 'y' || e.key === 'Y') {
         e.preventDefault();
-        redo();
+        toast(redo(), '已重做');
       }
     };
     window.addEventListener('keydown', onKey);
@@ -88,7 +91,10 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
               <button
                 type="button"
                 disabled={!canUndo}
-                onClick={undo}
+                onClick={() => {
+                  const name = undo();
+                  if (name) message.info({ content: `已撤销：${name}`, duration: 1.2 });
+                }}
                 className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <UndoOutlined style={{ fontSize: 15 }} />
@@ -98,7 +104,10 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
               <button
                 type="button"
                 disabled={!canRedo}
-                onClick={redo}
+                onClick={() => {
+                  const name = redo();
+                  if (name) message.info({ content: `已重做：${name}`, duration: 1.2 });
+                }}
                 className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <RedoOutlined style={{ fontSize: 15 }} />
@@ -110,6 +119,9 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
           <span className="text-[11px] text-slate-400">管道 {lastRunMs}ms</span>
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700">
             数据仅在本地处理，不会上传服务器
+          </span>
+          <span className="text-[10.5px] text-slate-300" title={`构建时间：${__BUILD_TIME__}`}>
+            v{__APP_VERSION__} · {__BUILD_TIME__}
           </span>
           <button type="button" onClick={onOpenLegacy} className="text-[11px] text-slate-400 underline hover:text-slate-600">
             打开旧版排行榜编辑器
