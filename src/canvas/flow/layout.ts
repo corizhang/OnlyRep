@@ -136,6 +136,20 @@ export function edgePath(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
+/** 连线贝塞尔中点（t=0.5）：用于选中态的删除按钮锚点 */
+export function edgeMid(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH: number = NODE_H): FlowPos {
+  const x1 = from.x + NODE_W;
+  const y1 = from.y + Math.max(20, fromH) / 2;
+  const x2 = to.x;
+  const y2 = to.y + Math.max(20, toH) / 2;
+  const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
+  // 三次贝塞尔 t=0.5：(P0 + 3P1 + 3P2 + P3) / 8
+  return {
+    x: (x1 + 3 * (x1 + dx) + 3 * (x2 - dx) + x2) / 8,
+    y: (y1 + 3 * y1 + 3 * y2 + y2) / 8,
+  };
+}
+
 /** 矩形相交（框选用） */
 export function rectsIntersect(
   a: { x: number; y: number; w: number; h: number },

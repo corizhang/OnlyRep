@@ -4,7 +4,7 @@ import { DeleteOutlined, MoonOutlined, PauseCircleOutlined, PlayCircleOutlined, 
 import type { MenuProps } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { NodeOutput, NodeType, PipelineNode } from '../types';
-import { computeFlowLayout, edgePath, NODE_H, NODE_W, rectsIntersect, type FlowPos } from './layout';
+import { computeFlowLayout, edgeMid, edgePath, NODE_H, NODE_W, rectsIntersect, type FlowPos } from './layout';
 import FlowNodeCard from './FlowNodeCard';
 import { nodeThemeVars, type NodeTheme } from './nodeTheme';
 import { stepDef } from './nodes';
@@ -69,6 +69,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const [connect, setConnect] = useState<{ from: string; start: FlowPos; cur: FlowPos; hover: string | null } | null>(null);
   /** 框选（Shift+背景拖拽）：画布坐标起止点 */
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
+  /** 选中的连线（点击选中后 Delete 或中点 ✕ 删除；与节点选择互斥） */
+  const [edgeSel, setEdgeSel] = useState<{ from: string; to: string } | null>(null);
   const selectedId = flowSelectedId;
 
   /** 节点高度上报（ResizeObserver 测量）：连线锚点与自动布局按实际高度计算 */
@@ -129,6 +131,17 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     deleteNodes(selectedIds.slice());
   };
 
+  /** 删除连线：断开目标节点的该上游（union 等多输入节点的其余输入保留） */
+  const removeEdge = (from: string, to: string): void => {
+    const tn = nodeById.get(to);
+    if (!tn) return;
+    transact('del-edge', () => {
+      updateNodeInStore(to, { inputs: tn.inputs.filter((i) => i !== from) });
+    });
+    setEdgeSel(null);
+    showHint('已删除连线');
+  };
+
   const addDownstream = (type: NodeType): void => {
     if (!selectedId) return;
     addNodeOfType(type, selectedId);
@@ -185,8 +198,19 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     const onKey = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      if (e.key === 'Escape' && selectedIds.length > 0 && !connect) {
-        setFlowSelectedIds([]);
+      if (e.key === 'Escape' && !connect) {
+        if (edgeSel) {
+          setEdgeSel(null);
+          return;
+        }
+        if (selectedIds.length > 0) {
+          setFlowSelectedIds([]);
+          return;
+        }
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && edgeSel) {
+        e.preventDefault();
+        removeEdge(edgeSel.from, edgeSel.to);
         return;
       }
       if (selectedIds.length === 0) return;
@@ -201,7 +225,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, config.pipeline.nodes, connect]);
+  }, [selectedIds, config.pipeline.nodes, connect, edgeSel]);
 
   /** 添加节点：表格类步骤需指定上游表格节点；formula（计算字段）无需输入 */
   const addNodeOfType = (type: NodeType, inputId: string | null): void => {
@@ -321,11 +345,13 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     }
     panRef.current = { startX: e.clientX, startY: e.clientY, ox: pan.x, oy: pan.y };
     setFlowSelectedIds([]);
+    setEdgeSel(null);
   };
 
   const onNodeDown = (e: React.PointerEvent, nodeId: string, node: FlowPos): void => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    setEdgeSel(null);
     containerRef.current?.setPointerCapture(e.pointerId);
     // Ctrl/Shift+点击：抬起时切换选中（不进入拖动）
     if (e.ctrlKey || e.metaKey || e.shiftKey) {
@@ -611,6 +637,9 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 <marker id="nb-arrow-active" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
                   <path d="M0,0 L9,4.5 L0,9 z" fill="#2563eb" />
                 </marker>
+                <marker id="nb-arrow-del" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                  <path d="M0,0 L9,4.5 L0,9 z" fill="#dc2626" />
+                </marker>
               </defs>
               {layout.edges.map((e) => {
                 const from = layout.byId[e.from];
@@ -619,16 +648,34 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 const bad = outputs[e.to]?.kind === 'error';
                 // 选中（含多选）节点时高亮其上下游连线，其余淡出
                 const active = isSel(e.from) || isSel(e.to);
+                const selEdge = edgeSel !== null && edgeSel.from === e.from && edgeSel.to === e.to;
+                const d = edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H);
                 return (
-                  <path
-                    key={`${e.from}->${e.to}`}
-                    d={edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H)}
-                    fill="none"
-                    stroke={bad ? 'var(--nb-edge-bad)' : active ? '#2563eb' : 'var(--nb-edge)'}
-                    strokeWidth={active ? 2.5 : 2}
-                    opacity={selectedIds.length > 0 && !active ? 0.35 : 1}
-                    markerEnd={bad ? 'url(#nb-arrow-bad)' : active ? 'url(#nb-arrow-active)' : 'url(#nb-arrow)'}
-                  />
+                  <g key={`${e.from}->${e.to}`}>
+                    {/* 加宽的隐形命中层：让细线易于点选 */}
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth={14}
+                      style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+                      onPointerDown={(ev) => {
+                        ev.stopPropagation();
+                        setEdgeSel(selEdge ? null : { from: e.from, to: e.to });
+                        setFlowSelectedIds([]);
+                      }}
+                    >
+                      <title>点击选中连线，按 Delete 删除</title>
+                    </path>
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke={selEdge ? '#dc2626' : bad ? 'var(--nb-edge-bad)' : active ? '#2563eb' : 'var(--nb-edge)'}
+                      strokeWidth={selEdge ? 3 : active ? 2.5 : 2}
+                      opacity={selectedIds.length > 0 && !active && !selEdge ? 0.35 : 1}
+                      markerEnd={selEdge ? 'url(#nb-arrow-del)' : bad ? 'url(#nb-arrow-bad)' : active ? 'url(#nb-arrow-active)' : 'url(#nb-arrow)'}
+                    />
+                  </g>
                 );
               })}
               {/* 连线拖拽的 ghost 虚线 */}
@@ -697,6 +744,27 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 </div>
               );
             })}
+
+            {/* 选中连线的中点删除按钮 */}
+            {edgeSel &&
+              (() => {
+                const from = layout.byId[edgeSel.from];
+                const to = layout.byId[edgeSel.to];
+                if (!from || !to) return null;
+                const mid = edgeMid(withDelta(from, delta), withDelta(to, delta), heights[edgeSel.from] ?? NODE_H, heights[edgeSel.to] ?? NODE_H);
+                return (
+                  <button
+                    type="button"
+                    title="删除此连线（或按 Delete）"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => removeEdge(edgeSel.from, edgeSel.to)}
+                    className="absolute flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-red-500 text-[10px] font-bold text-white shadow-md transition-transform hover:scale-110"
+                    style={{ left: mid.x - 10, top: mid.y - 10 }}
+                  >
+                    ✕
+                  </button>
+                );
+              })()}
 
             {/* 选中节点浮动工具条：添加下游 / 启用停用 / 删除（随缩放反向缩放保持可点面积） */}
             {selected && layout.byId[selected.id] && (

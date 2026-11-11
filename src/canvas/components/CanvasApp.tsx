@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Segmented, Tooltip } from 'antd';
-import { RedoOutlined, UndoOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
 import DataSourcePanel from './DataSourcePanel';
@@ -186,6 +186,108 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
       </main>
 
       {showFlow && <FlowSheet />}
+
+      {/* 快捷键帮助：右下浮动按钮 + 面板（内容随视图切换） */}
+      <ShortcutsHelp viewMode={viewMode} />
     </div>
+  );
+}
+
+/** 快捷键帮助面板：右下 ? 浮动按钮，Esc/点击遮罩关闭 */
+function ShortcutsHelp({ viewMode }: { viewMode: 'canvas' | 'node' }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const groups: { title: string; items: [string, string][] }[] =
+    viewMode === 'node'
+      ? [
+          {
+            title: '通用',
+            items: [
+              ['Ctrl+Z', '撤销'],
+              ['Ctrl+Shift+Z / Ctrl+Y', '重做'],
+              ['滚轮', '缩放画布'],
+              ['拖拽空白处', '平移画布'],
+            ],
+          },
+          {
+            title: '选择',
+            items: [
+              ['点击节点', '单选'],
+              ['Ctrl/Shift+点击', '切换多选'],
+              ['Shift+拖拽空白', '框选（+Ctrl 追加）'],
+              ['Ctrl+A', '全选'],
+              ['Esc', '取消选择/关闭面板'],
+            ],
+          },
+          {
+            title: '节点操作',
+            items: [
+              ['拖动已选节点', '整组移动'],
+              ['单击节点名', '改名'],
+              ['Delete', '删除选中节点/连线'],
+              ['右侧端口拖出', '建立连线'],
+              ['点击连线', '选中（红）→ Delete 或 ✕ 删除'],
+            ],
+          },
+        ]
+      : [
+          {
+            title: '通用',
+            items: [
+              ['Ctrl+Z', '撤销'],
+              ['Ctrl+Shift+Z / Ctrl+Y', '重做'],
+              ['拖动区块', '调整顺序/移入行容器'],
+            ],
+          },
+        ];
+
+  return (
+    <>
+      <button
+        type="button"
+        title="快捷键帮助"
+        onClick={() => setOpen((v) => !v)}
+        className="fixed bottom-4 right-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-colors hover:text-blue-600"
+      >
+        <QuestionCircleOutlined style={{ fontSize: 16 }} />
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50" onClick={() => setOpen(false)}>
+          <div
+            className="absolute bottom-14 right-4 w-[320px] rounded-lg border border-slate-200 bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[13px] font-semibold text-slate-800">快捷键{viewMode === 'node' ? '（数据节点）' : '（日报画布）'}</span>
+              <button type="button" className="text-slate-400 hover:text-slate-600" onClick={() => setOpen(false)}>✕</button>
+            </div>
+            <div className="space-y-3">
+              {groups.map((g) => (
+                <div key={g.title}>
+                  <div className="mb-1 text-[11px] font-medium text-slate-400">{g.title}</div>
+                  <div className="space-y-1">
+                    {g.items.map(([k, desc]) => (
+                      <div key={k} className="flex items-center justify-between gap-3">
+                        <code className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] text-slate-600">{k}</code>
+                        <span className="min-w-0 flex-1 text-right text-[11.5px] text-slate-600">{desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
