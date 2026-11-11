@@ -1,10 +1,15 @@
 import { useRef } from 'react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { CANVAS_PRESETS } from '../defaults';
-import { downloadCanvasTemplate, validateCanvasTemplate } from '../template';
+import { downloadCanvasTemplate, downloadJsonFile, makeAllDataBackup, validateAllDataBackup, validateCanvasTemplate } from '../template';
+import { loadTemplateLibrary, saveTemplateLibrary, type TemplateLibraryData } from '../templateLibrary';
+import { appStorage } from '../../storage/safeStorage';
+import { isTauri, tauriPersistStorage } from '../../storage/tauriKv';
 import { THEME_LIST } from '../../themes/themes';
 import { Btn, ColorInput, Field, NumberInput, Section, Select, TextInput } from './ui';
 import { useState } from 'react';
+
+const CANVAS_PERSIST_KEY = 'rankboard-canvas-v3';
 
 /** 画布级基础配置（PRD R4-10 / K9）：主题、宽度、字号、涨跌语义、模板存取 */
 export default function CanvasSettings() {
@@ -14,6 +19,33 @@ export default function CanvasSettings() {
   const loadTemplate = useCanvasStore((s) => s.loadTemplate);
   const [msg, setMsg] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const allRef = useRef<HTMLInputElement>(null);
+
+  /** 导出全量数据（工作区 + 模板库）：跨环境搬家（浏览器 ↔ 桌面 exe） */
+  const exportAll = (): void => {
+    const backup = makeAllDataBackup(
+      { state: { config: useCanvasStore.getState().config }, version: 3 },
+      loadTemplateLibrary(),
+    );
+    downloadJsonFile(`rankboard-全量备份_${new Date().toISOString().slice(0, 10)}.json`, backup);
+    setMsg('全量备份已导出（含工作区与模板库）');
+  };
+
+  /** 导入全量数据：写入持久层后刷新，让 persist 与模板库按新数据重建 */
+  const importAll = async (f: File): Promise<void> => {
+    try {
+      const backup = validateAllDataBackup(JSON.parse(await f.text()));
+      const canvasRaw = JSON.stringify(backup.canvas);
+      if (isTauri()) await tauriPersistStorage.setItem(CANVAS_PERSIST_KEY, canvasRaw);
+      else appStorage.setItem(CANVAS_PERSIST_KEY, canvasRaw);
+      if (backup.templates && typeof backup.templates === 'object') {
+        saveTemplateLibrary(backup.templates as TemplateLibraryData);
+      }
+      window.location.reload();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : '备份解析失败');
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -57,6 +89,31 @@ export default function CanvasSettings() {
         {msg && <p className="text-[11.5px] text-amber-600">{msg}</p>}
         <p className="text-[11.5px] text-slate-400">
           模板含数据源定义、处理步骤、绑定与手填数据；导入源的文件不会保存。
+        </p>
+      </Section>
+
+      <Section title="数据迁移">
+        <div className="flex flex-wrap gap-1">
+          <Btn size="xs" onClick={exportAll}>
+            导出全部数据
+          </Btn>
+          <Btn size="xs" onClick={() => allRef.current?.click()}>
+            导入全部数据
+          </Btn>
+          <input
+            ref={allRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (f) await importAll(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
+        <p className="text-[11.5px] text-slate-400">
+          备份含工作区与整个模板库，用于浏览器 ↔ 桌面应用之间搬家；导入后立即刷新生效。
         </p>
       </Section>
 
