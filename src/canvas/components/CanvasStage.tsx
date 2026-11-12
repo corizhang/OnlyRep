@@ -80,7 +80,10 @@ export default function CanvasStage() {
   const computeDropIndex = (clientY: number): number => {
     const node = document.getElementById('canvas-export-node');
     if (!node) return config.blocks.length;
-    const shells = Array.from(node.children).filter((el) => (el as HTMLElement).dataset.shell === '1') as HTMLElement[];
+    // 区块列表在导出节点的内层 wrapper（外层还有主题头带等），只数顶层 shell
+    const list = node.querySelector('[data-block-list="1"]');
+    if (!list) return config.blocks.length;
+    const shells = Array.from(list.children).filter((el) => (el as HTMLElement).dataset.shell === '1') as HTMLElement[];
     let idx = 0;
     for (const el of shells) {
       const r = el.getBoundingClientRect();

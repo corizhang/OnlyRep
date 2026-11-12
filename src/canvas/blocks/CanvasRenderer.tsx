@@ -79,6 +79,7 @@ export default function CanvasRenderer({ config, ctx, edit, chrome = false, drop
         />
       )}
       <div
+        data-block-list="1"
         style={{
           position: 'relative',
           zIndex: 1,
