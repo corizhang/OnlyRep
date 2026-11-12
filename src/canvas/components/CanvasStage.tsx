@@ -101,13 +101,15 @@ export default function CanvasStage() {
       const name = `${config.title}_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
       const res = await exportPng(node, { scale: config.exportScale, fileName: name });
       setToast(
-        `已导出 ${res.scale}x${res.downgraded ? '（受尺寸限制已自动降倍率）' : ''}${res.segmented ? ' · 分段拼接' : ''}`,
+        res.savedPath
+          ? `已导出：${res.savedPath}`
+          : `已导出 ${res.scale}x${res.downgraded ? '（受尺寸限制已自动降倍率）' : ''}${res.segmented ? ' · 分段拼接' : ''}`,
       );
     } catch (err) {
       setToast(err instanceof Error ? err.message : '导出失败');
     } finally {
       setExporting(false);
-      setTimeout(() => setToast(''), 4000);
+      setTimeout(() => setToast(''), 8000);
     }
   };
 

@@ -172,7 +172,71 @@ export function buildChartOption({ cfg, prepared, palette, fontSize }: BuildOpti
     };
   }
 
-  const isBar = cfg.chartType === 'bar';
+  if (cfg.chartType === 'funnel') {
+    const s = prepared.series[0];
+    // 展示顺序：desc 数值降序（漏斗默认）/ asc 升序 / none 源顺序；
+    // 在数据侧排好并令 echarts sort='none'，转化率才能与展示顺序严格对应
+    const rows = prepared.categories.map((c, i) => ({ name: c, value: s?.data[i] ?? 0 }));
+    const sorted =
+      cfg.sort === 'none' ? rows : [...rows].sort((a, b) => (cfg.sort === 'asc' ? a.value - b.value : b.value - a.value));
+    const top = sorted[0]?.value ?? 0;
+    const pct = (v: number): string => {
+      const r = Math.round(v * 10) / 10;
+      return `${Number.isInteger(r) ? r.toFixed(0) : r}%`;
+    };
+    const fmtN = (v: number): string => v.toLocaleString('en-US');
+    const data = sorted.map((v, i) => {
+      const prev = i > 0 ? sorted[i - 1].value : 0;
+      return {
+        name: v.name,
+        value: v.value,
+        /** 占首层 %（首层自身恒 100） */
+        ofFirst: top > 0 ? (v.value / top) * 100 : 0,
+        /** 较上层转化率 %（首层为 null） */
+        ofPrev: i > 0 && prev > 0 ? (v.value / prev) * 100 : null,
+      };
+    });
+    type FunnelItem = (typeof data)[number];
+    const tooltipFmt = (p: { name: string; data: FunnelItem }): string =>
+      `${p.name}<br/>数值：${fmtN(p.data.value)}${p.data.ofPrev !== null ? `<br/>较上层：${pct(p.data.ofPrev)}` : ''}<br/>占首层：${pct(p.data.ofFirst)}`;
+    return {
+      ...base,
+      tooltip: { show: true, trigger: 'item' as const, confine: true, formatter: tooltipFmt },
+      series: [
+        {
+          type: 'funnel',
+          sort: 'none',
+          left: '10%',
+          right: '10%',
+          top: 6,
+          bottom: 6,
+          min: 0,
+          max: top > 0 ? top : undefined,
+          minSize: '14%',
+          gap: 3,
+          itemStyle: { borderColor: palette.bg, borderWidth: 1 },
+          label: {
+            show: cfg.showValueLabel,
+            position: 'inside',
+            color: '#FFFFFF',
+            fontSize: fontSize - 1,
+            lineHeight: Math.round(fontSize * 1.5),
+            formatter: (p: { name: string; data: FunnelItem }) =>
+              // 小层级（占首层 <22%）梯形太窄，白字会溢出到画布上看不见 → 切紧凑单行；
+              // 完整转化率仍在 tooltip 中
+              p.data.ofFirst < 22
+                ? `${p.name}  ${fmtN(p.data.value)}`
+                : `${p.name}  ${fmtN(p.data.value)}\n${p.data.ofPrev !== null ? `较上层 ${pct(p.data.ofPrev)}` : '100%'} · 占首层 ${pct(p.data.ofFirst)}`,
+          },
+          emphasis: { label: { fontSize } },
+          data,
+          color: seriesColors(palette),
+        },
+      ],
+    };
+  }
+
+  const isBar = cfg.chartType === 'bar'; cfg.chartType === 'bar';
   const categoryAxis = {
     type: 'category' as const,
     data: prepared.categories,

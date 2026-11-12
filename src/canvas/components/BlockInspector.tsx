@@ -551,6 +551,7 @@ function ChartInspector({
               { value: 'line', label: '折线图' },
               { value: 'pie', label: '环形图' },
               { value: 'gauge', label: '仪表盘' },
+              { value: 'funnel', label: '转化漏斗' },
             ]}
             onChange={(v) => onChange({ chartType: v as ChartConfig['chartType'] })}
           />
@@ -560,6 +561,11 @@ function ChartInspector({
         </Field>
       </div>
 
+      {cfg.chartType === 'funnel' && (
+        <p className="rounded bg-blue-50 px-2 py-1 text-[11px] leading-relaxed text-blue-700">
+          漏斗：维度列=阶段名，使用<b>第一个数值列</b>；标签显示数值 + 较上层/占首层转化率，建议排序选「降序」。
+        </p>
+      )}
       <div className="space-y-1">
         <span className="text-[12px] font-medium text-slate-500">数值列</span>
         {metrics.map((m, i) => (

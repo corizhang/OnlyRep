@@ -221,7 +221,7 @@ export interface GoalProgressConfig {
   showPct: boolean;
 }
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'gauge';
+export type ChartType = 'bar' | 'line' | 'pie' | 'gauge' | 'funnel';
 
 export interface ChartMetric {
   col: string;
