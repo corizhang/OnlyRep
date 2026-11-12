@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons';
 import { DisconnectOutlined, LinkOutlined } from '@ant-design/icons';
 import BindingPicker from './BindingPicker';
+import { compressImageFile } from '../../utils/imageCompress';
 import { Btn, Check, ColorInput, Field, NumberInput, Section, Select, SliderBar, Textarea, TextInput } from './ui';
 
 /** 选中区块的属性面板：所有数值槽位均可绑定（PRD R3-01） */
@@ -339,6 +340,7 @@ function TextInspector({ cfg, onChange }: { cfg: TextBlockConfig; onChange: (p: 
 // ---------- 图片 ----------
 function ImageInspector({ block, onChange }: { block: Extract<CanvasBlock, { type: 'image' }>; onChange: (p: Record<string, unknown>) => void }) {
   const ref = useRef<HTMLInputElement>(null);
+  const [compressNote, setCompressNote] = useState('');
   const cfg = block.config;
   return (
     <>
@@ -347,12 +349,13 @@ function ImageInspector({ block, onChange }: { block: Extract<CanvasBlock, { typ
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => {
+        onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
-          const reader = new FileReader();
-          reader.onload = () => onChange({ src: String(reader.result) });
-          reader.readAsDataURL(f);
+          // 大图先压缩（防 base64 撑爆存储配额），小图原样
+          const r = await compressImageFile(f);
+          onChange({ src: r.dataUrl });
+          setCompressNote(r.compressed ? `已压缩：${r.beforeKB}KB → ${r.afterKB}KB` : '');
           e.target.value = '';
         }}
       />
@@ -365,6 +368,7 @@ function ImageInspector({ block, onChange }: { block: Extract<CanvasBlock, { typ
             移除
           </Btn>
         )}
+        {compressNote && <span className="self-center text-[10.5px] text-emerald-600">{compressNote}</span>}
       </div>
       <Field label="宽度 %">
         <NumberInput value={cfg.widthPct} min={10} max={100} onChange={(v) => onChange({ widthPct: v })} />

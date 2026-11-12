@@ -100,6 +100,8 @@ export interface CanvasStore {
   undo: () => string | null;
   /** 返回被重做动作的可读名（无历史时 null） */
   redo: () => string | null;
+  /** 内部：恢复目标 config 含未加载的文件导入源时给提示串（undo/redo 用） */
+  fileReloadHint: (cfg: CanvasConfig) => string;
   /** 把多次连续修改合并为一步历史（如添加+落点、群移、批量删除） */
   transact: (label: string, fn: () => void) => void;
 
@@ -331,6 +333,14 @@ export const useCanvasStore = create<CanvasStore>()(
             batchDepth -= 1;
           }
         },
+        // 撤销/重做恢复到的 config 若含「已选文件但运行时未加载」的导入源，附重读提示
+        fileReloadHint: (cfg: CanvasConfig): string => {
+          const pending = cfg.dataSources.some(
+            (d) => d.kind === 'import' && d.fileName && get().sources[d.id]?.status !== 'ready',
+          );
+          return pending ? '（含文件导入源，如数据缺失请点「重读文件」）' : '';
+        },
+
         undo: () => {
           const s = get();
           const past = s.history.past.slice();
@@ -339,7 +349,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const future = [{ config: s.config, label: entry.label, at: Date.now() }, ...s.history.future].slice(0, HISTORY_LIMIT);
           set({ config: entry.config, history: { past, future } });
           recomputeWith(entry.config, get().sources);
-          return historyLabelOf(entry.label);
+          return historyLabelOf(entry.label) + get().fileReloadHint(entry.config);
         },
         redo: () => {
           const s = get();
@@ -349,7 +359,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const past = [...s.history.past, { config: s.config, label: entry.label, at: Date.now() }].slice(-HISTORY_LIMIT);
           set({ config: entry.config, history: { past, future } });
           recomputeWith(entry.config, get().sources);
-          return historyLabelOf(entry.label);
+          return historyLabelOf(entry.label) + get().fileReloadHint(entry.config);
         },
 
         setFlowPos: (nodeId, pos) =>

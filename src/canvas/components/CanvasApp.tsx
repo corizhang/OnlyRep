@@ -368,6 +368,11 @@ function ShortcutsHelp({ viewMode }: { viewMode: 'canvas' | 'node' }) {
                 </div>
               ))}
             </div>
+            <div className="mt-3 border-t border-slate-100 pt-2 text-[10.5px] leading-relaxed text-slate-400">
+              遇到问题：截图 + 画布设置「导出全部数据」→ 发给运营管理员
+              <br />
+              反馈时请附版本号：<span className="text-slate-500">v{__APP_VERSION__} · {__BUILD_TIME__}</span>
+            </div>
           </div>
         </div>
       )}
