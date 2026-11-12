@@ -597,17 +597,26 @@ function ChartInspector({
             </p>
           ) : (
             <>
-              <div className="space-y-1">
-                <span className="text-[12px] font-medium text-slate-500">漏斗层级（顺序即漏斗顺序）</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-slate-500">漏斗层级（顺序即漏斗顺序）</span>
+                  <span className="text-[10.5px] text-slate-400">{stages.length} 层</span>
+                </div>
                 {stages.map((st, i) => (
-                  <div key={i} className="flex items-center gap-1">
-                    <input
-                      className="w-[88px] shrink-0 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
-                      value={st.name}
-                      placeholder={`层级${i + 1}`}
-                      onChange={(e) => setStages(stages.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-                    />
-                    <div className="min-w-0 flex-1">
+                  <div key={i} className="rounded-md border border-slate-200 bg-slate-50/60 p-1.5">
+                    <div className="flex items-center gap-1">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-600">{i + 1}</span>
+                      <input
+                        className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[11.5px] text-slate-700 hover:border-slate-300 focus:border-blue-400 focus:bg-white focus:outline-none"
+                        value={st.name}
+                        placeholder="层级名（空=按绑定自动命名）"
+                        onChange={(e) => setStages(stages.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                      />
+                      <button type="button" title="上移" disabled={i === 0} className="shrink-0 rounded px-1 py-0.5 text-[11px] text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, -1)}>↑</button>
+                      <button type="button" title="下移" disabled={i === stages.length - 1} className="shrink-0 rounded px-1 py-0.5 text-[11px] text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, 1)}>↓</button>
+                      <button type="button" title="删除层级" className="shrink-0 rounded px-1 py-0.5 text-[11px] text-slate-400 hover:bg-red-50 hover:text-red-500" onClick={() => setStages(stages.filter((_, j) => j !== i))}>✕</button>
+                    </div>
+                    <div className="mt-1">
                       <BindingPicker
                         value={st.value}
                         onChange={(b) => setStages(stages.map((x, j) => (j === i ? { ...x, value: b } : x)))}
@@ -618,12 +627,9 @@ function ChartInspector({
                         label=""
                       />
                     </div>
-                    <button type="button" title="上移" disabled={i === 0} className="shrink-0 px-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, -1)}>↑</button>
-                    <button type="button" title="下移" disabled={i === stages.length - 1} className="shrink-0 px-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, 1)}>↓</button>
-                    <button type="button" title="删除层级" className="shrink-0 px-0.5 text-slate-400 hover:text-red-500" onClick={() => setStages(stages.filter((_, j) => j !== i))}>✕</button>
                   </div>
                 ))}
-                <Btn size="xs" onClick={() => setStages([...stages, { name: `层级${stages.length + 1}`, value: { kind: 'none' } }])}>
+                <Btn size="xs" onClick={() => setStages([...stages, { name: '', value: { kind: 'none' } }])}>
                   + 添加层级
                 </Btn>
               </div>
@@ -634,6 +640,7 @@ function ChartInspector({
           )}
         </>
       )}
+      {!(cfg.chartType === 'funnel' && cfg.funnelMode === 'scalars') && (
       <div className="space-y-1">
         <span className="text-[12px] font-medium text-slate-500">数值列</span>
         {metrics.map((m, i) => (
@@ -665,8 +672,11 @@ function ChartInspector({
           + 数值列
         </Btn>
       </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
+        {!(cfg.chartType === 'funnel' && cfg.funnelMode === 'scalars') && (
+        <>
         <Field label="排序依据">
           <Select
             value={cfg.sortBy}
@@ -691,6 +701,8 @@ function ChartInspector({
         <Field label="行数上限（0=全部）">
           <NumberInput value={cfg.maxRows} min={0} onChange={(v) => onChange({ maxRows: v })} />
         </Field>
+        </>
+        )}
         <Field label="高度 px">
           <NumberInput value={cfg.height} min={80} max={800} onChange={(v) => onChange({ height: v })} />
         </Field>
@@ -698,10 +710,14 @@ function ChartInspector({
 
       <div className="flex flex-wrap gap-3">
         <Check checked={cfg.showValueLabel} label="数值标签" onChange={(v) => onChange({ showValueLabel: v })} />
-        <Check checked={cfg.highlightLast} label="末位高亮" onChange={(v) => onChange({ highlightLast: v })} />
-        <Check checked={cfg.horizontal} label="横向条形" onChange={(v) => onChange({ horizontal: v })} />
-        <Check checked={cfg.showLegend} label="图例" onChange={(v) => onChange({ showLegend: v })} />
-        <Check checked={cfg.showGrid} label="网格线" onChange={(v) => onChange({ showGrid: v })} />
+        {cfg.chartType !== 'funnel' && (
+          <>
+            <Check checked={cfg.highlightLast} label="末位高亮" onChange={(v) => onChange({ highlightLast: v })} />
+            <Check checked={cfg.horizontal} label="横向条形" onChange={(v) => onChange({ horizontal: v })} />
+            <Check checked={cfg.showLegend} label="图例" onChange={(v) => onChange({ showLegend: v })} />
+            <Check checked={cfg.showGrid} label="网格线" onChange={(v) => onChange({ showGrid: v })} />
+          </>
+        )}
       </div>
     </>
   );

@@ -28,22 +28,37 @@ export const CHART_FONT = "'PingFang SC','Microsoft YaHei','Helvetica Neue',Aria
 /**
  * 漏斗逐层取数（scalars 模式）：把 FunnelStage 列表解析为 PreparedChart。
  * 数组顺序即漏斗顺序（用户自定义，不排序）；解析失败/失联的层级归入错误信息。
+ * 层级名为空时按绑定兜底命名（表单项名/手录/常量/层级N），免手填。
  */
 export function prepareFunnelScalars(
   stages: FunnelStage[],
   resolve: ResolveContext,
 ): PreparedChart | { error: string } {
   if (stages.length === 0) return { error: '尚未添加漏斗层级（在右侧添加层级并绑定取数）' };
+  const nameOf = (st: FunnelStage, i: number): string => {
+    if (st.name.trim()) return st.name;
+    switch (st.value.kind) {
+      case 'form':
+        return st.value.key || `层级${i + 1}`;
+      case 'formula':
+        return '手录';
+      case 'constant':
+        return '常量';
+      default:
+        return `层级${i + 1}`;
+    }
+  };
   const categories: string[] = [];
   const data: number[] = [];
   const problems: string[] = [];
-  for (const st of stages) {
-    categories.push(st.name || '未命名层级');
+  stages.forEach((st, i) => {
+    const label = nameOf(st, i);
+    categories.push(label);
     const res = resolveField(st.value, resolve);
     const num = res.kind === 'value' ? numericOf(res) : null;
-    if (num === null) problems.push(`「${st.name || '未命名层级'}」${res.kind === 'value' ? '不是数值' : res.kind === 'missing' ? '取数未就绪' : '取数失败'}`);
+    if (num === null) problems.push(`「${label}」${res.kind === 'value' ? '不是数值' : res.kind === 'missing' ? '取数未就绪' : '取数失败'}`);
     data.push(num ?? 0);
-  }
+  });
   if (problems.length > 0 && problems.length === stages.length) {
     return { error: `全部层级取数失败：${problems[0]}${stages.length > 1 ? ' 等' : ''}` };
   }
