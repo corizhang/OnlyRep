@@ -229,6 +229,12 @@ export interface ChartMetric {
   color: string;
 }
 
+/** 漏斗逐层取数：名称 + 标量绑定（node/form/constant/formula；手录数字用 formula expr） */
+export interface FunnelStage {
+  name: string;
+  value: FieldBinding;
+}
+
 export interface ChartConfig {
   title: string;
   chartType: ChartType;
@@ -247,6 +253,10 @@ export interface ChartConfig {
   showLegend: boolean;
   showGrid: boolean;
   yUnit: string;
+  /** 漏斗取数方式：table=维度列+数值列（默认，兼容存量）；scalars=逐层标量绑定 */
+  funnelMode?: 'table' | 'scalars';
+  /** scalars 模式下的层级列表（数组顺序即漏斗顺序，不受 sort 影响） */
+  funnelStages?: FunnelStage[];
 }
 
 export interface TableColumnConfig {

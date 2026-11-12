@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { ChartConfig } from '../types';
 import { resolveTable } from '../binding/resolve';
-import { buildChartOption, prepareChartData, type ChartPalette } from '../charts/chartTheme';
+import { buildChartOption, prepareChartData, prepareFunnelScalars, type ChartPalette } from '../charts/chartTheme';
 import { echarts, type EChartsInstance } from '../charts/echarts';
 import type { RenderCtx } from './context';
 
@@ -46,6 +46,14 @@ export default function ChartBlock({ cfg, ctx }: { cfg: ChartConfig; ctx: Render
   };
 
   const body = (() => {
+    // 漏斗·逐层取数模式：不走表格绑定，逐层解析标量（数组顺序即漏斗顺序）
+    if (cfg.chartType === 'funnel' && cfg.funnelMode === 'scalars') {
+      const prepared = prepareFunnelScalars(cfg.funnelStages ?? [], ctx.resolve);
+      if ('error' in prepared) return <Placeholder text={prepared.error} ctx={ctx} height={cfg.height} />;
+      // 层级顺序由用户定义，强制 sort=none（sort 只作用于 table 模式）
+      const option = buildChartOption({ cfg: { ...cfg, sort: 'none' }, prepared, palette, fontSize: ctx.baseFont });
+      return <EChart option={option} height={cfg.height} />;
+    }
     if ('reason' in tableRes) return <Placeholder text={`表格未就绪：${tableRes.reason}`} ctx={ctx} height={cfg.height} />;
     const prepared = prepareChartData(cfg, tableRes.table, palette);
     if ('error' in prepared) return <Placeholder text={prepared.error} ctx={ctx} height={cfg.height} />;

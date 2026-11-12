@@ -533,15 +533,31 @@ function ChartInspector({
 }) {
   const metrics = cfg.metrics;
   const setMetrics = (next: ChartMetric[]) => onChange({ metrics: next });
+  // 漏斗逐层取数（scalars 模式）所需上下文（BindingPicker 供参）
+  const config = useCanvasStore((s) => s.config);
+  const outputs = useCanvasStore((s) => s.outputs);
+  const env = useCanvasStore((s) => s.env);
+  const graphNodes = config.pipeline.nodes.map((n) => ({ id: n.id, name: n.name, type: n.type }));
+  const stages = cfg.funnelStages ?? [];
+  const setStages = (next: ChartConfig['funnelStages']) => onChange({ funnelStages: next });
+  const moveStage = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= stages.length) return;
+    const next = [...stages];
+    [next[i], next[j]] = [next[j], next[i]];
+    setStages(next);
+  };
 
   return (
     <>
       <Field label="标题">
         <TextInput value={cfg.title} onChange={(v) => onChange({ title: v })} />
       </Field>
-      <Field label="表格数据">
-        <Select value={cfg.table.nodeRef} placeholder="选择表格节点" options={tableOptions} onChange={(v) => onChange({ table: { nodeRef: v }, dimension: '', metrics: [] })} />
-      </Field>
+      {!(cfg.chartType === 'funnel' && cfg.funnelMode === 'scalars') && (
+        <Field label="表格数据">
+          <Select value={cfg.table.nodeRef} placeholder="选择表格节点" options={tableOptions} onChange={(v) => onChange({ table: { nodeRef: v }, dimension: '', metrics: [] })} />
+        </Field>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Field label="图表类型">
           <Select
@@ -556,15 +572,67 @@ function ChartInspector({
             onChange={(v) => onChange({ chartType: v as ChartConfig['chartType'] })}
           />
         </Field>
-        <Field label="维度列">
-          <Select value={cfg.dimension} placeholder="选择列" options={colOptions} onChange={(v) => onChange({ dimension: v })} />
-        </Field>
+        {!(cfg.chartType === 'funnel' && cfg.funnelMode === 'scalars') && (
+          <Field label="维度列">
+            <Select value={cfg.dimension} placeholder="选择列" options={colOptions} onChange={(v) => onChange({ dimension: v })} />
+          </Field>
+        )}
       </div>
 
       {cfg.chartType === 'funnel' && (
-        <p className="rounded bg-blue-50 px-2 py-1 text-[11px] leading-relaxed text-blue-700">
-          漏斗：维度列=阶段名，使用<b>第一个数值列</b>；标签显示数值 + 较上层/占首层转化率，建议排序选「降序」。
-        </p>
+        <>
+          <Field label="取数方式">
+            <Select
+              value={cfg.funnelMode ?? 'table'}
+              options={[
+                { value: 'table', label: '表格维度（一行为一层）' },
+                { value: 'scalars', label: '逐层取数（每层绑定一个标量）' },
+              ]}
+              onChange={(v) => onChange({ funnelMode: v as 'table' | 'scalars' })}
+            />
+          </Field>
+          {(cfg.funnelMode ?? 'table') === 'table' ? (
+            <p className="rounded bg-blue-50 px-2 py-1 text-[11px] leading-relaxed text-blue-700">
+              表格模式：维度列=阶段名，使用<b>第一个数值列</b>；标签显示数值 + 较上层/占首层转化率，建议排序选「降序」。
+            </p>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <span className="text-[12px] font-medium text-slate-500">漏斗层级（顺序即漏斗顺序）</span>
+                {stages.map((st, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <input
+                      className="w-[88px] shrink-0 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+                      value={st.name}
+                      placeholder={`层级${i + 1}`}
+                      onChange={(e) => setStages(stages.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <BindingPicker
+                        value={st.value}
+                        onChange={(b) => setStages(stages.map((x, j) => (j === i ? { ...x, value: b } : x)))}
+                        sources={config.dataSources}
+                        graphNodes={graphNodes}
+                        outputs={outputs}
+                        env={env}
+                        label=""
+                      />
+                    </div>
+                    <button type="button" title="上移" disabled={i === 0} className="shrink-0 px-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, -1)}>↑</button>
+                    <button type="button" title="下移" disabled={i === stages.length - 1} className="shrink-0 px-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, 1)}>↓</button>
+                    <button type="button" title="删除层级" className="shrink-0 px-0.5 text-slate-400 hover:text-red-500" onClick={() => setStages(stages.filter((_, j) => j !== i))}>✕</button>
+                  </div>
+                ))}
+                <Btn size="xs" onClick={() => setStages([...stages, { name: `层级${stages.length + 1}`, value: { kind: 'none' } }])}>
+                  + 添加层级
+                </Btn>
+              </div>
+              <p className="rounded bg-blue-50 px-2 py-1 text-[11px] leading-relaxed text-blue-700">
+                每层绑定一个标量：取数节点 / 表单项 / 常量都可；<b>手动录入数字选「现场公式」直接填数值</b>。标签显示数值 + 较上层/占首层转化率。
+              </p>
+            </>
+          )}
+        </>
       )}
       <div className="space-y-1">
         <span className="text-[12px] font-medium text-slate-500">数值列</span>

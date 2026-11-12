@@ -1,7 +1,8 @@
 import type { CleanedTable } from '../../parser/clean';
 import { getRawText, getVal } from '../../parser/clean';
-import type { ChartConfig } from '../types';
+import type { ChartConfig, FunnelStage } from '../types';
 import { formatShortDate, parseDateValue } from '../pipeline/dates';
+import { numericOf, resolveField, type ResolveContext } from '../binding/resolve';
 
 /**
  * 图表数据整理 + ECharts option 构建（ARCH D23）。
@@ -23,6 +24,31 @@ export interface PreparedChart {
 }
 
 export const CHART_FONT = "'PingFang SC','Microsoft YaHei','Helvetica Neue',Arial,sans-serif";
+
+/**
+ * 漏斗逐层取数（scalars 模式）：把 FunnelStage 列表解析为 PreparedChart。
+ * 数组顺序即漏斗顺序（用户自定义，不排序）；解析失败/失联的层级归入错误信息。
+ */
+export function prepareFunnelScalars(
+  stages: FunnelStage[],
+  resolve: ResolveContext,
+): PreparedChart | { error: string } {
+  if (stages.length === 0) return { error: '尚未添加漏斗层级（在右侧添加层级并绑定取数）' };
+  const categories: string[] = [];
+  const data: number[] = [];
+  const problems: string[] = [];
+  for (const st of stages) {
+    categories.push(st.name || '未命名层级');
+    const res = resolveField(st.value, resolve);
+    const num = res.kind === 'value' ? numericOf(res) : null;
+    if (num === null) problems.push(`「${st.name || '未命名层级'}」${res.kind === 'value' ? '不是数值' : res.kind === 'missing' ? '取数未就绪' : '取数失败'}`);
+    data.push(num ?? 0);
+  }
+  if (problems.length > 0 && problems.length === stages.length) {
+    return { error: `全部层级取数失败：${problems[0]}${stages.length > 1 ? ' 等' : ''}` };
+  }
+  return { categories, series: [{ name: '数值', data, color: '' }] };
+}
 
 /** 系列配色：主题主色打头，其余用与主题协调的固定色板 */
 export function seriesColors(palette: ChartPalette): string[] {
