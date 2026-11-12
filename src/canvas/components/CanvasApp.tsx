@@ -34,6 +34,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const canUndo = useCanvasStore((s) => s.history.past.length > 0);
   const canRedo = useCanvasStore((s) => s.history.future.length > 0);
   const storageError = useCanvasStore((s) => s.storageError);
+  const externalUpdate = useCanvasStore((s) => s.externalUpdate);
   const activeTemplateId = useCanvasStore((s) => s.activeTemplateId);
   const templates = useCanvasStore((s) => s.templates);
   const [showTplLib, setShowTplLib] = useState(false);
@@ -58,6 +59,22 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
       }
     };
     void start();
+
+    // 多窗口/标签页互踩检测：storage 事件只在「其他窗口」写入时触发（本窗口写不触发），
+    // 且 Tauri 单窗口无此事件——只在浏览器多开时提示，防止旧内存态覆写新数据
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key !== 'rankboard-canvas-v3' || e.newValue == null) return;
+      try {
+        const incoming = (JSON.parse(e.newValue) as { state?: { config?: unknown } }).state?.config;
+        if (incoming && JSON.stringify(incoming) !== JSON.stringify(useCanvasStore.getState().config)) {
+          useCanvasStore.setState({ externalUpdate: true });
+        }
+      } catch {
+        // 解析失败不打扰
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
     // 仅在挂载时跑一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -180,6 +197,27 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
             className="shrink-0 rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-100"
           >
             立即导出模板备份
+          </button>
+        </div>
+      )}
+
+      {/* 多窗口互踩提示：另一窗口改了工作区，本窗口继续编辑会覆盖对方 */}
+      {externalUpdate && (
+        <div className="flex items-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-[12px] text-orange-800">
+          <span className="min-w-0 flex-1">⚠ 另一个窗口/标签页修改了工作区。为避免互相覆盖，建议刷新加载最新版本（本窗口未保存的修改请先导出模板备份）。</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="shrink-0 rounded border border-orange-300 bg-white px-2 py-0.5 text-[11px] font-medium text-orange-700 hover:bg-orange-100"
+          >
+            刷新加载最新
+          </button>
+          <button
+            type="button"
+            onClick={() => useCanvasStore.getState().dismissExternalUpdate()}
+            className="shrink-0 text-orange-400 hover:text-orange-600"
+          >
+            知道了
           </button>
         </div>
       )}

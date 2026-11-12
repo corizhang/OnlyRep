@@ -16,6 +16,8 @@ export default function WelcomeModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // ?preset=xxx 是显式模板直达（演示/截图/分享链接），跳过欢迎页
+    if (new URLSearchParams(window.location.search).get('preset')) return;
     const onboarded = appStorage.getItem(ONBOARD_KEY);
     const hasWorkspace = appStorage.getItem(CANVAS_KEY) !== null;
     if (!onboarded && !hasWorkspace) setOpen(true);

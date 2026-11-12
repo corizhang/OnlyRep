@@ -611,6 +611,97 @@ export function createDemoCanvasConfig(): CanvasConfig {
   };
 }
 
+
+/** 银行转介场景预设：转介统计 8 列结构 + 漏斗逐层取数示范（含人工补录层） */
+export function createBankReferralPreset(): CanvasConfig {
+  const base = createDefaultCanvasConfig();
+  const rows = [
+    ['20261110', '鞍山分行', '205', '6', '47', '10', '32', '10'],
+    ['20261110', '阜新分行', '119', '9', '22', '4', '14', '5'],
+    ['20261110', '长春分行', '316', '2', '1862', '317', '820', '438'],
+    ['20261110', '抚顺分行', '131', '3', '0', '0', '0', '0'],
+    ['20261110', '锦州分行', '187', '7', '0', '0', '0', '0'],
+  ];
+  const columns = ['数据日期', '分行', '员工数', 'm1人数', '扫码人数', '扫码-绑卡人数', '扫码-非特邀客户', '达标人数'];
+  return {
+    ...base,
+    title: '转介活动漏斗日报（示例）',
+    dataSources: [{ id: 'ds_zj', name: '转介统计', kind: 'manualTable', columns, rows }],
+    pipeline: {
+      nodes: [
+        { id: 'n_zj', type: 'source', name: '转介统计', inputs: [], params: { sourceId: 'ds_zj' }, enabled: true },
+        { id: 'n_sm', type: 'scalarOut', name: '扫码人数', inputs: ['n_zj'], params: { col: '扫码人数', method: 'sum' }, enabled: true },
+        { id: 'n_bk', type: 'scalarOut', name: '绑卡人数', inputs: ['n_zj'], params: { col: '扫码-绑卡人数', method: 'sum' }, enabled: true },
+        { id: 'n_db', type: 'scalarOut', name: '达标人数', inputs: ['n_zj'], params: { col: '达标人数', method: 'sum' }, enabled: true },
+      ],
+    },
+    blocks: [
+      {
+        id: 'b_title',
+        type: 'text',
+        config: { content: '转介活动漏斗日报', role: 'title', fontSizeScale: 1.75, bold: true, align: 'left', colorMode: 'theme', customColor: '' },
+      },
+      {
+        id: 'b_sub',
+        type: 'text',
+        config: { content: '数据日期：{{TODAY()}}　｜　示例数据，换成你的转介统计表即用', role: 'note', fontSizeScale: 0.85, bold: false, align: 'left', colorMode: 'custom', customColor: 'rgba(255, 255, 255, 0.85)' },
+      },
+      {
+        id: 'b_funnel',
+        type: 'chart',
+        config: {
+          title: '转介转化漏斗（逐层取数）',
+          chartType: 'funnel',
+          funnelMode: 'scalars',
+          funnelStages: [
+            { name: '扫码人数', value: { kind: 'node', nodeRef: 'n_sm' } },
+            { name: '绑卡人数', value: { kind: 'node', nodeRef: 'n_bk' } },
+            { name: '达标人数', value: { kind: 'node', nodeRef: 'n_db' } },
+            { name: '人工补录', value: { kind: 'formula', expr: '88' } },
+          ],
+          table: { nodeRef: 'n_zj' },
+          dimension: '',
+          metrics: [],
+          sortBy: 'value',
+          sort: 'desc',
+          maxRows: 0,
+          showValueLabel: true,
+          highlightLast: false,
+          horizontal: false,
+          height: 320,
+          showLegend: false,
+          showGrid: false,
+          yUnit: '',
+        },
+      },
+      {
+        id: 'b_detail',
+        type: 'dataTable',
+        config: {
+          title: '分行明细',
+          table: { nodeRef: 'n_zj' },
+          columns: [
+            { col: '分行', label: '分行', align: 'left', format: 'text', decimals: 'auto' },
+            { col: '扫码人数', label: '扫码人数', align: 'right', format: 'number', decimals: 'auto' },
+            { col: '扫码-绑卡人数', label: '绑卡人数', align: 'right', format: 'number', decimals: 'auto' },
+            { col: '达标人数', label: '达标人数', align: 'right', format: 'number', decimals: 'auto' },
+          ],
+          zebra: true,
+          showHeader: true,
+          headerBold: true,
+          showIndex: false,
+          totalRow: true,
+          totalLabel: '合计',
+          maxRows: 0,
+          fontSizeScale: 1,
+          cardBg: '',
+          highlightRules: [],
+        },
+      },
+    ],
+  };
+}
+
 export const CANVAS_PRESETS: CanvasPreset[] = [
   {
     id: 'blank',
@@ -629,6 +720,12 @@ export const CANVAS_PRESETS: CanvasPreset[] = [
     name: '示例：带数据的日报',
     desc: '内置示例数据，打开即可看到完整效果',
     create: createDemoCanvasConfig,
+  },
+  {
+    id: 'bank-referral',
+    name: '银行转介漏斗（示例）',
+    desc: '转介统计表 + 漏斗逐层取数示范（扫码→绑卡→达标，含人工补录层）',
+    create: createBankReferralPreset,
   },
 ];
 

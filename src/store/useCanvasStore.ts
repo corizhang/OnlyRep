@@ -60,6 +60,9 @@ export interface CanvasStore {
   restored: boolean;
   /** 本地存储写失败（配额满/环境禁用）：非空时顶部显示导出备份警告条（内存降级中，刷新即丢） */
   storageError: string | null;
+  /** 其他窗口/标签页更新了工作区（storage 事件）：提示刷新，避免旧内存态覆写 */
+  externalUpdate: boolean;
+  dismissExternalUpdate: () => void;
   /** 导入/解析中标记 */
   busy: boolean;
   /** 流程视图是否打开（全屏抽屉，不入持久化） */
@@ -283,6 +286,8 @@ export const useCanvasStore = create<CanvasStore>()(
       return {
         config: createDefaultCanvasConfig(),
         storageError: null,
+        externalUpdate: false,
+        dismissExternalUpdate: () => set({ externalUpdate: false }),
         templates: [],
         activeTemplateId: null,
         sources: {},
