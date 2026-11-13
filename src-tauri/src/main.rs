@@ -40,18 +40,30 @@ fn kv_remove(state: State<DbState>, key: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 导出文件落盘：base64 解码写入系统下载目录（WebView 不处理 <a download>，桌面端必须走 Rust）。
+/// 导出文件落盘：base64 解码写入导出目录（WebView 不处理 <a download>，桌面端必须走 Rust）。
+/// 目录优先级：设置页自定义（kv 键 rankboard-export-dir）> 系统下载目录/RankBoard。
 /// 返回完整路径供前端 toast 展示。
 #[tauri::command]
-fn export_file(app: tauri::AppHandle, name: String, data_base64: String) -> Result<String, String> {
+fn export_file(app: tauri::AppHandle, state: State<DbState>, name: String, data_base64: String) -> Result<String, String> {
     let bytes = STANDARD
         .decode(data_base64)
         .map_err(|e| format!("base64 解码失败: {e}"))?;
-    let dir = app
-        .path()
-        .download_dir()
-        .map_err(|e| e.to_string())?
-        .join("RankBoard");
+    // 自定义导出目录（设置页写入的 kv）
+    let custom_dir = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT value FROM kv WHERE key = 'rankboard-export-dir'")
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+        match rows.next().map_err(|e| e.to_string())? {
+            Some(row) => row.get::<_, String>(0).ok(),
+            None => None,
+        }
+    };
+    let dir = match custom_dir.filter(|d| !d.trim().is_empty()) {
+        Some(d) => std::path::PathBuf::from(d),
+        None => app.path().download_dir().map_err(|e| e.to_string())?.join("RankBoard"),
+    };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // 同名不覆盖：追加序号
     let mut path = dir.join(&name);
@@ -79,8 +91,20 @@ fn export_file(app: tauri::AppHandle, name: String, data_base64: String) -> Resu
     Ok(path.to_string_lossy().to_string())
 }
 
+/// 在资源管理器中打开导出文件所在文件夹并选中该文件（Windows 桌面版）
+#[tauri::command]
+fn open_export_folder(path: String) -> Result<(), String> {
+    std::process::Command::new("explorer")
+        .arg("/select,")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -92,7 +116,7 @@ fn main() {
             app.manage(DbState(Mutex::new(conn)));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![kv_get, kv_set, kv_remove, export_file])
+        .invoke_handler(tauri::generate_handler![kv_get, kv_set, kv_remove, export_file, open_export_folder])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

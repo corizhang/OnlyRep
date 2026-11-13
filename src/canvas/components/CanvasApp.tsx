@@ -15,6 +15,7 @@ import CanvasSettings from './CanvasSettings';
 import CanvasStage from './CanvasStage';
 import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
 import TemplateLibraryModal from './TemplateLibraryModal';
+import SettingsModal from './SettingsModal';
 import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
 
@@ -38,6 +39,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const activeTemplateId = useCanvasStore((s) => s.activeTemplateId);
   const templates = useCanvasStore((s) => s.templates);
   const [showTplLib, setShowTplLib] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
   useEffect(() => {
@@ -128,6 +130,15 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
             >
               <FolderOpenOutlined style={{ fontSize: 12 }} />
               <span className="truncate">{activeTplName ?? '模板库'}</span>
+            </button>
+          </Tooltip>
+          <Tooltip title="设置（导出路径等）">
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-500 shadow-sm hover:border-blue-300 hover:text-blue-600"
+            >
+              ⚙
             </button>
           </Tooltip>
           {/* 撤销/重做（config 级：节点/数据/区块/主题全部覆盖） */}
@@ -266,6 +277,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
       {showFlow && <FlowSheet />}
 
       <TemplateLibraryModal open={showTplLib} onClose={() => setShowTplLib(false)} />
+      <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* 首屏欢迎页（仅首次使用出现一次） */}
       <WelcomeModal />

@@ -6,6 +6,7 @@ import type { CanvasBlock } from '../types';
 import CanvasRenderer from '../blocks/CanvasRenderer';
 import type { RenderCtx } from '../blocks/context';
 import { exportPng } from '../../utils/exportImage';
+import { invoke } from '@tauri-apps/api/core';
 import EmptyGuide from './EmptyGuide';
 import { createBlock } from '../defaults';
 import { Btn } from './ui';
@@ -26,6 +27,8 @@ export default function CanvasStage() {
   const [exporting, setExporting] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [toast, setToast] = useState('');
+  /** 最近一次导出的落盘路径（桌面端）：toast 显示「打开文件夹」按钮 */
+  const [lastExportPath, setLastExportPath] = useState('');
   const [dropHint, setDropHint] = useState(false);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
@@ -103,6 +106,7 @@ export default function CanvasStage() {
       const d = new Date();
       const name = `${config.title}_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
       const res = await exportPng(node, { scale: config.exportScale, fileName: name });
+      setLastExportPath(res.savedPath ?? '');
       setToast(
         res.savedPath
           ? `已导出：${res.savedPath}`
@@ -140,7 +144,18 @@ export default function CanvasStage() {
       </div>
 
       {toast && (
-        <div className="border-b border-blue-100 bg-blue-50 px-4 py-1.5 text-[11px] text-blue-700">{toast}</div>
+        <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50 px-4 py-1.5 text-[11px] text-blue-700">
+          <span className="min-w-0 flex-1 truncate" title={lastExportPath || undefined}>{toast}</span>
+          {lastExportPath && (
+            <button
+              type="button"
+              className="shrink-0 rounded border border-blue-200 bg-white px-2 py-0.5 text-[10.5px] font-medium text-blue-600 hover:bg-blue-100"
+              onClick={() => invoke('open_export_folder', { path: lastExportPath }).catch(() => undefined)}
+            >
+              📂 打开文件夹
+            </button>
+          )}
+        </div>
       )}
 
       <div
