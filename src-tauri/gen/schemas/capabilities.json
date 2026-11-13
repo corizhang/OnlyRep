@@ -1,1 +1,1 @@
-{}
+{"default":{"identifier":"default","description":"默认能力集：核心事件/窗口 + 原生对话框（文件夹/文件选择）","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}

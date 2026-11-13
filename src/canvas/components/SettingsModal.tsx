@@ -9,6 +9,7 @@ import { isTauri, tauriPersistStorage } from '../../storage/tauriKv';
 export default function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [exportDir, setExportDir] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [err, setErr] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -29,10 +30,15 @@ export default function SettingsModal({ open, onClose }: { open: boolean; onClos
   if (!open) return null;
 
   const pickDir = async (): Promise<void> => {
-    const dir = await openDialog({ directory: true, title: '选择导出图片的默认保存位置' });
-    if (typeof dir === 'string' && dir) {
-      setExportDir(dir);
-      await tauriPersistStorage.setItem('rankboard-export-dir', dir);
+    setErr('');
+    try {
+      const dir = await openDialog({ directory: true, title: '选择导出图片的默认保存位置' });
+      if (typeof dir === 'string' && dir) {
+        setExportDir(dir);
+        await tauriPersistStorage.setItem('rankboard-export-dir', dir);
+      }
+    } catch (e) {
+      setErr(`打开文件夹选择器失败：${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -77,6 +83,7 @@ export default function SettingsModal({ open, onClose }: { open: boolean; onClos
               <p className="mt-2 text-[10.5px] leading-relaxed text-slate-400">
                 自定义后所有导出图片都保存到该位置（同名自动追加序号）。仅桌面应用生效。
               </p>
+              {err && <p className="mt-1.5 text-[11px] text-red-600">{err}</p>}
             </>
           ) : (
             <p className="mt-1.5 text-[11.5px] leading-relaxed text-slate-400">
