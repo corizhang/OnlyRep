@@ -34,7 +34,7 @@ export default function StepChainPanel() {
         </Btn>
       }
     >
-      {config.dataSources.length === 0 && <p className="text-[12px] text-slate-400">先添加数据源。</p>}
+      {config.dataSources.length === 0 && <p className="text-[12px] text-ink-faint">先添加数据源。</p>}
 
       {config.dataSources.map((src) => {
         const srcNode = nodes.find((n) => n.type === 'source' && String(n.params.sourceId ?? '') === src.id);
@@ -43,14 +43,14 @@ export default function StepChainPanel() {
         const last = chain.length > 0 ? chain[chain.length - 1] : srcNode;
 
         return (
-          <div key={src.id} className="rounded-md border border-slate-200 p-2">
+          <div key={src.id} className="rounded-md border border-line p-2">
             <div className="mb-1 flex items-center gap-1.5">
-              <span className="text-[12px] font-medium text-slate-700">{src.name}</span>
+              <span className="text-[12px] font-medium text-ink">{src.name}</span>
               <Pill tone="blue">{src.kind === 'import' ? '文件' : src.kind === 'form' ? '表单' : src.kind === 'constant' ? '常量' : '手填表'}</Pill>
               <StatusDot output={outputs[srcNode.id]} />
             </div>
 
-            {chain.length === 0 && <p className="text-[11.5px] text-slate-400">未加处理步骤，组件可直接绑定原始表。</p>}
+            {chain.length === 0 && <p className="text-[11.5px] text-ink-faint">未加处理步骤，组件可直接绑定原始表。</p>}
 
             {chain.map((n) => {
               const upstream = n.inputs[0];
@@ -86,9 +86,9 @@ export default function StepChainPanel() {
         );
       })}
 
-      <div className="mt-2 rounded-md border border-dashed border-slate-300 p-2">
+      <div className="mt-2 rounded-md border border-dashed border-line-strong p-2">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[12px] font-medium text-slate-700">计算字段</span>
+          <span className="text-[12px] font-medium text-ink">计算字段</span>
           <Btn
             size="xs"
             onClick={() => {
@@ -107,7 +107,7 @@ export default function StepChainPanel() {
             + 公式
           </Btn>
         </div>
-        {formulas.length === 0 && <p className="text-[11.5px] text-slate-400">用公式把标量算成新指标，如「完成率 = 已完成/全年目标」。</p>}
+        {formulas.length === 0 && <p className="text-[11.5px] text-ink-faint">用公式把标量算成新指标，如「完成率 = 已完成/全年目标」。</p>}
         {formulas.map((n) => (
           <StepRow
             key={n.id}
@@ -156,14 +156,14 @@ function StepRow({
   const rowSample = upstreamOutput && upstreamOutput.kind === 'table' ? upstreamOutput.table.rows[0] : undefined;
 
   return (
-    <div className={`mt-1 rounded border ${node.enabled ? 'border-slate-200' : 'border-slate-200 bg-slate-100/60'} px-1.5 py-1`}>
+    <div className={`mt-1 rounded border ${node.enabled ? 'border-line' : 'border-line bg-hover/60'} px-1.5 py-1`}>
       <div className="flex items-center gap-1">
-        <button type="button" className="w-4 text-[11.5px] text-slate-400" onClick={onToggleExpand}>
+        <button type="button" className="w-4 text-[11.5px] text-ink-faint" onClick={onToggleExpand}>
           {expanded ? '▾' : '▸'}
         </button>
-        <span className={`text-[12px] ${node.enabled ? 'text-slate-700' : 'text-slate-400 line-through'}`}>{node.name}</span>
-        <span className="text-[10.5px] text-slate-400">{typeLabel(node.type)}</span>
-        <span className="ml-auto truncate text-[10.5px] text-slate-400">{summary(node)}</span>
+        <span className={`text-[12px] ${node.enabled ? 'text-ink' : 'text-ink-faint line-through'}`}>{node.name}</span>
+        <span className="text-[10.5px] text-ink-faint">{typeLabel(node.type)}</span>
+        <span className="ml-auto truncate text-[10.5px] text-ink-faint">{summary(node)}</span>
         <input
           type="checkbox"
           className="h-3 w-3"
@@ -171,15 +171,15 @@ function StepRow({
           title="启停该步骤"
           onChange={() => toggleNode(node.id)}
         />
-        <button type="button" className="text-[11.5px] text-slate-400 hover:text-red-500" onClick={() => removeNode(node.id)}>
+        <button type="button" className="text-[11.5px] text-ink-faint hover:text-danger" onClick={() => removeNode(node.id)}>
           ✕
         </button>
       </div>
 
-      {output?.kind === 'error' && <div className="pl-5 text-[11.5px] text-amber-600">{output.message}</div>}
+      {output?.kind === 'error' && <div className="pl-5 text-[11.5px] text-warn">{output.message}</div>}
 
       {expanded && (
-        <div className="mt-1 space-y-1.5 border-t border-slate-100 pl-5 pt-1.5">
+        <div className="mt-1 space-y-1.5 border-t border-line pl-5 pt-1.5">
           <Field label="显示名">
             <TextInput value={node.name} onChange={(v) => updateNode(node.id, { name: v })} />
           </Field>
@@ -308,7 +308,7 @@ function StepRow({
           )}
 
           {output && output.kind !== 'error' && (
-            <div className="text-[11.5px] text-emerald-600">
+            <div className="text-[11.5px] text-ok">
               结果：
               {output.kind === 'table'
                 ? `${output.table.rows.length} 行`
@@ -330,11 +330,11 @@ function AggEditor({ node, cols }: { node: PipelineNode; cols: { value: string; 
 
   return (
     <div className="space-y-1">
-      <span className="text-[12px] text-slate-500">聚合列</span>
+      <span className="text-[12px] text-ink-dim">聚合列</span>
       {aggs.map((a, i) => (
         <div key={i} className="flex gap-1">
           <select
-            className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+            className="min-w-0 flex-1 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
             value={a.col}
             onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, col: e.target.value, as: x.as || e.target.value } : x)))}
           >
@@ -346,7 +346,7 @@ function AggEditor({ node, cols }: { node: PipelineNode; cols: { value: string; 
             ))}
           </select>
           <select
-            className="rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+            className="rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
             value={a.method}
             onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, method: e.target.value as AggMethod } : x)))}
           >
@@ -357,12 +357,12 @@ function AggEditor({ node, cols }: { node: PipelineNode; cols: { value: string; 
             ))}
           </select>
           <input
-            className="w-16 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+            className="w-16 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
             value={a.as}
             placeholder="命名"
             onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, as: e.target.value } : x)))}
           />
-          <button type="button" className="text-slate-400 hover:text-red-500" onClick={() => set(aggs.filter((_, j) => j !== i))}>
+          <button type="button" className="text-ink-faint hover:text-danger" onClick={() => set(aggs.filter((_, j) => j !== i))}>
             ×
           </button>
         </div>
@@ -377,7 +377,7 @@ function AggEditor({ node, cols }: { node: PipelineNode; cols: { value: string; 
 function AddStep({ onAdd }: { onAdd: (type: PipelineNode['type']) => void }) {
   return (
     <select
-      className="rounded border border-slate-300 bg-white px-1 py-0.5 text-[11.5px] text-slate-600"
+      className="rounded border border-line-strong bg-panel px-1 py-0.5 text-[11.5px] text-ink-dim"
       value=""
       onChange={(e) => {
         if (e.target.value) onAdd(e.target.value as PipelineNode['type']);

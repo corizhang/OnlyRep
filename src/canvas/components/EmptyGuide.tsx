@@ -14,13 +14,13 @@ export default function EmptyGuide({ variant }: { variant: 'node' | 'canvas' }) 
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-      <div className="pointer-events-auto w-[380px] rounded-xl border border-slate-200 bg-white/95 p-6 shadow-xl backdrop-blur">
+      <div className="pointer-events-auto w-[380px] rounded-xl border border-line bg-panel/95 p-6 shadow-xl backdrop-blur">
         <div className="text-[24px]">🧩</div>
-        <h3 className="mt-2 text-[15px] font-semibold text-slate-800">{variant === 'node' ? '从一份数据开始' : '画布还是空的'}</h3>
+        <h3 className="mt-2 text-[15px] font-semibold text-ink">{variant === 'node' ? '从一份数据开始' : '画布还是空的'}</h3>
         <ol className="mt-2.5 space-y-1.5">
           {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-slate-500">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[10px] font-semibold text-blue-600">{i + 1}</span>
+            <li key={i} className="flex items-start gap-2 text-[12px] leading-relaxed text-ink-dim">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[10px] font-semibold text-brand">{i + 1}</span>
               {s}
             </li>
           ))}
@@ -28,7 +28,7 @@ export default function EmptyGuide({ variant }: { variant: 'node' | 'canvas' }) 
         <button
           type="button"
           onClick={() => applyPreset('demo')}
-          className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2 text-[12.5px] font-medium text-white hover:bg-blue-700"
+          className="mt-4 w-full rounded-lg bg-brand px-4 py-2 text-[12.5px] font-medium text-white hover:bg-brand-hover"
         >
           或者：载入示例数据，先看完整效果 →
         </button>

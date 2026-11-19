@@ -10,9 +10,9 @@ import { Button, Checkbox, Input, InputNumber, Select as AntSelect, Slider } fro
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-[12px] font-medium text-slate-500">{label}</span>
+      <span className="block text-[12px] font-medium text-ink-dim">{label}</span>
       {children}
-      {hint && <span className="block text-[11px] leading-snug text-slate-400">{hint}</span>}
+      {hint && <span className="block text-[11px] leading-snug text-ink-faint">{hint}</span>}
     </label>
   );
 }
@@ -121,7 +121,7 @@ export function ColorInput({ value, onChange }: { value: string; onChange: (v: s
     <div className="flex items-center gap-1.5">
       <input
         type="color"
-        className="h-8 w-9 cursor-pointer rounded-md border border-slate-300 bg-white p-0.5"
+        className="h-8 w-9 cursor-pointer rounded-md border border-line-strong bg-panel p-0.5"
         value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#3B82F6'}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -194,9 +194,9 @@ export function SliderBar({
 
 export function Section({ title, children, extra }: { title: string; children: ReactNode; extra?: ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-        <h2 className="text-[12px] font-medium tracking-wide text-slate-500">{title}</h2>
+    <section className="rounded-lg border border-line bg-panel shadow-sm">
+      <header className="flex items-center justify-between border-b border-line px-3 py-2">
+        <h2 className="text-[12px] font-medium tracking-wide text-ink-dim">{title}</h2>
         {extra}
       </header>
       <div className="space-y-2.5 p-3">{children}</div>
@@ -206,11 +206,11 @@ export function Section({ title, children, extra }: { title: string; children: R
 
 export function Pill({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'green' | 'amber' | 'red' | 'blue' }) {
   const tones: Record<string, string> = {
-    slate: 'bg-slate-100 text-slate-600',
-    green: 'bg-emerald-50 text-emerald-700',
-    amber: 'bg-amber-50 text-amber-700',
-    red: 'bg-red-50 text-red-700',
-    blue: 'bg-blue-50 text-blue-700',
+    slate: 'bg-hover text-ink-dim',
+    green: 'bg-ok-soft text-ok',
+    amber: 'bg-warn-soft text-warn',
+    red: 'bg-danger-soft text-danger',
+    blue: 'bg-brand-soft text-brand',
   };
   return <span className={`rounded px-1.5 py-0.5 text-[11px] ${tones[tone]}`}>{children}</span>;
 }

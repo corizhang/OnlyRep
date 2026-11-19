@@ -87,16 +87,16 @@ export default function FormulaEditorModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex h-[640px] max-h-[88vh] w-[860px] max-w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className="flex h-[640px] max-h-[88vh] w-[860px] max-w-full flex-col overflow-hidden rounded-xl bg-panel shadow-2xl">
         {/* 标题栏 */}
-        <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3">
-          <span className="text-[15px] font-semibold text-slate-800">编辑公式</span>
-          <span className="min-w-0 truncate rounded bg-slate-100 px-2 py-0.5 text-[12px] text-slate-500" title={title}>
+        <div className="flex items-center gap-2 border-b border-line px-5 py-3">
+          <span className="text-[15px] font-semibold text-ink">编辑公式</span>
+          <span className="min-w-0 truncate rounded bg-hover px-2 py-0.5 text-[12px] text-ink-dim" title={title}>
             {title}
           </span>
           <button
             type="button"
-            className="ml-auto rounded px-1.5 text-[18px] leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="ml-auto rounded px-1.5 text-[18px] leading-none text-ink-faint hover:bg-hover hover:text-ink-dim"
             onClick={onClose}
             title="关闭（Esc）"
           >
@@ -119,10 +119,10 @@ export default function FormulaEditorModal({
         </div>
 
         {/* 变量 / 函数浏览区 */}
-        <div className="mt-4 flex min-h-0 flex-1 border-t border-slate-200">
+        <div className="mt-4 flex min-h-0 flex-1 border-t border-line">
           {/* 左栏：Tab + 搜索 + 列表 */}
-          <div className="flex w-[320px] shrink-0 flex-col border-r border-slate-200">
-            <div className="flex items-center gap-4 border-b border-slate-100 px-4 pt-2.5">
+          <div className="flex w-[320px] shrink-0 flex-col border-r border-line">
+            <div className="flex items-center gap-4 border-b border-line px-4 pt-2.5">
               {(
                 [
                   { key: 'vars', label: '变量' },
@@ -133,7 +133,7 @@ export default function FormulaEditorModal({
                   key={t.key}
                   type="button"
                   onClick={() => setTab(t.key)}
-                  className={`-mb-px border-b-2 pb-2 text-[13px] font-medium ${tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                  className={`-mb-px border-b-2 pb-2 text-[13px] font-medium ${tab === t.key ? 'border-blue-600 text-brand' : 'border-transparent text-ink-dim hover:text-ink'}`}
                 >
                   {t.label}
                 </button>
@@ -143,7 +143,7 @@ export default function FormulaEditorModal({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={tab === 'vars' ? '搜索变量（支持拼音）' : '搜索函数'}
-                  className="w-full rounded-md border border-slate-200 px-2 py-1 text-[12px] outline-none focus:border-blue-400"
+                  className="w-full rounded-md border border-line px-2 py-1 text-[12px] outline-none focus:border-brand-line"
                 />
               </div>
             </div>
@@ -152,7 +152,7 @@ export default function FormulaEditorModal({
               {tab === 'vars' &&
                 varGroups.map((g) => (
                   <div key={g.group} className="mb-2">
-                    <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-slate-400">
+                    <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-ink-faint">
                       {g.group} · {g.items.length}
                     </p>
                     {g.items.map((v) => (
@@ -165,20 +165,20 @@ export default function FormulaEditorModal({
                           insert(wrapVarName(v.name));
                         }}
                         onMouseEnter={() => setSelVar(v)}
-                        className={`flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-slate-50 ${selVar?.name === v.name ? 'bg-blue-50' : ''}`}
+                        className={`flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-hover ${selVar?.name === v.name ? 'bg-brand-soft' : ''}`}
                       >
                         <span className={`min-w-0 flex-1 truncate font-medium ${GROUP_COLOR[v.group]}`}>{v.name}</span>
-                        {v.value !== undefined && <span className="shrink-0 text-[11.5px] text-slate-400">= {displayVarValue(v)}</span>}
+                        {v.value !== undefined && <span className="shrink-0 text-[11.5px] text-ink-faint">= {displayVarValue(v)}</span>}
                       </button>
                     ))}
                   </div>
                 ))}
-              {tab === 'vars' && varGroups.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-slate-400">没有匹配的变量</p>}
+              {tab === 'vars' && varGroups.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-ink-faint">没有匹配的变量</p>}
 
               {tab === 'fns' &&
                 fnList.map((g) => (
                   <div key={g.cat} className="mb-2">
-                    <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-slate-400">{g.cat}</p>
+                    <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-ink-faint">{g.cat}</p>
                     {g.items.map((n) => (
                       <button
                         key={n}
@@ -189,15 +189,15 @@ export default function FormulaEditorModal({
                           insert(`${n}(`);
                         }}
                         onMouseEnter={() => setSelFn(n)}
-                        className={`flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-slate-50 ${selFn === n ? 'bg-blue-50' : ''}`}
+                        className={`flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-hover ${selFn === n ? 'bg-brand-soft' : ''}`}
                       >
                         <span className="font-medium text-purple-600">{n}</span>
-                        <span className="min-w-0 flex-1 truncate text-[11.5px] text-slate-400">{FUNC_DOCS[n].sig}</span>
+                        <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink-faint">{FUNC_DOCS[n].sig}</span>
                       </button>
                     ))}
                   </div>
                 ))}
-              {tab === 'fns' && fnList.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-slate-400">没有匹配的函数</p>}
+              {tab === 'fns' && fnList.length === 0 && <p className="px-2 py-6 text-center text-[12px] text-ink-faint">没有匹配的函数</p>}
             </div>
           </div>
 
@@ -205,17 +205,17 @@ export default function FormulaEditorModal({
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
             {tab === 'fns' && selFn ? (
               <div>
-                <p className="text-[14px] font-semibold text-slate-800">
+                <p className="text-[14px] font-semibold text-ink">
                   {selFn}
-                  <span className="ml-1.5 text-[12px] font-normal text-slate-400">{FUNC_DOCS[selFn].cat}</span>
+                  <span className="ml-1.5 text-[12px] font-normal text-ink-faint">{FUNC_DOCS[selFn].cat}</span>
                 </p>
-                <code className="mt-1.5 block rounded-md bg-slate-100 px-2.5 py-1.5 text-[12.5px] text-purple-700">{FUNC_DOCS[selFn].sig}</code>
-                <p className="mt-3 text-[12.5px] leading-relaxed text-slate-600">{FUNC_DOCS[selFn].desc}</p>
-                <p className="mt-4 text-[11.5px] font-semibold text-slate-500">示例</p>
-                <pre className="mt-1.5 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-[12px] leading-relaxed text-slate-600">{FUNC_DOCS[selFn].example}</pre>
+                <code className="mt-1.5 block rounded-md bg-hover px-2.5 py-1.5 text-[12.5px] text-purple-700">{FUNC_DOCS[selFn].sig}</code>
+                <p className="mt-3 text-[12.5px] leading-relaxed text-ink-dim">{FUNC_DOCS[selFn].desc}</p>
+                <p className="mt-4 text-[11.5px] font-semibold text-ink-dim">示例</p>
+                <pre className="mt-1.5 whitespace-pre-wrap rounded-md bg-soft p-3 text-[12px] leading-relaxed text-ink-dim">{FUNC_DOCS[selFn].example}</pre>
                 <button
                   type="button"
-                  className="mt-3 rounded-md bg-blue-600 px-3 py-1 text-[12px] font-medium text-white hover:bg-blue-700"
+                  className="mt-3 rounded-md bg-brand px-3 py-1 text-[12px] font-medium text-white hover:bg-brand-hover"
                   onClick={() => insert(`${selFn}(`)}
                 >
                   插入函数
@@ -223,26 +223,26 @@ export default function FormulaEditorModal({
               </div>
             ) : tab === 'vars' && selVar ? (
               <div>
-                <p className="text-[14px] font-semibold text-slate-800">
+                <p className="text-[14px] font-semibold text-ink">
                   {selVar.name}
-                  <span className="ml-1.5 text-[12px] font-normal text-slate-400">{selVar.group}</span>
+                  <span className="ml-1.5 text-[12px] font-normal text-ink-faint">{selVar.group}</span>
                 </p>
                 {selVar.value !== undefined && (
-                  <p className="mt-2 text-[13px] text-slate-600">
-                    当前值 <b className="ml-1 text-emerald-600">{displayVarValue(selVar)}</b>
+                  <p className="mt-2 text-[13px] text-ink-dim">
+                    当前值 <b className="ml-1 text-ok">{displayVarValue(selVar)}</b>
                   </p>
                 )}
-                {selVar.hint && <p className="mt-2 text-[12.5px] leading-relaxed text-slate-500">{selVar.hint}</p>}
+                {selVar.hint && <p className="mt-2 text-[12.5px] leading-relaxed text-ink-dim">{selVar.hint}</p>}
                 <button
                   type="button"
-                  className="mt-4 rounded-md bg-blue-600 px-3 py-1 text-[12px] font-medium text-white hover:bg-blue-700"
+                  className="mt-4 rounded-md bg-brand px-3 py-1 text-[12px] font-medium text-white hover:bg-brand-hover"
                   onClick={() => insert(wrapVarName(selVar.name))}
                 >
                   插入变量
                 </button>
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center text-[12.5px] text-slate-300">
+              <div className="flex h-full items-center justify-center text-[12.5px] text-ink-faint">
                 {tab === 'fns' ? '把光标移到函数上查看说明与示例' : '把光标移到变量上查看取值与来源'}
               </div>
             )}
@@ -250,19 +250,19 @@ export default function FormulaEditorModal({
         </div>
 
         {/* 底部操作 */}
-        <div className="flex items-center gap-2 border-t border-slate-200 px-5 py-3">
-          <span className="text-[12px] text-slate-400">点击变量/函数插入到光标处；修改先以草稿预览，点「保存」后应用并重新计算。</span>
+        <div className="flex items-center gap-2 border-t border-line px-5 py-3">
+          <span className="text-[12px] text-ink-faint">点击变量/函数插入到光标处；修改先以草稿预览，点「保存」后应用并重新计算。</span>
           <div className="ml-auto flex gap-2">
             <button
               type="button"
-              className="rounded-md border border-slate-300 px-3.5 py-1.5 text-[13px] text-slate-600 hover:bg-slate-50"
+              className="rounded-md border border-line-strong px-3.5 py-1.5 text-[13px] text-ink-dim hover:bg-hover"
               onClick={onClose}
             >
               取消
             </button>
             <button
               type="button"
-              className="rounded-md bg-blue-600 px-4 py-1.5 text-[13px] font-medium text-white hover:bg-blue-700"
+              className="rounded-md bg-brand px-4 py-1.5 text-[13px] font-medium text-white hover:bg-brand-hover"
               onClick={() => {
                 onOk(draft);
                 onClose();

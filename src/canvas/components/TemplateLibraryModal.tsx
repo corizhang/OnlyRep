@@ -61,16 +61,16 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
     <Modal title="模板库" open={open} onCancel={onClose} footer={null} width={520} destroyOnHidden>
       <div className="space-y-3">
         {/* 顶部：保存当前 + 新建空白 */}
-        <div className="flex items-center gap-2 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-md border border-brand-line bg-brand-soft/60 px-3 py-2">
           <button
             type="button"
             onClick={() => saveTemplate()}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-blue-700"
+            className="rounded-md bg-brand px-3 py-1.5 text-[12px] font-medium text-white hover:bg-brand-hover"
           >
             {active ? `保存到「${active.name}」` : '保存当前工作区'}
           </button>
-          {active && dirty && <span className="text-[11px] text-amber-600">● 有未保存修改</span>}
-          {!active && <span className="text-[11px] text-slate-400">将存为新模板并设为当前</span>}
+          {active && dirty && <span className="text-[11px] text-warn">● 有未保存修改</span>}
+          {!active && <span className="text-[11px] text-ink-faint">将存为新模板并设为当前</span>}
           <button
             type="button"
             onClick={() => {
@@ -78,7 +78,7 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
               newBlankWorkspace();
               onClose();
             }}
-            className="ml-auto rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] text-slate-600 hover:bg-slate-50"
+            className="ml-auto rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-[12px] text-ink-dim hover:bg-hover"
           >
             新建空白
           </button>
@@ -86,7 +86,7 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
 
         {/* 列表 */}
         {templates.length === 0 ? (
-          <p className="py-6 text-center text-[12px] text-slate-400">
+          <p className="py-6 text-center text-[12px] text-ink-faint">
             还没有模板。搭好一份日报后点上方「保存当前工作区」，下次一键切换。
           </p>
         ) : (
@@ -97,9 +97,9 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
               return (
                 <div
                   key={t.id}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 ${isActive ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 ${isActive ? 'border-brand-line bg-brand-soft/50' : 'border-line bg-panel hover:border-line-strong'}`}
                 >
-                  <FolderOpenOutlined className={isActive ? 'text-blue-500' : 'text-slate-300'} />
+                  <FolderOpenOutlined className={isActive ? 'text-brand' : 'text-ink-faint'} />
                   <div className="min-w-0 flex-1">
                     {renaming ? (
                       <input
@@ -114,16 +114,16 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
                           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                           if (e.key === 'Escape') setRenamingId(null);
                         }}
-                        className="w-full rounded border border-blue-400 px-1 py-px text-[12.5px] outline-none"
+                        className="w-full rounded border border-brand-line px-1 py-px text-[12.5px] outline-none"
                       />
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate text-[12.5px] font-medium text-slate-800">{t.name}</span>
-                        {isActive && <CheckCircleFilled className="shrink-0 text-[11px] text-blue-500" />}
-                        {isActive && dirty && <span className="shrink-0 text-[10.5px] text-amber-600">已修改</span>}
+                        <span className="truncate text-[12.5px] font-medium text-ink">{t.name}</span>
+                        {isActive && <CheckCircleFilled className="shrink-0 text-[11px] text-brand" />}
+                        {isActive && dirty && <span className="shrink-0 text-[10.5px] text-warn">已修改</span>}
                       </div>
                     )}
-                    <div className="mt-0.5 text-[10.5px] text-slate-400">
+                    <div className="mt-0.5 text-[10.5px] text-ink-faint">
                       {templateSummary(t)} · {new Date(t.updatedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}
                     </div>
                   </div>
@@ -131,7 +131,7 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
                     <button
                       type="button"
                       onClick={() => doLoad(t.id)}
-                      className={`rounded px-2 py-1 text-[11.5px] font-medium ${isActive ? 'text-slate-400' : 'text-blue-600 hover:bg-blue-50'}`}
+                      className={`rounded px-2 py-1 text-[11.5px] font-medium ${isActive ? 'text-ink-faint' : 'text-brand hover:bg-brand-soft'}`}
                       disabled={isActive && !dirty}
                     >
                       {isActive ? (dirty ? '还原' : '当前') : '载入'}
@@ -139,7 +139,7 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
                     <Tooltip title="重命名">
                       <button
                         type="button"
-                        className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                        className="rounded p-1 text-ink-faint hover:bg-hover hover:text-ink-dim"
                         onClick={() => {
                           setRenamingId(t.id);
                           setRenameDraft(t.name);
@@ -149,12 +149,12 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
                       </button>
                     </Tooltip>
                     <Tooltip title="创建副本">
-                      <button type="button" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" onClick={() => duplicateTemplate(t.id)}>
+                      <button type="button" className="rounded p-1 text-ink-faint hover:bg-hover hover:text-ink-dim" onClick={() => duplicateTemplate(t.id)}>
                         <CopyOutlined style={{ fontSize: 12 }} />
                       </button>
                     </Tooltip>
                     <Popconfirm title={`删除模板「${t.name}」？`} okText="删除" cancelText="取消" onConfirm={() => deleteTemplate(t.id)}>
-                      <button type="button" className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500">
+                      <button type="button" className="rounded p-1 text-ink-faint hover:bg-danger-soft hover:text-danger">
                         <DeleteOutlined style={{ fontSize: 12 }} />
                       </button>
                     </Popconfirm>
@@ -164,7 +164,7 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
             })}
           </div>
         )}
-        <p className="text-[10.5px] leading-relaxed text-slate-400">
+        <p className="text-[10.5px] leading-relaxed text-ink-faint">
           模板保存在本机浏览器；「保存当前」才更新存档，日常编辑不回写。跨电脑请配合「导出模板 JSON」。
         </p>
       </div>

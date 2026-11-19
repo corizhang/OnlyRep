@@ -538,10 +538,10 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       style={nodeThemeVars(nodeTheme)}
     >
       {!embedded && (
-        <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-2.5">
+        <div className="flex items-center gap-3 border-b border-line bg-panel px-5 py-2.5">
           <div className="flex items-baseline gap-2">
-            <h2 className="text-sm font-semibold text-slate-800">数据流视图</h2>
-            <span className="text-[11px] text-slate-400">
+            <h2 className="text-sm font-semibold text-ink">数据流视图</h2>
+            <span className="text-[11px] text-ink-faint">
               {config.pipeline.nodes.length} 个节点 · 点选节点后可加下游 · 拖动微调 · 滚轮缩放
             </span>
           </div>
@@ -575,12 +575,12 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       )}
 
       {hint && (
-        <div className="border-b border-amber-200 bg-amber-50 px-5 py-1.5 text-[11px] text-amber-800">{hint}</div>
+        <div className="border-b border-warn/30 bg-warn-soft px-5 py-1.5 text-[11px] text-warn">{hint}</div>
       )}
 
       {embedded && (
-        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
-          <span className="text-[11.5px] text-slate-400">
+        <div className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
+          <span className="text-[11.5px] text-ink-faint">
             {config.pipeline.nodes.length} 个节点 · 从左侧节点库拖入 · 点选节点后在右侧修改配置 · 滚轮缩放
           </span>
           <div className="ml-auto flex items-center gap-2">
@@ -621,7 +621,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
           onDrop={onLibDrop}
           data-drop-hover={dropHover ? '1' : undefined}
         >
-          {dropHover && <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-blue-400 bg-blue-50/30" />}
+          {dropHover && <div className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-brand-line bg-brand-soft/30" />}
 
           {/* 空态引导：没有任何节点时给出最短上手路径 */}
           {config.pipeline.nodes.length === 0 && <EmptyGuide variant="node" />}
@@ -811,7 +811,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             {/* 框选矩形（Shift+背景拖拽） */}
             {marquee && (
               <div
-                className="pointer-events-none absolute border border-blue-500 bg-blue-500/10"
+                className="pointer-events-none absolute border border-brand bg-brand/10"
                 style={{
                   left: Math.min(marquee.x0, marquee.x1),
                   top: Math.min(marquee.y0, marquee.y1),
@@ -909,24 +909,24 @@ export function NodeInspector() {
     return (
       <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
         <div>
-          <div className="text-[13px] font-semibold text-slate-800">已选 {ids.length} 个节点</div>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-slate-400">可整组拖动对齐位置，或批量启停、删除。按 Esc 取消选择。</p>
+          <div className="text-[13px] font-semibold text-ink">已选 {ids.length} 个节点</div>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">可整组拖动对齐位置，或批量启停、删除。按 Esc 取消选择。</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {names.map((nm, i) => (
-            <span key={ids[i]} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+            <span key={ids[i]} className="rounded-full border border-line bg-soft px-2 py-0.5 text-[11px] text-ink-dim">
               {nm}
             </span>
           ))}
         </div>
         <div className="mt-1 flex flex-col gap-2">
-          <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: true }))}>
+          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-[12px] text-ink hover:bg-hover" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: true }))}>
             全部启用
           </button>
-          <button type="button" className="rounded-md border border-slate-300 px-3 py-1.5 text-[12px] text-slate-700 hover:bg-slate-50" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: false }))}>
+          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-[12px] text-ink hover:bg-hover" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: false }))}>
             全部停用
           </button>
-          <button type="button" className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-100" onClick={() => deleteNodes(ids.slice())}>
+          <button type="button" className="rounded-md border border-danger/30 bg-danger-soft px-3 py-1.5 text-[12px] font-medium text-danger hover:bg-danger-soft" onClick={() => deleteNodes(ids.slice())}>
             删除选中节点（Delete）
           </button>
         </div>
@@ -937,8 +937,8 @@ export function NodeInspector() {
   if (!node) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <span className="text-[13px] font-medium text-slate-500">未选中节点</span>
-        <p className="text-[12px] leading-relaxed text-slate-400">
+        <span className="text-[13px] font-medium text-ink-dim">未选中节点</span>
+        <p className="text-[12px] leading-relaxed text-ink-faint">
           在中间流程图中点击一个节点，即可在这里查看实时结果、修改配置或添加下游节点。
         </p>
       </div>
@@ -979,13 +979,13 @@ function AddNodeMenu({
         ['manualTable', '手填表', '可编辑网格'],
         ['constant', '常量', '单个数值'],
       ] as [DataSource['kind'], string, string][]
-    ).map(([kind, label, hint]) => ({ key: `src-${kind}`, label: <span className="flex w-full items-center justify-between gap-3"><span>+ {label}</span><span className="text-[10.5px] text-slate-400">{hint}</span></span> })) },
+    ).map(([kind, label, hint]) => ({ key: `src-${kind}`, label: <span className="flex w-full items-center justify-between gap-3"><span>+ {label}</span><span className="text-[10.5px] text-ink-faint">{hint}</span></span> })) },
     { type: 'divider' },
     { key: 'g-step', type: 'group', label: selected && isTableOut(selected.id) ? `处理节点：将接到「${selected.name}」之后` : '处理节点需先点选一个表格节点', children: (
-      STEP_TYPES.map((s) => ({ key: `step-${s.type}`, label: <span className="flex w-full items-center justify-between gap-3"><span>{s.label}</span><span className="text-[10.5px] text-slate-400">{s.hint}</span></span> }))
+      STEP_TYPES.map((s) => ({ key: `step-${s.type}`, label: <span className="flex w-full items-center justify-between gap-3"><span>{s.label}</span><span className="text-[10.5px] text-ink-faint">{s.hint}</span></span> }))
     ) },
     { type: 'divider' },
-    { key: 'step-formula', label: <span className="flex w-full items-center justify-between gap-3"><span>计算字段</span><span className="text-[10.5px] text-slate-400">公式产出新变量</span></span> },
+    { key: 'step-formula', label: <span className="flex w-full items-center justify-between gap-3"><span>计算字段</span><span className="text-[10.5px] text-ink-faint">公式产出新变量</span></span> },
   ];
 
   const onMenuClick: MenuProps['onClick'] = ({ key }) => {
@@ -1112,7 +1112,7 @@ function SelectionToolbar({
               type="button"
               title={s.hint}
               onClick={() => onAddDownstream(s.type)}
-              className="rounded-full border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-2 py-[3px] text-[10.5px] text-[var(--nb-pop-text)] transition-colors hover:border-blue-500/70 hover:bg-[var(--nb-control-hover)] hover:text-blue-500"
+              className="rounded-full border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-2 py-[3px] text-[10.5px] text-[var(--nb-pop-text)] transition-colors hover:border-brand/70 hover:bg-[var(--nb-control-hover)] hover:text-brand"
             >
               {s.label}
             </button>
@@ -1137,7 +1137,7 @@ function SelectionToolbar({
           type="button"
           title={outIsTable ? '添加下游节点' : '该节点输出不是表格'}
           onClick={onToggleAddMenu}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-blue-400 transition-colors hover:bg-blue-500/20"
+          className="flex h-6 w-6 items-center justify-center rounded-full text-brand transition-colors hover:bg-brand/20"
         >
           <PlusOutlined style={{ fontSize: 13 }} />
         </button>
@@ -1146,7 +1146,7 @@ function SelectionToolbar({
           title={node.enabled ? '停用该节点' : '启用该节点'}
           onClick={onToggleEnabled}
           className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
-            node.enabled ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-slate-500 hover:bg-slate-500/20'
+            node.enabled ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-ink-dim hover:bg-slate-500/20'
           }`}
         >
           <PoweroffOutlined style={{ fontSize: 13 }} />
@@ -1166,9 +1166,9 @@ function SelectionToolbar({
 
 function Legend() {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-white/90 px-2.5 py-1.5 text-[10px] text-slate-500 shadow-sm">
+    <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-panel/90 px-2.5 py-1.5 text-[10px] text-ink-dim shadow-sm">
       <span className="flex items-center gap-1">
-        <i className="inline-block h-2 w-2 rounded-sm bg-blue-500" />
+        <i className="inline-block h-2 w-2 rounded-sm bg-brand" />
         数据源
       </span>
       <span className="flex items-center gap-1">
@@ -1223,44 +1223,44 @@ function Drawer({
   };
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white p-3">
+    <aside className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-line bg-panel p-3">
       <div className="flex items-start gap-2">
         <div className="min-w-0">
-          <div className="text-[10px] text-slate-400">{NODE_TYPE_LABELS[node.type]}</div>
-          <div className="truncate text-sm font-semibold text-slate-800">{node.name}</div>
+          <div className="text-[10px] text-ink-faint">{NODE_TYPE_LABELS[node.type]}</div>
+          <div className="truncate text-sm font-semibold text-ink">{node.name}</div>
         </div>
-        <button type="button" className="ml-auto text-slate-400 hover:text-slate-700" onClick={onClose} title="关闭详情">
+        <button type="button" className="ml-auto text-ink-faint hover:text-ink" onClick={onClose} title="关闭详情">
           ✕
         </button>
       </div>
 
-      <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-        <div className="mb-1 text-[10px] font-medium text-slate-500">实时结果</div>
+      <div className="mt-2 rounded-md border border-line bg-soft p-2">
+        <div className="mb-1 text-[10px] font-medium text-ink-dim">实时结果</div>
         {output?.kind === 'table' ? (
           <DataPreview table={output.table} />
         ) : output?.kind === 'scalar' ? (
-          <div className="text-lg font-semibold text-emerald-600">{output.value === null ? '空值' : String(output.value)}</div>
+          <div className="text-lg font-semibold text-ok">{output.value === null ? '空值' : String(output.value)}</div>
         ) : output?.kind === 'scalars' ? (
           <div className="space-y-0.5">
             {Object.entries(output.values).map(([k, v]) => (
               <div key={k} className="flex justify-between text-[11px]">
-                <span className="text-slate-500">{k}</span>
-                <span className="font-medium text-slate-700">{String(v ?? '')}</span>
+                <span className="text-ink-dim">{k}</span>
+                <span className="font-medium text-ink">{String(v ?? '')}</span>
               </div>
             ))}
           </div>
         ) : output?.kind === 'error' ? (
-          <div className="text-[11px] text-red-600">{output.message}</div>
+          <div className="text-[11px] text-danger">{output.message}</div>
         ) : (
-          <div className="text-[11px] text-slate-400">未执行</div>
+          <div className="text-[11px] text-ink-faint">未执行</div>
         )}
       </div>
 
       {upstreamCandidates.length > 0 && (
-        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-          <div className="mb-1 text-[10px] font-medium text-slate-500">上游数据来源（改接即重跑）</div>
+        <div className="mt-2 rounded-md border border-line bg-soft p-2">
+          <div className="mb-1 text-[10px] font-medium text-ink-dim">上游数据来源（改接即重跑）</div>
           <select
-            className="w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-[11px] text-slate-700"
+            className="w-full rounded border border-line-strong bg-panel px-1.5 py-1 text-[11px] text-ink"
             value={node.inputs[0] ?? ''}
             onChange={(e) => onChangeUpstream(e.target.value)}
           >
@@ -1274,8 +1274,8 @@ function Drawer({
       )}
 
       {outIsTable && (
-        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-          <div className="mb-1 text-[10px] font-medium text-slate-500">添加下游节点（自动接到本节点之后）</div>
+        <div className="mt-2 rounded-md border border-line bg-soft p-2">
+          <div className="mb-1 text-[10px] font-medium text-ink-dim">添加下游节点（自动接到本节点之后）</div>
           <div className="flex flex-wrap gap-1">
             {STEP_TYPES.map((s) => (
               <Btn key={s.type} size="xs" onClick={() => onAddDownstream(s.type)} title={s.hint}>
@@ -1287,10 +1287,10 @@ function Drawer({
       )}
 
       {srcDef && (
-        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-          <div className="mb-1 text-[10px] font-medium text-slate-500">
+        <div className="mt-2 rounded-md border border-line bg-soft p-2">
+          <div className="mb-1 text-[10px] font-medium text-ink-dim">
             数据源配置
-            <span className="ml-1 font-normal text-slate-400">
+            <span className="ml-1 font-normal text-ink-faint">
               {srcDef.kind === 'import'
                 ? srcRt?.status === 'ready'
                   ? `已载入 ${srcRt.table?.rows.length ?? 0} 行`
@@ -1322,22 +1322,22 @@ function Drawer({
       )}
 
       {(node.type === 'scalarOut' || node.type === 'formula') && (
-        <p className="mt-2 text-[10px] text-slate-500">
-          变量名：<code className="rounded bg-slate-100 px-1">{node.name}</code>，被 {refs} 个组件引用
+        <p className="mt-2 text-[10px] text-ink-dim">
+          变量名：<code className="rounded bg-hover px-1">{node.name}</code>，被 {refs} 个组件引用
         </p>
       )}
 
-      <div className="mt-3 border-t border-slate-100 pt-2">
+      <div className="mt-3 border-t border-line pt-2">
         <NodeFields node={node} cols={cols} />
       </div>
 
-      <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-2">
+      <div className="mt-3 flex items-center gap-3 border-t border-line pt-2">
         <Check checked={node.enabled} label="启用该节点" onChange={() => updateNode(node.id, { enabled: !node.enabled })} />
         <Btn size="xs" tone="danger" onClick={deleteNode}>
           删除节点
         </Btn>
       </div>
-      <p className="mt-2 text-[10px] leading-relaxed text-slate-400">
+      <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
         提示：删除节点会连带清除下游节点的输入连线和绑定
         {node.type === 'source' ? '；数据源节点会连同数据源定义一起删除' : ''}
         ，操作前可先截图或在「导出模板」留档。

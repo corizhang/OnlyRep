@@ -58,7 +58,7 @@ export default function DataPreview() {
   return (
     <div className="space-y-2 text-xs">
       {/* 表头行调整（R1-04） */}
-      <div className="flex items-center gap-2 text-slate-600">
+      <div className="flex items-center gap-2 text-ink-dim">
         <span>表头所在行</span>
         <input
           type="number"
@@ -71,13 +71,13 @@ export default function DataPreview() {
               setHeaderRow(v - 1);
             }
           }}
-          className="w-16 rounded border border-slate-300 px-2 py-1"
+          className="w-16 rounded border border-line-strong px-2 py-1"
         />
-        <span className="text-slate-400">（第 N 行）</span>
+        <span className="text-ink-faint">（第 N 行）</span>
       </div>
 
       {/* 合计行开关（R1-05） */}
-      <label className="flex cursor-pointer items-center gap-2 text-slate-600">
+      <label className="flex cursor-pointer items-center gap-2 text-ink-dim">
         <input
           type="checkbox"
           checked={excludeTotalKeywords}
@@ -87,19 +87,19 @@ export default function DataPreview() {
       </label>
 
       {/* 统计（R1-08） */}
-      <div className="rounded bg-slate-50 px-2 py-1 text-slate-500">
+      <div className="rounded bg-soft px-2 py-1 text-ink-dim">
         总行数 {cleaned.totalRows} ｜ 有效行数 {cleaned.rows.length} ｜ 已排除 {cleaned.excludedCount} 行
       </div>
 
       {/* E2：有效行数为 0 */}
       {cleaned.rows.length === 0 && (
-        <div className="rounded border border-red-300 bg-red-50 p-2 text-red-700">
+        <div className="rounded border border-danger/40 bg-danger-soft p-2 text-danger">
           <div className="font-medium">未找到有效数据行，请检查排除规则</div>
-          <div className="mt-0.5 text-red-600">有效行数为 0，可能误排除了全部数据</div>
+          <div className="mt-0.5 text-danger">有效行数为 0，可能误排除了全部数据</div>
           <button
             type="button"
             onClick={() => setExcludeTotalKeywords(false)}
-            className="mt-1 rounded bg-red-600 px-2 py-1 font-medium text-white hover:bg-red-700"
+            className="mt-1 rounded bg-danger px-2 py-1 font-medium text-white hover:bg-red-700"
           >
             放宽排除规则
           </button>
@@ -111,11 +111,11 @@ export default function DataPreview() {
         <table className="w-full border-collapse text-left">
           <thead>
             <tr>
-              <th className="w-8 border-b border-slate-200 px-1 py-1 font-normal text-slate-400">排</th>
+              <th className="w-8 border-b border-line px-1 py-1 font-normal text-ink-faint">排</th>
               {rawTable.columns.map((col) => (
                 <th
                   key={col.key}
-                  className="border-b border-slate-200 px-1 py-1 font-medium text-slate-600"
+                  className="border-b border-line px-1 py-1 font-medium text-ink-dim"
                 >
                   <div className="truncate" title={col.rawName}>
                     {col.rawName}
@@ -124,8 +124,8 @@ export default function DataPreview() {
                     <span
                       className={`rounded px-1 ${
                         col.typeConfidence < 0.7
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-slate-100 text-slate-500'
+                          ? 'bg-amber-100 text-warn'
+                          : 'bg-hover text-ink-dim'
                       }`}
                     >
                       {TYPE_LABEL[col.type]}
@@ -133,14 +133,14 @@ export default function DataPreview() {
                     </span>
                     {col.dirtyCount > 0 && (
                       <span
-                        className="cursor-help rounded bg-amber-200 px-1 text-amber-800"
+                        className="cursor-help rounded bg-amber-200 px-1 text-warn"
                         title={`${col.dirtyCount} 个值无法转为${TYPE_LABEL[col.type]}，已按缺失处理`}
                       >
                         脏 {col.dirtyCount}
                       </span>
                     )}
                     {col.missingCount > 0 && (
-                      <span className="rounded bg-slate-100 px-1 text-slate-400">
+                      <span className="rounded bg-hover px-1 text-ink-faint">
                         缺失 {col.missingCount}
                       </span>
                     )}
@@ -179,7 +179,7 @@ export default function DataPreview() {
                       <td
                         key={col.key}
                         className={`max-w-[120px] truncate px-1 py-0.5 align-top ${
-                          isDirty ? 'cursor-help bg-amber-100 text-amber-900' : 'text-slate-700'
+                          isDirty ? 'cursor-help bg-amber-100 text-amber-900' : 'text-ink'
                         }`}
                         title={
                           isDirty
@@ -198,7 +198,7 @@ export default function DataPreview() {
         </table>
       </div>
       {rawTable.cells.length - h - 1 > 20 && (
-        <div className="text-slate-400">仅预览前 20 行，共 {rawTable.cells.length - h - 1} 行数据</div>
+        <div className="text-ink-faint">仅预览前 20 行，共 {rawTable.cells.length - h - 1} 行数据</div>
       )}
     </div>
   );

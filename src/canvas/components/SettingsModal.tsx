@@ -48,25 +48,25 @@ export default function SettingsModal({ open, onClose }: { open: boolean; onClos
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/40" onClick={onClose}>
-      <div className="w-[440px] rounded-xl border border-slate-200 bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/40" onClick={onClose}>
+      <div className="w-[440px] rounded-xl border border-line bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-semibold text-slate-800">设置</h3>
-          <button type="button" className="text-slate-400 hover:text-slate-600" onClick={onClose}>✕</button>
+          <h3 className="text-[14px] font-semibold text-ink">设置</h3>
+          <button type="button" className="text-ink-faint hover:text-ink-dim" onClick={onClose}>✕</button>
         </div>
 
         <div className="mt-4">
-          <div className="text-[12px] font-medium text-slate-600">导出图片保存位置</div>
+          <div className="text-[12px] font-medium text-ink-dim">导出图片保存位置</div>
           {isTauri() ? (
             <>
-              <div className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11.5px] text-slate-600 break-all">
+              <div className="mt-1.5 rounded-md border border-line bg-soft px-2.5 py-2 text-[11.5px] text-ink-dim break-all">
                 {loaded ? (exportDir || '默认：系统「下载」文件夹下的 RankBoard 目录') : '读取中…'}
               </div>
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"
                   onClick={() => void pickDir()}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[12px] text-slate-600 hover:bg-slate-50"
+                  className="rounded-md border border-line-strong bg-panel px-3 py-1.5 text-[12px] text-ink-dim hover:bg-hover"
                 >
                   更改…
                 </button>
@@ -74,19 +74,19 @@ export default function SettingsModal({ open, onClose }: { open: boolean; onClos
                   <button
                     type="button"
                     onClick={() => void resetDir()}
-                    className="rounded-md border border-slate-200 px-3 py-1.5 text-[12px] text-slate-500 hover:bg-slate-50"
+                    className="rounded-md border border-line px-3 py-1.5 text-[12px] text-ink-dim hover:bg-hover"
                   >
                     恢复默认
                   </button>
                 )}
               </div>
-              <p className="mt-2 text-[10.5px] leading-relaxed text-slate-400">
+              <p className="mt-2 text-[10.5px] leading-relaxed text-ink-faint">
                 自定义后所有导出图片都保存到该位置（同名自动追加序号）。仅桌面应用生效。
               </p>
-              {err && <p className="mt-1.5 text-[11px] text-red-600">{err}</p>}
+              {err && <p className="mt-1.5 text-[11px] text-danger">{err}</p>}
             </>
           ) : (
-            <p className="mt-1.5 text-[11.5px] leading-relaxed text-slate-400">
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
               浏览器版导出走浏览器下载目录（浏览器设置中调整）；桌面应用可在其设置中自定义路径。
             </p>
           )}

@@ -122,8 +122,8 @@ export default function CanvasStage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
-        <span className="text-[12px] text-slate-500">
+      <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-2">
+        <span className="text-[12px] text-ink-dim">
           {config.width}px · {countBlocks(config.blocks)} 个区块
         </span>
         <div className="ml-auto flex items-center gap-2">
@@ -144,12 +144,12 @@ export default function CanvasStage() {
       </div>
 
       {toast && (
-        <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50 px-4 py-1.5 text-[11px] text-blue-700">
+        <div className="flex items-center gap-2 border-b border-brand-line bg-brand-soft px-4 py-1.5 text-[11px] text-brand">
           <span className="min-w-0 flex-1 truncate" title={lastExportPath || undefined}>{toast}</span>
           {lastExportPath && (
             <button
               type="button"
-              className="shrink-0 rounded border border-blue-200 bg-white px-2 py-0.5 text-[10.5px] font-medium text-blue-600 hover:bg-blue-100"
+              className="shrink-0 rounded border border-brand-line bg-panel px-2 py-0.5 text-[10.5px] font-medium text-brand hover:bg-brand-line"
               onClick={() => invoke('open_export_folder', { path: lastExportPath }).catch(() => undefined)}
             >
               📂 打开文件夹
@@ -159,7 +159,7 @@ export default function CanvasStage() {
       )}
 
       <div
-        className="relative flex-1 overflow-auto bg-slate-200 p-6"
+        className="relative flex-1 overflow-auto bg-base p-6"
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes('text/new-block')) {
             e.preventDefault();
@@ -186,7 +186,7 @@ export default function CanvasStage() {
       >
         {/* 空态引导：没有区块时给出最短上手路径 */}
         {config.blocks.length === 0 && <EmptyGuide variant="canvas" />}
-        <div className={`mx-auto w-fit rounded-lg ${dropHint ? 'ring-2 ring-blue-400' : ''}`}>
+        <div className={`mx-auto w-fit rounded-lg ${dropHint ? 'ring-2 ring-brand-line' : ''}`}>
           <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
             <CanvasRenderer
               config={config}

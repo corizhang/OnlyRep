@@ -1,0 +1,50 @@
+/**
+ * RankBoard 设计 Token（编辑器外壳）—— 单一事实来源。
+ *
+ * 分层边界（勿混用）：
+ * - 本文件 --ui-*：编辑器 UI（面板/检查器/工具栏/弹窗/库），当前仅浅色；深色预留 [data-theme="dark"]。
+ * - canvas/flow/nodeTheme.ts --nb-*：节点画布内部主题（深/浅），由 FlowSheet 根节点注入。
+ * - types/index.ts ThemeTokens：用户作品（日报画布内容）的主题，与编辑器无关，保持独立。
+ *
+ * 配色基调：冷灰中性 + 银行蓝，状态色去荧光感（warn 用 amber-700 而非刺眼的 500）。
+ */
+
+:root {
+  /* 面与底 */
+  --ui-bg: #eef1f5; /* 应用底色（比 slate-100 略冷，承托白色面板） */
+  --ui-panel: #ffffff; /* 面板/卡片底 */
+  --ui-panel-soft: #f8fafc; /* 内嵌区/表头底 */
+  --ui-panel-hover: #f1f5f9; /* 悬停底 */
+
+  /* 线条 */
+  --ui-line: #e4e9f0; /* 常规边框/分隔线 */
+  --ui-line-strong: #cbd5e1; /* 强边框（输入框、选中态） */
+
+  /* 文字（三级） */
+  --ui-ink: #1e293b; /* 主文字 */
+  --ui-ink-dim: #5b6b82; /* 次要文字（标签/说明） */
+  --ui-ink-faint: #94a3b8; /* 最弱（占位/计数） */
+
+  /* 品牌蓝 */
+  --ui-brand: #2563eb;
+  --ui-brand-hover: #1d4ed8;
+  --ui-brand-soft: #eff4ff; /* 品牌浅底（选中态/提示底） */
+  --ui-brand-line: #bfdbfe; /* 品牌描边 */
+
+  /* 状态色（DEFAULT=文字/强色，soft=底） */
+  --ui-ok: #059669;
+  --ui-ok-soft: #ecfdf5;
+  --ui-warn: #b45309;
+  --ui-warn-soft: #fffbeb;
+  --ui-danger: #dc2626;
+  --ui-danger-soft: #fef2f2;
+
+  /* 结构 */
+  --ui-radius: 8px;
+  --ui-radius-sm: 6px;
+  --ui-shadow-pop: 0 4px 16px rgba(15, 23, 42, 0.12);
+  --ui-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* 深色编辑器预留：实现时在此覆盖 --ui-* 即可，组件类名不动 */
+/* [data-theme='dark'] { --ui-bg: #0f172a; ... } */

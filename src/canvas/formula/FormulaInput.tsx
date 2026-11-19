@@ -14,10 +14,10 @@ import { collectVariables, displayVarValue, groupVariables, type FormulaVariable
  */
 
 export const GROUP_COLOR: Record<FormulaVariable['group'], string> = {
-  参数: 'text-blue-600',
+  参数: 'text-brand',
   常量: 'text-cyan-700',
   取数: 'text-orange-600',
-  计算字段: 'text-emerald-600',
+  计算字段: 'text-ok',
   列: 'text-violet-600',
   合计: 'text-rose-600',
   系统: 'text-sky-600',
@@ -65,11 +65,11 @@ function highlightSpans(src: string, vars: Map<string, FormulaVariable>): Span[]
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
-    if (m.index > last) spans.push({ text: src.slice(last, m.index), cls: 'text-slate-600', pos: last });
+    if (m.index > last) spans.push({ text: src.slice(last, m.index), cls: 'text-ink-dim', pos: last });
     const [raw, bracket, str, num, ident, op] = m;
-    let cls = 'text-slate-500';
+    let cls = 'text-ink-dim';
     if (bracket) cls = 'text-violet-600';
-    else if (str) cls = 'text-amber-700';
+    else if (str) cls = 'text-warn';
     else if (num) cls = 'text-teal-700';
     else if (ident) {
       const after = src.slice(m.index + raw.length);
@@ -77,13 +77,13 @@ function highlightSpans(src: string, vars: Map<string, FormulaVariable>): Span[]
       else {
         // 系统固定变量大小写不敏感（Today / TODAY 都算命中）
         const v = vars.get(ident) ?? vars.get(ident.toLowerCase());
-        cls = v ? GROUP_COLOR[v.group] : 'text-red-500';
+        cls = v ? GROUP_COLOR[v.group] : 'text-danger';
       }
-    } else if (op && '()+-*/%'.includes(raw)) cls = 'text-slate-400';
+    } else if (op && '()+-*/%'.includes(raw)) cls = 'text-ink-faint';
     spans.push({ text: raw, cls, pos: m.index });
     last = m.index + raw.length;
   }
-  if (last < src.length) spans.push({ text: src.slice(last), cls: 'text-slate-600', pos: last });
+  if (last < src.length) spans.push({ text: src.slice(last), cls: 'text-ink-dim', pos: last });
   return spans;
 }
 
@@ -312,7 +312,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
   const pad = size === 'lg' ? 'px-3 py-2.5' : 'px-2 py-1';
 
   return (
-    <div className="rounded border border-slate-300 bg-white focus-within:border-blue-400">
+    <div className="rounded border border-line-strong bg-panel focus-within:border-brand-line">
       {/* 输入区：高亮层 + 透明 textarea */}
       <div className="relative flex items-start">
         <div className={`relative ${size === 'lg' ? 'min-h-[120px]' : 'min-h-[24px]'} flex-1 overflow-hidden`}>
@@ -330,7 +330,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
                 {s.text || ' '}
               </span>
             ))}
-            {value === '' && <span className="text-slate-300">{placeholder}</span>}
+            {value === '' && <span className="text-ink-faint">{placeholder}</span>}
           </div>
           <textarea
             ref={taRef}
@@ -359,7 +359,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
         {/* 预览值 */}
         {preview !== null && (
           <span
-            className={`mt-1 shrink-0 whitespace-nowrap pr-2 font-medium text-emerald-600 ${size === 'lg' ? 'mt-2 pr-3 text-[13px]' : 'text-[10px]'}`}
+            className={`mt-1 shrink-0 whitespace-nowrap pr-2 font-medium text-ok ${size === 'lg' ? 'mt-2 pr-3 text-[13px]' : 'text-[10px]'}`}
             title="按当前环境实时预览"
           >
             = {preview}
@@ -368,7 +368,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
         <button
           type="button"
           title={expanded ? '收起变量与函数面板' : '展开变量与函数面板'}
-          className={`m-0.5 shrink-0 rounded px-1.5 py-0.5 font-semibold ${size === 'lg' ? 'text-[13px]' : 'text-[10px]'} ${expanded ? 'bg-blue-100 text-blue-700' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+          className={`m-0.5 shrink-0 rounded px-1.5 py-0.5 font-semibold ${size === 'lg' ? 'text-[13px]' : 'text-[10px]'} ${expanded ? 'bg-brand-line text-brand' : 'text-ink-faint hover:bg-hover hover:text-ink-dim'}`}
           onClick={() => setExpanded(!expanded)}
         >
           ƒx
@@ -378,14 +378,14 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
 
       {/* 校验信息行 */}
       {showErrorLine ? (
-        <div className="flex items-center gap-2 border-t border-red-100 bg-red-50 px-2 py-1 text-[10px] text-red-600">
+        <div className="flex items-center gap-2 border-t border-red-100 bg-danger-soft px-2 py-1 text-[10px] text-danger">
           <span className="min-w-0 flex-1 truncate" title={validation?.message}>
             {validation?.message}
           </span>
           {validation?.suggest && validation.badFn && (
             <button
               type="button"
-              className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-700 hover:bg-red-200"
+              className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 font-medium text-danger hover:bg-red-200"
               onClick={() => {
                 const offset = value.length - value.trimStart().length;
                 const p = (validation.pos ?? 0) - offset;
@@ -397,17 +397,17 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
           )}
         </div>
       ) : (
-        ac === null && <div className="px-2 py-0.5 text-[9px] leading-3 text-slate-300">ƒ 输入触发补全 · ↑↓ 选择 · Enter 插入 · 点 ƒx 展开变量面板</div>
+        ac === null && <div className="px-2 py-0.5 text-[9px] leading-3 text-ink-faint">ƒ 输入触发补全 · ↑↓ 选择 · Enter 插入 · 点 ƒx 展开变量面板</div>
       )}
 
       {/* 补全弹层 */}
       {ac && (
-        <div className="absolute z-30 mt-0.5 w-[250px] rounded-md border border-slate-200 bg-white py-1 shadow-lg" style={{ marginLeft: popupLeft }}>
+        <div className="absolute z-30 mt-0.5 w-[250px] rounded-md border border-line bg-panel py-1 shadow-lg" style={{ marginLeft: popupLeft }}>
           {ac.items.map((item, i) => (
             <button
               key={`${item.kind}:${item.label}`}
               type="button"
-              className={`flex w-full items-baseline gap-1.5 px-2 py-1 text-left text-[11px] ${i === ac.index ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+              className={`flex w-full items-baseline gap-1.5 px-2 py-1 text-left text-[11px] ${i === ac.index ? 'bg-brand-soft' : 'hover:bg-hover'}`}
               onMouseDown={(e) => {
                 e.preventDefault();
                 applyInsert(item.insert, ac.start, ac.end);
@@ -417,8 +417,8 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
               <span className={`font-medium ${item.kind === 'fn' ? 'text-purple-600' : GROUP_COLOR[(varMap.get(item.label)?.group ?? '参数') as never]}`}>
                 {item.label}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[9px] text-slate-400">{item.sub}</span>
-              {item.kind === 'var' && <span className="shrink-0 text-[9px] text-slate-400">{varMap.get(item.label)?.group}</span>}
+              <span className="min-w-0 flex-1 truncate text-[9px] text-ink-faint">{item.sub}</span>
+              {item.kind === 'var' && <span className="shrink-0 text-[9px] text-ink-faint">{varMap.get(item.label)?.group}</span>}
             </button>
           ))}
         </div>
@@ -426,19 +426,19 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
 
       {/* ƒx 面板：变量树 + 函数字典 */}
       {expanded && (
-        <div className="grid max-h-52 grid-cols-2 overflow-y-auto border-t border-slate-200 text-[10px]">
-          <div className="border-r border-slate-100 p-1.5">
-            <p className="pb-1 text-[9px] font-semibold text-slate-400">变量（点击插入）</p>
+        <div className="grid max-h-52 grid-cols-2 overflow-y-auto border-t border-line text-[10px]">
+          <div className="border-r border-line p-1.5">
+            <p className="pb-1 text-[9px] font-semibold text-ink-faint">变量（点击插入）</p>
             {groupVariables(variables).map((b) => (
               <div key={b.group}>
-                <p className="pt-1 text-[9px] text-slate-400">
+                <p className="pt-1 text-[9px] text-ink-faint">
                   {b.group} · {b.items.length}
                 </p>
                 {b.items.map((v) => (
                   <button
                     key={v.name}
                     type="button"
-                    className="block w-full truncate rounded px-1 py-0.5 text-left hover:bg-slate-50"
+                    className="block w-full truncate rounded px-1 py-0.5 text-left hover:bg-hover"
                     title={`${v.hint ?? ''}${v.value !== undefined ? `\n当前值 = ${displayVarValue(v)}` : ''}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -446,25 +446,25 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
                     }}
                   >
                     <span className={`font-medium ${GROUP_COLOR[v.group]}`}>{v.name}</span>
-                    {v.value !== undefined && <span className="ml-1 text-slate-400">= {displayVarValue(v)}</span>}
+                    {v.value !== undefined && <span className="ml-1 text-ink-faint">= {displayVarValue(v)}</span>}
                   </button>
                 ))}
               </div>
             ))}
-            {variables.length === 0 && <p className="py-1 text-slate-300">暂无可用变量</p>}
+            {variables.length === 0 && <p className="py-1 text-ink-faint">暂无可用变量</p>}
           </div>
           <div className="p-1.5">
-            <p className="pb-1 text-[9px] font-semibold text-slate-400">函数（点击插入）</p>
+            <p className="pb-1 text-[9px] font-semibold text-ink-faint">函数（点击插入）</p>
             {FUNC_CATEGORIES.map((c) => (
               <div key={c}>
-                <p className="pt-1 text-[9px] text-slate-400">{c}</p>
+                <p className="pt-1 text-[9px] text-ink-faint">{c}</p>
                 {Object.keys(FUNC_DOCS)
                   .filter((n) => FUNC_DOCS[n].cat === c)
                   .map((n) => (
                     <button
                       key={n}
                       type="button"
-                      className="block w-full truncate rounded px-1 py-0.5 text-left hover:bg-slate-50"
+                      className="block w-full truncate rounded px-1 py-0.5 text-left hover:bg-hover"
                       title={`${FUNC_DOCS[n].desc}\n例：${FUNC_DOCS[n].example}`}
                       onMouseDown={(e) => {
                         e.preventDefault();
@@ -472,7 +472,7 @@ export const FormulaInput = forwardRef<FormulaInputHandle, FormulaInputProps>(fu
                       }}
                     >
                       <span className="font-medium text-purple-600">{n}</span>
-                      <span className="ml-1 text-slate-400">{FUNC_DOCS[n].sig}</span>
+                      <span className="ml-1 text-ink-faint">{FUNC_DOCS[n].sig}</span>
                     </button>
                   ))}
               </div>
@@ -499,8 +499,8 @@ export function FormulaDisplay({
   const varMap = useMemo(() => new Map(variables.map((v) => [v.name, v])), [variables]);
   const spans = useMemo(() => highlightSpans(value, varMap), [value, varMap]);
   return (
-    <div className="w-full min-w-0 whitespace-pre-wrap break-all rounded border border-slate-300 bg-white px-2 py-1 text-[11px] leading-5 text-slate-600">
-      {value.trim() === '' ? <span className="text-slate-300">{placeholder}</span> : spans.map((s, i) => <span key={i} className={s.cls}>{s.text}</span>)}
+    <div className="w-full min-w-0 whitespace-pre-wrap break-all rounded border border-line-strong bg-panel px-2 py-1 text-[11px] leading-5 text-ink-dim">
+      {value.trim() === '' ? <span className="text-ink-faint">{placeholder}</span> : spans.map((s, i) => <span key={i} className={s.cls}>{s.text}</span>)}
     </div>
   );
 }

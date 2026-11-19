@@ -142,16 +142,16 @@ export default function BlockEditorPanel() {
 
   if (!rawTable) return null;
 
-  const input = 'w-full rounded border border-slate-300 px-2 py-1 text-xs';
-  const label = 'mb-1 block font-medium text-slate-600';
+  const input = 'w-full rounded border border-line-strong px-2 py-1 text-xs';
+  const label = 'mb-1 block font-medium text-ink-dim';
   const smallBtn =
-    'shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-500 hover:border-blue-300 hover:text-blue-600 disabled:opacity-30';
+    'shrink-0 rounded border border-line bg-panel px-1.5 py-0.5 text-[11px] text-ink-dim hover:border-brand-line hover:text-brand disabled:opacity-30';
   /** 分段按钮（选中态高亮），用于行样式/徽章形状/列宽模式等多选一 */
   const optBtn = (active: boolean): string =>
     `flex-1 rounded border px-1 py-1 text-[11px] ${
       active
-        ? 'border-blue-400 bg-blue-50 font-medium text-blue-600'
-        : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300'
+        ? 'border-brand-line bg-brand-soft font-medium text-brand'
+        : 'border-line bg-panel text-ink-dim hover:border-brand-line'
     }`;
 
   // ---- 区块列表操作 ----
@@ -322,7 +322,7 @@ export default function BlockEditorPanel() {
                       onChange={(e) =>
                         patchBlockConfig(isFloat, b.id, { customColor: e.target.value })
                       }
-                      className="h-7 w-full cursor-pointer rounded border border-slate-300"
+                      className="h-7 w-full cursor-pointer rounded border border-line-strong"
                     />
                   </label>
                 )}
@@ -344,13 +344,13 @@ export default function BlockEditorPanel() {
                       void onBlockImageFile(isFloat, b.id, e.target.files?.[0]);
                       e.target.value = '';
                     }}
-                    className="w-full text-slate-500"
+                    className="w-full text-ink-dim"
                   />
                   {c.src !== null && (
                     <button
                       type="button"
                       onClick={() => patchBlockConfig(isFloat, b.id, { src: null })}
-                      className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-slate-500 hover:border-red-300 hover:text-red-600"
+                      className="shrink-0 rounded border border-line-strong bg-panel px-2 py-1 text-ink-dim hover:border-danger/40 hover:text-danger"
                     >
                       移除
                     </button>
@@ -509,7 +509,7 @@ export default function BlockEditorPanel() {
                   ))}
                 </div>
                 {c.badgeShape === 'plain' && (
-                  <div className="mt-0.5 text-[11px] text-slate-400">纯数字：无底色名次</div>
+                  <div className="mt-0.5 text-[11px] text-ink-faint">纯数字：无底色名次</div>
                 )}
               </div>
               {/* 第 1 名图标（auto = 跟随全局奖牌开关） */}
@@ -579,7 +579,7 @@ export default function BlockEditorPanel() {
                             title={shownCols.length <= 1 ? '至少保留一列' : undefined}
                             onChange={(e) => toggleCol(col, e.target.checked)}
                           />
-                          <span className="w-12 shrink-0 text-slate-600">
+                          <span className="w-12 shrink-0 text-ink-dim">
                             {TABLE_COL_LABEL[col]}
                           </span>
                           <button
@@ -603,7 +603,7 @@ export default function BlockEditorPanel() {
                           <select
                             value={c.table.aligns[col] ?? TABLE_COL_DEFAULT_ALIGN[col]}
                             onChange={(e) => setColAlign(col, e.target.value as TableColAlign)}
-                            className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                            className="min-w-0 flex-1 rounded border border-line-strong px-1 py-0.5 text-[11px]"
                           >
                             {(Object.keys(ALIGN_LABEL) as TableColAlign[]).map((a) => (
                               <option key={a} value={a}>
@@ -622,7 +622,7 @@ export default function BlockEditorPanel() {
                                 const v = Math.round(Number(e.target.value));
                                 if (Number.isFinite(v)) setColWeight(col, Math.min(10, Math.max(1, v)));
                               }}
-                              className="w-12 shrink-0 rounded border border-slate-300 px-1 py-0.5 text-[11px]"
+                              className="w-12 shrink-0 rounded border border-line-strong px-1 py-0.5 text-[11px]"
                             />
                           )}
                         </div>
@@ -642,7 +642,7 @@ export default function BlockEditorPanel() {
                         ))}
                       </div>
                     )}
-                    <div className="mt-0.5 text-[11px] text-slate-400">
+                    <div className="mt-0.5 text-[11px] text-ink-faint">
                       次要字段列按已选次要字段数展开
                     </div>
                   </div>
@@ -739,7 +739,7 @@ export default function BlockEditorPanel() {
                       onChange={(e) =>
                         patchBlockConfig(isFloat, b.id, { customColor: e.target.value })
                       }
-                      className="h-7 w-full cursor-pointer rounded border border-slate-300"
+                      className="h-7 w-full cursor-pointer rounded border border-line-strong"
                     />
                   </label>
                 )}
@@ -780,7 +780,7 @@ export default function BlockEditorPanel() {
 
     // 悬浮块附加坐标编辑（x/y 百分比，仅 floats 生效）
     return (
-      <div className="mt-2 space-y-2 rounded border border-slate-200 bg-slate-50 p-2">
+      <div className="mt-2 space-y-2 rounded border border-line bg-soft p-2">
         {form}
         {isFloat && (
           <>
@@ -824,7 +824,7 @@ export default function BlockEditorPanel() {
                 />
               </label>
             </div>
-            <div className="text-[11px] text-slate-400">百分比坐标，左上角为原点</div>
+            <div className="text-[11px] text-ink-faint">百分比坐标，左上角为原点</div>
           </>
         )}
       </div>
@@ -836,24 +836,24 @@ export default function BlockEditorPanel() {
     return (
       <div className="space-y-1">
         {list.length === 0 && (
-          <div className="rounded border border-dashed border-slate-200 px-2 py-3 text-center text-slate-400">
+          <div className="rounded border border-dashed border-line px-2 py-3 text-center text-ink-faint">
             暂无区块，点击下方添加
           </div>
         )}
         {list.map((b, i) => {
           const selected = selectedId === b.id;
           return (
-            <div key={b.id} className="rounded border border-slate-200 bg-white">
+            <div key={b.id} className="rounded border border-line bg-panel">
               <div className="flex items-center gap-1 px-2 py-1">
                 <button
                   type="button"
                   onClick={() => setSelectedId(selected ? null : b.id)}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 text-[11px] font-medium text-slate-500">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-hover text-[11px] font-medium text-ink-dim">
                     {BLOCK_META[b.type].icon}
                   </span>
-                  <span className="truncate text-xs text-slate-600">
+                  <span className="truncate text-xs text-ink-dim">
                     {i + 1}. {blockSummary(b)}
                   </span>
                 </button>
@@ -879,7 +879,7 @@ export default function BlockEditorPanel() {
                   type="button"
                   title="删除"
                   onClick={() => removeBlock(isFloat, b.id)}
-                  className={`${smallBtn} hover:border-red-300 hover:text-red-600`}
+                  className={`${smallBtn} hover:border-danger/40 hover:text-danger`}
                 >
                   ✕
                 </button>
@@ -901,7 +901,7 @@ export default function BlockEditorPanel() {
             key={t}
             type="button"
             onClick={() => addBlock(t, isFloat)}
-            className="flex-1 rounded border border-dashed border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:border-blue-400 hover:text-blue-600"
+            className="flex-1 rounded border border-dashed border-line-strong bg-panel px-2 py-1 text-xs text-ink-dim hover:border-brand-line hover:text-brand"
           >
             + {BLOCK_META[t].label}
           </button>
@@ -931,7 +931,7 @@ export default function BlockEditorPanel() {
               type="button"
               title={t.description}
               onClick={() => applyTemplate(t.id)}
-              className="rounded border border-slate-200 bg-white px-1 py-1.5 text-slate-600 hover:border-blue-400 hover:text-blue-600"
+              className="rounded border border-line bg-panel px-1 py-1.5 text-ink-dim hover:border-brand-line hover:text-brand"
             >
               {t.name}
             </button>
@@ -950,7 +950,7 @@ export default function BlockEditorPanel() {
                 key={t}
                 type="button"
                 onClick={() => addBlock(t, false)}
-                className="flex-1 rounded border border-dashed border-slate-300 bg-white px-1 py-1 text-[11px] text-slate-600 hover:border-blue-400 hover:text-blue-600"
+                className="flex-1 rounded border border-dashed border-line-strong bg-panel px-1 py-1 text-[11px] text-ink-dim hover:border-brand-line hover:text-brand"
               >
                 + {BLOCK_META[t].label}
               </button>
@@ -958,7 +958,7 @@ export default function BlockEditorPanel() {
             <button
               type="button"
               onClick={() => setShowAddMenu(false)}
-              className="rounded border border-slate-200 bg-white px-2 text-slate-400"
+              className="rounded border border-line bg-panel px-2 text-ink-faint"
             >
               取消
             </button>
@@ -967,7 +967,7 @@ export default function BlockEditorPanel() {
           <button
             type="button"
             onClick={() => setShowAddMenu(true)}
-            className="mt-1 w-full rounded border border-dashed border-slate-300 bg-white px-2 py-1 text-slate-600 hover:border-blue-400 hover:text-blue-600"
+            className="mt-1 w-full rounded border border-dashed border-line-strong bg-panel px-2 py-1 text-ink-dim hover:border-brand-line hover:text-brand"
           >
             + 添加区块
           </button>
@@ -981,10 +981,10 @@ export default function BlockEditorPanel() {
         {addMenu(true)}
       </div>
 
-      {imgError && <div className="text-red-600">{imgError}</div>}
+      {imgError && <div className="text-danger">{imgError}</div>}
 
       {/* 榜单字段 */}
-      <div className="space-y-2 border-t border-slate-200 pt-2">
+      <div className="space-y-2 border-t border-line pt-2">
         <label className="block">
           <span className={label}>次要字段 1（可选，小字显示）</span>
           <select

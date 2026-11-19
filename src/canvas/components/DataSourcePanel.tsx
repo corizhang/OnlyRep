@@ -50,7 +50,7 @@ export default function DataSourcePanel() {
       }
     >
       {config.dataSources.length === 0 && (
-        <p className="text-[12px] leading-relaxed text-slate-400">
+        <p className="text-[12px] leading-relaxed text-ink-faint">
           还没有数据源。日报通常包含：活动看板、推送汇总、转介统计三个文件 + 一个"口径参数"表单（全年目标/已完成等）。
         </p>
       )}
@@ -59,10 +59,10 @@ export default function DataSourcePanel() {
         const rt = sources[src.id];
         const open = openId === src.id;
         return (
-          <div key={src.id} className="rounded-md border border-slate-200 bg-slate-50/60 p-2">
+          <div key={src.id} className="rounded-md border border-line bg-soft/60 p-2">
             <div className="flex items-center gap-1.5">
               <input
-                className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium text-slate-700 hover:border-slate-300 focus:border-blue-400 focus:bg-white focus:outline-none"
+                className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium text-ink hover:border-line-strong focus:border-brand-line focus:bg-panel focus:outline-none"
                 value={src.name}
                 onChange={(e) => updateSource(src.id, { name: e.target.value })}
               />
@@ -83,33 +83,33 @@ export default function DataSourcePanel() {
                 <>
                   {rt?.status === 'ready' ? (
                     <>
-                      <span className="text-emerald-600">已载入 {rt.table?.rows.length ?? 0} 行</span>
+                      <span className="text-ok">已载入 {rt.table?.rows.length ?? 0} 行</span>
                       {rt.fromCache && (
-                        <span className="text-amber-600" title="数据来自上次导入的本地缓存快照">
+                        <span className="text-warn" title="数据来自上次导入的本地缓存快照">
                           ⚡ 缓存 {fmtCacheTime(rt.cachedAt)}
                         </span>
                       )}
                     </>
                   ) : rt?.status === 'error' ? (
-                    <span className="text-red-600">{rt.message}</span>
+                    <span className="text-danger">{rt.message}</span>
                   ) : (
-                    <span className="text-amber-600">待选择文件</span>
+                    <span className="text-warn">待选择文件</span>
                   )}
-                  {src.fileName && <span className="truncate text-slate-400">{src.fileName}</span>}
+                  {src.fileName && <span className="truncate text-ink-faint">{src.fileName}</span>}
                 </>
               ) : src.kind === 'form' ? (
-                <span className="text-slate-400">{src.entries.length} 个参数</span>
+                <span className="text-ink-faint">{src.entries.length} 个参数</span>
               ) : src.kind === 'manualTable' ? (
-                <span className="text-slate-400">
+                <span className="text-ink-faint">
                   {src.rows.length} 行 × {src.columns.length} 列
                 </span>
               ) : (
-                <span className="text-slate-400">值：{src.value || '（空）'}</span>
+                <span className="text-ink-faint">值：{src.value || '（空）'}</span>
               )}
             </div>
 
             {open && (
-              <div className="mt-2 space-y-2 border-t border-slate-200 pt-2">
+              <div className="mt-2 space-y-2 border-t border-line pt-2">
                 {src.kind === 'import' && (
                   <ImportEditor
                     sourceId={src.id}
@@ -214,7 +214,7 @@ export function ImportEditor({
           </Btn>
         )}
       </div>
-      <p className="text-[11.5px] leading-relaxed text-slate-400">
+      <p className="text-[11.5px] leading-relaxed text-ink-faint">
         xlsx / xls / csv，数据只在本地解析。
         {fsAccess ? ' 浏览器将记住文件位置，刷新后可一键重读最新文件。' : ''}
         {cacheData ? ' 解析结果会缓存在本机浏览器（IndexedDB），刷新自动恢复；敏感数据可关闭。' : ''}
@@ -249,7 +249,7 @@ export function FormEditor({ sourceId, entries }: { sourceId: string; entries: {
       {entries.map((e, i) => (
         <div key={i} className="flex gap-1">
           <input
-            className="w-[42%] rounded border border-slate-300 px-1.5 py-0.5 text-[12px]"
+            className="w-[42%] rounded border border-line-strong px-1.5 py-0.5 text-[12px]"
             value={e.key}
             placeholder="名称"
             onChange={(ev) => {
@@ -258,7 +258,7 @@ export function FormEditor({ sourceId, entries }: { sourceId: string; entries: {
             }}
           />
           <input
-            className="min-w-0 flex-1 rounded border border-slate-300 px-1.5 py-0.5 text-[12px]"
+            className="min-w-0 flex-1 rounded border border-line-strong px-1.5 py-0.5 text-[12px]"
             value={e.value}
             placeholder="数值"
             onChange={(ev) => {
@@ -274,7 +274,7 @@ export function FormEditor({ sourceId, entries }: { sourceId: string; entries: {
       <Btn size="xs" onClick={() => updateSource(sourceId, { entries: [...entries, { key: '', value: '' }] })}>
         + 添加参数
       </Btn>
-      <p className="text-[11.5px] leading-relaxed text-slate-400">
+      <p className="text-[11.5px] leading-relaxed text-ink-faint">
         参数名即公式变量名，如「全年目标」，公式里可直接写 已完成/全年目标。
       </p>
     </div>
@@ -308,7 +308,7 @@ export function ManualEditor({
           <thead>
             <tr>
               {columns.map((c, ci) => (
-                <th key={ci} className="border border-slate-200 bg-slate-100 p-0">
+                <th key={ci} className="border border-line bg-hover p-0">
                   <div className="flex">
                     <input
                       className="w-full min-w-[52px] bg-transparent px-1 py-0.5 text-[12px] font-medium outline-none"
@@ -318,7 +318,7 @@ export function ManualEditor({
                     {columns.length > 1 && (
                       <button
                         type="button"
-                        className="px-1 text-slate-400 hover:text-red-500"
+                        className="px-1 text-ink-faint hover:text-danger"
                         title="删除列"
                         onClick={() => updateSource(sourceId, { columns: columns.filter((_, i) => i !== ci), rows: rows.map((r) => r.filter((_, i) => i !== ci)) })}
                       >
@@ -335,7 +335,7 @@ export function ManualEditor({
             {rows.map((r, ri) => (
               <tr key={ri}>
                 {columns.map((_, ci) => (
-                  <td key={ci} className="border border-slate-200 p-0">
+                  <td key={ci} className="border border-line p-0">
                     <input
                       className="w-full min-w-[52px] px-1 py-0.5 text-[12px] outline-none"
                       value={r[ci] === null || r[ci] === undefined ? '' : String(r[ci])}
@@ -346,7 +346,7 @@ export function ManualEditor({
                 <td className="text-center">
                   <button
                     type="button"
-                    className="text-slate-400 hover:text-red-500"
+                    className="text-ink-faint hover:text-danger"
                     title="删除行"
                     onClick={() => updateSource(sourceId, { rows: rows.filter((_, i) => i !== ri) })}
                   >
@@ -369,11 +369,11 @@ export function ManualEditor({
         <Btn size="xs" onClick={() => updateSource(sourceId, { columns: [...columns, `列${columns.length + 1}`], rows: rows.map((r) => [...r, '']) })}>
           + 列
         </Btn>
-        <span className="ml-auto text-[11.5px] text-slate-400">
+        <span className="ml-auto text-[11.5px] text-ink-faint">
           {rows.length}/{MANUAL_ROW_LIMIT} 行
         </span>
       </div>
-      <p className="text-[11.5px] text-slate-400">手填数据随模板保存（≤{MANUAL_ROW_LIMIT} 行）；导入文件的数据不会落盘。</p>
+      <p className="text-[11.5px] text-ink-faint">手填数据随模板保存（≤{MANUAL_ROW_LIMIT} 行）；导入文件的数据不会落盘。</p>
     </div>
   );
 }

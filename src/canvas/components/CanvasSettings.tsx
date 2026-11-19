@@ -86,8 +86,8 @@ export default function CanvasSettings() {
             }}
           />
         </div>
-        {msg && <p className="text-[11.5px] text-amber-600">{msg}</p>}
-        <p className="text-[11.5px] text-slate-400">
+        {msg && <p className="text-[11.5px] text-warn">{msg}</p>}
+        <p className="text-[11.5px] text-ink-faint">
           模板含数据源定义、处理步骤、绑定与手填数据；导入源的文件不会保存。
         </p>
       </Section>
@@ -112,7 +112,7 @@ export default function CanvasSettings() {
             }}
           />
         </div>
-        <p className="text-[11.5px] text-slate-400">
+        <p className="text-[11.5px] text-ink-faint">
           备份含工作区与整个模板库，用于浏览器 ↔ 桌面应用之间搬家；导入后立即刷新生效。
         </p>
       </Section>
@@ -150,7 +150,7 @@ export default function CanvasSettings() {
                 key={t.id}
                 type="button"
                 onClick={() => patch({ themeId: t.id })}
-                className={`rounded border px-2 py-1 text-[12px] ${config.themeId === t.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                className={`rounded border px-2 py-1 text-[12px] ${config.themeId === t.id ? 'border-brand bg-brand-soft text-brand' : 'border-line text-ink-dim hover:border-line-strong'}`}
               >
                 <span
                   className="mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle"
@@ -177,7 +177,7 @@ export default function CanvasSettings() {
             <ColorInput value={config.headerBg ?? ''} onChange={(v) => patch({ headerBg: v })} />
           </Field>
         </div>
-        <p className="text-[11.5px] text-slate-400">
+        <p className="text-[11.5px] text-ink-faint">
           主题为「白底正文 + 彩色头部色带」；高度设 0 可隐藏色带（此时标题建议改深色）。
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -202,7 +202,7 @@ export default function CanvasSettings() {
             onChange={(v) => patch({ exportScale: Number(v) as 1 | 2 | 4 })}
           />
         </Field>
-        <p className="text-[11.5px] text-slate-400">图表使用 SVG 渲染，4x 导出依然清晰；导出时编辑框会自动隐藏。</p>
+        <p className="text-[11.5px] text-ink-faint">图表使用 SVG 渲染，4x 导出依然清晰；导出时编辑框会自动隐藏。</p>
       </Section>
     </div>
   );

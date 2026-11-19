@@ -18,8 +18,8 @@ const TIE_LABEL: Record<TieStrategy, string> = {
 };
 
 const btn = 'rounded border px-2 py-1 text-xs';
-const btnOn = 'border-blue-500 bg-blue-50 font-medium text-blue-700';
-const btnOff = 'border-slate-200 bg-white text-slate-600 hover:border-blue-300';
+const btnOn = 'border-brand bg-brand-soft font-medium text-brand';
+const btnOff = 'border-line bg-panel text-ink-dim hover:border-brand-line';
 
 const TYPE_LABEL: Record<string, string> = {
   number: '数值',
@@ -46,11 +46,11 @@ export default function RulePanel() {
     <div className="space-y-3 text-xs">
       {/* ① 指标列（R2-02） */}
       <label className="block">
-        <span className="mb-1 block font-medium text-slate-600">指标列</span>
+        <span className="mb-1 block font-medium text-ink-dim">指标列</span>
         <select
           value={config.metricKey}
           onChange={(e) => patchConfig({ metricKey: e.target.value })}
-          className="w-full rounded border border-slate-300 px-2 py-1"
+          className="w-full rounded border border-line-strong px-2 py-1"
         >
           <option value="">请选择</option>
           {numericCols.map((c) => (
@@ -64,11 +64,11 @@ export default function RulePanel() {
 
       {/* ② 名称列（R3-04，用户明确确认；默认自动取第一个文本列，可选任意列——含员工号等数字列） */}
       <label className="block">
-        <span className="mb-1 block font-medium text-slate-600">名称列（榜单显示谁）</span>
+        <span className="mb-1 block font-medium text-ink-dim">名称列（榜单显示谁）</span>
         <select
           value={config.nameKey}
           onChange={(e) => patchConfig({ nameKey: e.target.value })}
-          className="w-full rounded border border-slate-300 px-2 py-1"
+          className="w-full rounded border border-line-strong px-2 py-1"
         >
           <option value="">自动（第一个文本列）</option>
           {columns.map((c) => (
@@ -81,7 +81,7 @@ export default function RulePanel() {
 
       {/* ③ 排序方向（R2-03） */}
       <div>
-        <span className="mb-1 block font-medium text-slate-600">排序方向</span>
+        <span className="mb-1 block font-medium text-ink-dim">排序方向</span>
         <div className="flex gap-1">
           <button
             type="button"
@@ -102,7 +102,7 @@ export default function RulePanel() {
 
       {/* ③ 展示人数（R2-08） */}
       <div>
-        <span className="mb-1 block font-medium text-slate-600">展示人数</span>
+        <span className="mb-1 block font-medium text-ink-dim">展示人数</span>
         <div className="flex flex-wrap items-center gap-1">
           {TOP_N_CANDIDATES.map((n) => (
             <button
@@ -123,7 +123,7 @@ export default function RulePanel() {
               const v = Math.round(Number(e.target.value));
               if (Number.isFinite(v)) patchConfig({ topN: Math.min(200, Math.max(1, v)) });
             }}
-            className="w-16 rounded border border-slate-300 px-2 py-1"
+            className="w-16 rounded border border-line-strong px-2 py-1"
             title="自定义（1~200）"
           />
         </div>
@@ -131,7 +131,7 @@ export default function RulePanel() {
 
       {/* 模式切换（R2-01） */}
       <div>
-        <span className="mb-1 block font-medium text-slate-600">排行模式</span>
+        <span className="mb-1 block font-medium text-ink-dim">排行模式</span>
         <div className="flex gap-1">
           <button
             type="button"
@@ -153,11 +153,11 @@ export default function RulePanel() {
       {config.mode === 'grouped' && (
         <>
           <label className="block">
-            <span className="mb-1 block font-medium text-slate-600">分组维度列</span>
+            <span className="mb-1 block font-medium text-ink-dim">分组维度列</span>
             <select
               value={config.dimensionKey}
               onChange={(e) => patchConfig({ dimensionKey: e.target.value })}
-              className="w-full rounded border border-slate-300 px-2 py-1"
+              className="w-full rounded border border-line-strong px-2 py-1"
             >
               <option value="">请选择</option>
               {textCols.map((c) => (
@@ -168,11 +168,11 @@ export default function RulePanel() {
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium text-slate-600">聚合方式</span>
+            <span className="mb-1 block font-medium text-ink-dim">聚合方式</span>
             <select
               value={config.aggMethod}
               onChange={(e) => patchConfig({ aggMethod: e.target.value as AggMethod })}
-              className="w-full rounded border border-slate-300 px-2 py-1"
+              className="w-full rounded border border-line-strong px-2 py-1"
             >
               {(Object.keys(AGG_LABEL) as AggMethod[]).map((m) => (
                 <option key={m} value={m}>
@@ -185,12 +185,12 @@ export default function RulePanel() {
       )}
 
       {/* 高级设置（渐进式配置，PRD 原则 2） */}
-      <details className="rounded border border-slate-200 bg-slate-50 p-2">
-        <summary className="cursor-pointer font-medium text-slate-600">高级设置</summary>
+      <details className="rounded border border-line bg-soft p-2">
+        <summary className="cursor-pointer font-medium text-ink-dim">高级设置</summary>
         <div className="mt-2 space-y-3">
           {/* 并列策略（R2-07） */}
           <div>
-            <span className="mb-1 block font-medium text-slate-600">并列名次策略</span>
+            <span className="mb-1 block font-medium text-ink-dim">并列名次策略</span>
             <div className="space-y-1">
               {(Object.keys(TIE_LABEL) as TieStrategy[]).map((t) => (
                 <label key={t} className="flex cursor-pointer items-center gap-2">
@@ -208,7 +208,7 @@ export default function RulePanel() {
               <select
                 value={config.secondarySortKey}
                 onChange={(e) => patchConfig({ secondarySortKey: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                className="mt-1 w-full rounded border border-line-strong px-2 py-1"
               >
                 <option value="">选择次要排序列</option>
                 {columns.map((c) => (
@@ -222,9 +222,9 @@ export default function RulePanel() {
 
           {/* 展示人数编号注释顺延：③名称列已在上方；此处为 ④ 过滤（R2-06） */}          {/* 过滤（R2-06） */}
           <div>
-            <span className="mb-1 block font-medium text-slate-600">过滤条件</span>
+            <span className="mb-1 block font-medium text-ink-dim">过滤条件</span>
             <div className="flex items-center gap-2">
-              <span className="text-slate-500">最少样本数</span>
+              <span className="text-ink-dim">最少样本数</span>
               <input
                 type="number"
                 min={1}
@@ -235,9 +235,9 @@ export default function RulePanel() {
                     patchConfig({ filters: { ...config.filters, minSamples: v } });
                   }
                 }}
-                className="w-16 rounded border border-slate-300 px-2 py-1"
+                className="w-16 rounded border border-line-strong px-2 py-1"
               />
-              <span className="text-slate-500">最小值</span>
+              <span className="text-ink-dim">最小值</span>
               <input
                 type="number"
                 value={config.filters.minValue ?? ''}
@@ -248,10 +248,10 @@ export default function RulePanel() {
                   });
                 }}
                 placeholder="不启用"
-                className="w-20 rounded border border-slate-300 px-2 py-1"
+                className="w-20 rounded border border-line-strong px-2 py-1"
               />
             </div>
-            <div className="mt-1 text-slate-400">最少样本数仅分组聚合模式生效</div>
+            <div className="mt-1 text-ink-faint">最少样本数仅分组聚合模式生效</div>
           </div>
 
           {/* 「其他」合并（R2-08） */}
@@ -267,7 +267,7 @@ export default function RulePanel() {
           <button
             type="button"
             onClick={resetConfig}
-            className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-500 hover:border-red-300 hover:text-red-600"
+            className="rounded border border-line-strong bg-panel px-2 py-1 text-ink-dim hover:border-danger/40 hover:text-danger"
           >
             恢复默认配置
           </button>

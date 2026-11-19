@@ -32,11 +32,11 @@ export default function WelcomeModal() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
-      <div className="w-[440px] rounded-xl border border-slate-200 bg-white p-7 shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 backdrop-blur-[2px]">
+      <div className="w-[440px] rounded-xl border border-line bg-panel p-7 shadow-2xl">
         <div className="text-[26px]">📊</div>
-        <h2 className="mt-2 text-[18px] font-semibold text-slate-800">欢迎使用 RankBoard 日报画布</h2>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-slate-500">
+        <h2 className="mt-2 text-[18px] font-semibold text-ink">欢迎使用 RankBoard 日报画布</h2>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-dim">
           把每天的 Excel 拖进来，节点自动算数，日报一键出图——一次搭好，换数据即用。
         </p>
 
@@ -49,8 +49,8 @@ export default function WelcomeModal() {
             <div key={title} className="flex items-start gap-2.5">
               <span className="text-[15px]">{icon}</span>
               <div>
-                <div className="text-[12.5px] font-medium text-slate-700">{title}</div>
-                <div className="text-[11.5px] text-slate-400">{desc}</div>
+                <div className="text-[12.5px] font-medium text-ink">{title}</div>
+                <div className="text-[11.5px] text-ink-faint">{desc}</div>
               </div>
             </div>
           ))}
@@ -60,14 +60,14 @@ export default function WelcomeModal() {
           <button
             type="button"
             onClick={() => finish('demo')}
-            className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm hover:bg-blue-700"
+            className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-[13px] font-medium text-white shadow-sm hover:bg-brand-hover"
           >
             载入示例，看看效果 →
           </button>
           <button
             type="button"
             onClick={() => finish(null)}
-            className="rounded-lg border border-slate-300 px-4 py-2.5 text-[13px] text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-line-strong px-4 py-2.5 text-[13px] text-ink-dim hover:bg-hover"
           >
             从空白开始
           </button>

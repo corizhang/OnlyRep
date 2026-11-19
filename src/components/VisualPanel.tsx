@@ -15,8 +15,8 @@ export default function VisualPanel() {
   const [imgHint, setImgHint] = useState('');
   const [imgError, setImgError] = useState('');
 
-  const input = 'w-full rounded border border-slate-300 px-2 py-1 text-xs';
-  const label = 'mb-1 block font-medium text-slate-600';
+  const input = 'w-full rounded border border-line-strong px-2 py-1 text-xs';
+  const label = 'mb-1 block font-medium text-ink-dim';
 
   const onImageFile = async (file: File | undefined): Promise<void> => {
     setImgError('');
@@ -47,7 +47,7 @@ export default function VisualPanel() {
               type="button"
               onClick={() => patchConfig({ themeId: t.id as ThemeId, overlayColor: '' })}
               className={`overflow-hidden rounded-lg border-2 text-center ${
-                config.themeId === t.id ? 'border-blue-500' : 'border-transparent'
+                config.themeId === t.id ? 'border-brand' : 'border-transparent'
               }`}
               title={t.name}
             >
@@ -55,7 +55,7 @@ export default function VisualPanel() {
                 <div style={{ background: t.headerBg || t.accent, height: 14 }} />
                 <div style={{ background: t.pageBg, height: 22 }} />
               </div>
-              <div className="bg-white py-0.5 text-slate-600">{t.name}</div>
+              <div className="bg-panel py-0.5 text-ink-dim">{t.name}</div>
             </button>
           ))}
         </div>
@@ -72,20 +72,20 @@ export default function VisualPanel() {
               void onImageFile(e.target.files?.[0]);
               e.target.value = '';
             }}
-            className="w-full text-slate-500"
+            className="w-full text-ink-dim"
           />
           {config.backgroundImage && (
             <button
               type="button"
               onClick={() => patchConfig({ backgroundImage: null })}
-              className="shrink-0 rounded border border-slate-300 bg-white px-2 py-1 text-slate-500 hover:border-red-300 hover:text-red-600"
+              className="shrink-0 rounded border border-line-strong bg-panel px-2 py-1 text-ink-dim hover:border-danger/40 hover:text-danger"
             >
               移除
             </button>
           )}
         </div>
-        {imgHint && <div className="mt-1 text-amber-600">{imgHint}</div>}
-        {imgError && <div className="mt-1 text-red-600">{imgError}</div>}
+        {imgHint && <div className="mt-1 text-warn">{imgHint}</div>}
+        {imgError && <div className="mt-1 text-danger">{imgError}</div>}
       </div>
 
       {config.backgroundImage && (
@@ -129,13 +129,13 @@ export default function VisualPanel() {
             type="color"
             value={config.accentColor || '#2563eb'}
             onChange={(e) => patchConfig({ accentColor: e.target.value })}
-            className="h-7 w-10 cursor-pointer rounded border border-slate-300"
+            className="h-7 w-10 cursor-pointer rounded border border-line-strong"
           />
           {config.accentColor && (
             <button
               type="button"
               onClick={() => patchConfig({ accentColor: '' })}
-              className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-500"
+              className="rounded border border-line-strong bg-panel px-2 py-1 text-ink-dim"
             >
               跟随主题
             </button>

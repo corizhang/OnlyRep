@@ -12,8 +12,8 @@ import PreviewBoard from './PreviewBoard';
 /** 区块卡片外壳（设置面板 UI 用 Tailwind；海报区不用） */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3">
-      <h2 className="mb-2 text-sm font-semibold text-slate-700">{title}</h2>
+    <section className="rounded-lg border border-line bg-panel p-3">
+      <h2 className="mb-2 text-sm font-semibold text-ink">{title}</h2>
       {children}
     </section>
   );
@@ -26,22 +26,22 @@ export default function PanelLayout() {
   const configRestored = useRankStore((s) => s.configRestored);
 
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-        <h1 className="text-lg font-semibold text-slate-800">RankBoard 排行榜生成工具</h1>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-700">
+    <div className="flex h-screen flex-col bg-hover">
+      <header className="flex items-center justify-between border-b border-line bg-panel px-6 py-3">
+        <h1 className="text-lg font-semibold text-ink">RankBoard 排行榜生成工具</h1>
+        <span className="rounded-full bg-ok-soft px-3 py-1 text-xs text-ok">
           数据仅在本地处理，不会上传服务器
         </span>
       </header>
 
       {/* E9：刷新后配置已恢复但数据已清空 */}
       {configRestored && !rawTable && (
-        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-800">
+        <div className="border-b border-warn/30 bg-warn-soft px-6 py-2 text-sm text-warn">
           上次配置已恢复，请重新导入数据
         </div>
       )}
       {parseError && rawTable && (
-        <div className="border-b border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700">
+        <div className="border-b border-danger/30 bg-danger-soft px-6 py-2 text-sm text-danger">
           {parseError}
         </div>
       )}
@@ -51,7 +51,7 @@ export default function PanelLayout() {
           <div className="w-full max-w-2xl">
             <ImportZone />
             {parseError && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
                 {parseError}
               </div>
             )}
@@ -59,7 +59,7 @@ export default function PanelLayout() {
         </main>
       ) : (
         <main className="flex min-h-0 flex-1">
-          <aside className="w-[380px] shrink-0 space-y-3 overflow-y-auto border-r border-slate-200 bg-slate-50 p-3">
+          <aside className="w-[380px] shrink-0 space-y-3 overflow-y-auto border-r border-line bg-soft p-3">
             <Section title="数据源">
               <SheetPicker />
             </Section>
@@ -79,7 +79,7 @@ export default function PanelLayout() {
               <ExportPanel />
             </Section>
           </aside>
-          <section className="flex flex-1 overflow-auto bg-slate-200 p-6">
+          <section className="flex flex-1 overflow-auto bg-base p-6">
             {/* m-auto 替代 justify-center：海报宽于视口时四向均可滚动；海报高度=内容高度，不被拉伸裁切 */}
             <div className="m-auto">
               <PreviewBoard />

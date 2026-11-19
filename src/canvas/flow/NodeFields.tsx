@@ -31,7 +31,7 @@ export default function NodeFields({ node, cols }: { node: PipelineNode; cols: {
         <TextInput value={node.name} onChange={(v) => set({ name: v })} />
       </Field>
 
-      {node.type === 'source' && <p className="text-[11.5px] text-slate-400">数据源的配置直接内嵌在画布节点上完成。</p>}
+      {node.type === 'source' && <p className="text-[11.5px] text-ink-faint">数据源的配置直接内嵌在画布节点上完成。</p>}
 
       {def && def.needsTableInput && cols.length === 0 && <NoTableHint />}
       {def && !(def.needsTableInput && cols.length === 0) && (

@@ -82,9 +82,9 @@ export default function BindingPicker({
           placeholder="如：已完成/全年目标"
         />
       )}
-      <div className="flex items-center gap-2 text-[11.5px] text-slate-400">
+      <div className="flex items-center gap-2 text-[11.5px] text-ink-faint">
         <span>当前值</span>
-        <span className={preview.state === 'ok' ? 'font-medium text-emerald-600' : 'text-amber-600'}>
+        <span className={preview.state === 'ok' ? 'font-medium text-ok' : 'text-warn'}>
           {preview.text}
           {preview.message ? `（${preview.message}）` : ''}
         </span>

@@ -32,7 +32,7 @@ export default function FormulaRow({
           <button
             type="button"
             title="打开公式编辑面板"
-            className="shrink-0 rounded border border-[var(--nb-control-border,#cbd2da)] bg-[var(--nb-control-bg,#ffffff)] px-1.5 py-[3px] text-[10px] font-semibold text-emerald-600 transition-colors hover:bg-[var(--nb-control-hover,#eef0f3)] dark:text-emerald-300"
+            className="shrink-0 rounded border border-[var(--nb-control-border,#cbd2da)] bg-[var(--nb-control-bg,#ffffff)] px-1.5 py-[3px] text-[10px] font-semibold text-ok transition-colors hover:bg-[var(--nb-control-hover,#eef0f3)] dark:text-emerald-300"
             onClick={() => setOpen(true)}
           >
             ƒx

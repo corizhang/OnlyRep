@@ -8,18 +8,18 @@ export default function DataPreview({ table, limit = 10 }: { table: CleanedTable
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-[11.5px] text-slate-500">
+      <div className="flex items-center justify-between text-[11.5px] text-ink-dim">
         <span>
           共 <b>{table.rows.length}</b> 行 × {cols.length} 列
         </span>
         {table.rows.length > limit && <span>仅预览前 {limit} 行</span>}
       </div>
-      <div className="max-h-[280px] overflow-auto rounded border border-slate-200">
+      <div className="max-h-[280px] overflow-auto rounded border border-line">
         <table className="w-full border-collapse text-[11.5px]">
-          <thead className="sticky top-0 bg-slate-100">
+          <thead className="sticky top-0 bg-hover">
             <tr>
               {cols.map((c) => (
-                <th key={c.key} className="whitespace-nowrap border-b border-slate-200 px-1.5 py-1 text-left font-medium text-slate-600">
+                <th key={c.key} className="whitespace-nowrap border-b border-line px-1.5 py-1 text-left font-medium text-ink-dim">
                   {c.rawName || c.key}
                 </th>
               ))}
@@ -27,11 +27,11 @@ export default function DataPreview({ table, limit = 10 }: { table: CleanedTable
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className={i % 2 ? 'bg-slate-50/70' : 'bg-white'}>
+              <tr key={i} className={i % 2 ? 'bg-soft/70' : 'bg-panel'}>
                 {cols.map((c) => {
                   const v = getVal(r, c.key);
                   return (
-                    <td key={c.key} className="whitespace-nowrap border-b border-slate-100 px-1.5 py-0.5 text-slate-700">
+                    <td key={c.key} className="whitespace-nowrap border-b border-line px-1.5 py-0.5 text-ink">
                       {v === null ? '' : typeof v === 'number' ? v.toLocaleString('zh-CN') : String(v)}
                     </td>
                   );
@@ -40,7 +40,7 @@ export default function DataPreview({ table, limit = 10 }: { table: CleanedTable
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={Math.max(1, cols.length)} className="px-2 py-3 text-center text-slate-400">
+                <td colSpan={Math.max(1, cols.length)} className="px-2 py-3 text-center text-ink-faint">
                   没有数据行（可能是上一步筛选条件过严）
                 </td>
               </tr>

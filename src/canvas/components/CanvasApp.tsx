@@ -107,10 +107,10 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const isCanvas = viewMode === 'canvas';
 
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-2">
+    <div className="flex h-screen flex-col bg-hover">
+      <header className="flex items-center justify-between border-b border-line bg-panel px-5 py-2">
         <div className="flex items-center gap-4">
-          <h1 className="text-[15px] font-semibold text-slate-800">RankBoard · 日报画布</h1>
+          <h1 className="text-[15px] font-semibold text-ink">RankBoard · 日报画布</h1>
           {/* 双视图切换：切换时左栏/画布/右栏三处联动 */}
           <Segmented
             value={viewMode}
@@ -120,13 +120,13 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
               { label: '数据节点', value: 'node' },
             ]}
           />
-          <span className="text-[11.5px] text-slate-400">一次搭好，换数据即出图</span>
+          <span className="text-[11.5px] text-ink-faint">一次搭好，换数据即出图</span>
           {/* 模板库入口：显示当前模板名（无则"未保存的工作区"） */}
           <Tooltip title="模板库（多模板保存/切换）">
             <button
               type="button"
               onClick={() => setShowTplLib(true)}
-              className="flex max-w-[180px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-slate-600 shadow-sm hover:border-blue-300 hover:text-blue-600"
+              className="flex max-w-[180px] items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[11.5px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
             >
               <FolderOpenOutlined style={{ fontSize: 12 }} />
               <span className="truncate">{activeTplName ?? '模板库'}</span>
@@ -136,7 +136,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
             <button
               type="button"
               onClick={() => setShowSettings(true)}
-              className="flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[12px] text-slate-500 shadow-sm hover:border-blue-300 hover:text-blue-600"
+              className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
             >
               ⚙
             </button>
@@ -151,7 +151,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
                   const name = undo();
                   if (name) message.info({ content: `已撤销：${name}`, duration: 1.2 });
                 }}
-                className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                className="rounded p-1 text-ink-dim transition-colors hover:bg-hover hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <UndoOutlined style={{ fontSize: 15 }} />
               </button>
@@ -164,7 +164,7 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
                   const name = redo();
                   if (name) message.info({ content: `已重做：${name}`, duration: 1.2 });
                 }}
-                className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
+                className="rounded p-1 text-ink-dim transition-colors hover:bg-hover hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <RedoOutlined style={{ fontSize: 15 }} />
               </button>
@@ -172,26 +172,26 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-slate-400">管道 {lastRunMs}ms</span>
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700">
+          <span className="text-[11px] text-ink-faint">管道 {lastRunMs}ms</span>
+          <span className="rounded-full bg-ok-soft px-2.5 py-1 text-[11px] text-ok">
             数据仅在本地处理，不会上传服务器
           </span>
-          <span className="text-[10.5px] text-slate-300" title={`构建时间：${__BUILD_TIME__}`}>
+          <span className="text-[10.5px] text-ink-faint" title={`构建时间：${__BUILD_TIME__}`}>
             v{__APP_VERSION__} · {__BUILD_TIME__}
           </span>
-          <button type="button" onClick={onOpenLegacy} className="text-[11px] text-slate-400 underline hover:text-slate-600">
+          <button type="button" onClick={onOpenLegacy} className="text-[11px] text-ink-faint underline hover:text-ink-dim">
             打开旧版排行榜编辑器
           </button>
         </div>
       </header>
 
       {(errors.length > 0 || warnings.length > 0) && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-amber-200 bg-amber-50 px-5 py-1.5 text-[12px] text-amber-800">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-warn/30 bg-warn-soft px-5 py-1.5 text-[12px] text-warn">
           {errors.slice(0, 3).map((e, i) => (
             <span key={`e${i}`}>● {e}</span>
           ))}
           {warnings.filter((w) => !errors.includes(w)).slice(0, 2).map((w, i) => (
-            <span key={`w${i}`} className="text-amber-600">
+            <span key={`w${i}`} className="text-warn">
               ○ {w}
             </span>
           ))}
@@ -200,12 +200,12 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
 
       {/* 存储降级警告：写入 localStorage 失败（配额满/环境禁用），提示立即导出备份 */}
       {storageError && (
-        <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-5 py-1.5 text-[12px] text-red-700">
+        <div className="flex items-center gap-3 border-b border-danger/30 bg-danger-soft px-5 py-1.5 text-[12px] text-danger">
           <span className="min-w-0 flex-1">⚠ {storageError}</span>
           <button
             type="button"
             onClick={() => downloadCanvasTemplate(config)}
-            className="shrink-0 rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-100"
+            className="shrink-0 rounded border border-danger/40 bg-panel px-2 py-0.5 text-[11px] font-medium text-danger hover:bg-danger-soft"
           >
             立即导出模板备份
           </button>
@@ -214,19 +214,19 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
 
       {/* 多窗口互踩提示：另一窗口改了工作区，本窗口继续编辑会覆盖对方 */}
       {externalUpdate && (
-        <div className="flex items-center gap-3 border-b border-orange-200 bg-orange-50 px-5 py-1.5 text-[12px] text-orange-800">
+        <div className="flex items-center gap-3 border-b border-warn/30 bg-warn-soft px-5 py-1.5 text-[12px] text-warn">
           <span className="min-w-0 flex-1">⚠ 另一个窗口/标签页修改了工作区。为避免互相覆盖，建议刷新加载最新版本（本窗口未保存的修改请先导出模板备份）。</span>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="shrink-0 rounded border border-orange-300 bg-white px-2 py-0.5 text-[11px] font-medium text-orange-700 hover:bg-orange-100"
+            className="shrink-0 rounded border border-warn/40 bg-panel px-2 py-0.5 text-[11px] font-medium text-warn hover:bg-warn-soft"
           >
             刷新加载最新
           </button>
           <button
             type="button"
             onClick={() => useCanvasStore.getState().dismissExternalUpdate()}
-            className="shrink-0 text-orange-400 hover:text-orange-600"
+            className="shrink-0 text-warn hover:text-warn"
           >
             知道了
           </button>
@@ -250,11 +250,11 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
 
         <VariablePanel />
 
-        <aside className={`shrink-0 overflow-y-auto border-l border-slate-200 bg-slate-50 p-2.5 ${isCanvas ? 'w-[360px]' : 'w-[380px]'}`}>
+        <aside className={`shrink-0 overflow-y-auto border-l border-line bg-soft p-2.5 ${isCanvas ? 'w-[360px]' : 'w-[380px]'}`}>
           {isCanvas ? (
             <>
               {selected ? (
-                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="rounded-lg border border-line bg-panel p-3 shadow-sm">
                   <BlockInspector block={selected} />
                 </div>
               ) : (
@@ -351,39 +351,39 @@ function ShortcutsHelp({ viewMode }: { viewMode: 'canvas' | 'node' }) {
         type="button"
         title="快捷键帮助"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition-colors hover:text-blue-600"
+        className="fixed bottom-4 right-4 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-line bg-panel text-ink-dim shadow-md transition-colors hover:text-brand"
       >
         <QuestionCircleOutlined style={{ fontSize: 16 }} />
       </button>
       {open && (
         <div className="fixed inset-0 z-50" onClick={() => setOpen(false)}>
           <div
-            className="absolute bottom-14 right-4 w-[320px] rounded-lg border border-slate-200 bg-white p-4 shadow-xl"
+            className="absolute bottom-14 right-4 w-[320px] rounded-lg border border-line bg-panel p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[13px] font-semibold text-slate-800">快捷键{viewMode === 'node' ? '（数据节点）' : '（日报画布）'}</span>
-              <button type="button" className="text-slate-400 hover:text-slate-600" onClick={() => setOpen(false)}>✕</button>
+              <span className="text-[13px] font-semibold text-ink">快捷键{viewMode === 'node' ? '（数据节点）' : '（日报画布）'}</span>
+              <button type="button" className="text-ink-faint hover:text-ink-dim" onClick={() => setOpen(false)}>✕</button>
             </div>
             <div className="space-y-3">
               {groups.map((g) => (
                 <div key={g.title}>
-                  <div className="mb-1 text-[11px] font-medium text-slate-400">{g.title}</div>
+                  <div className="mb-1 text-[11px] font-medium text-ink-faint">{g.title}</div>
                   <div className="space-y-1">
                     {g.items.map(([k, desc]) => (
                       <div key={k} className="flex items-center justify-between gap-3">
-                        <code className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] text-slate-600">{k}</code>
-                        <span className="min-w-0 flex-1 text-right text-[11.5px] text-slate-600">{desc}</span>
+                        <code className="shrink-0 rounded bg-hover px-1.5 py-0.5 text-[10.5px] text-ink-dim">{k}</code>
+                        <span className="min-w-0 flex-1 text-right text-[11.5px] text-ink-dim">{desc}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 border-t border-slate-100 pt-2 text-[10.5px] leading-relaxed text-slate-400">
+            <div className="mt-3 border-t border-line pt-2 text-[10.5px] leading-relaxed text-ink-faint">
               遇到问题：截图 + 画布设置「导出全部数据」→ 发给运营管理员
               <br />
-              反馈时请附版本号：<span className="text-slate-500">v{__APP_VERSION__} · {__BUILD_TIME__}</span>
+              反馈时请附版本号：<span className="text-ink-dim">v{__APP_VERSION__} · {__BUILD_TIME__}</span>
             </div>
           </div>
         </div>

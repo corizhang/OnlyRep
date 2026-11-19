@@ -60,7 +60,7 @@ export default function BlockInspector({ block }: { block: CanvasBlock }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-slate-700">{typeName(block.type)}</span>
+        <span className="text-xs font-semibold text-ink">{typeName(block.type)}</span>
         <div className="ml-auto flex gap-1">
           {isTopLevel(config.blocks, block.id) && (
             <>
@@ -250,7 +250,7 @@ function TextInspector({ cfg, onChange }: { cfg: TextBlockConfig; onChange: (p: 
               key={mark}
               type="button"
               title={`包裹选中文本：${mark}文字${mark}`}
-              className="rounded border border-slate-300 px-1.5 py-0.5 text-[11.5px] text-slate-600 hover:border-blue-400 hover:text-blue-600"
+              className="rounded border border-line-strong px-1.5 py-0.5 text-[11.5px] text-ink-dim hover:border-brand-line hover:text-brand"
               onClick={() => wrapMark(mark, title)}
             >
               {label}
@@ -264,17 +264,17 @@ function TextInspector({ cfg, onChange }: { cfg: TextBlockConfig; onChange: (p: 
           ƒx 插入变量
         </Btn>
         {showVars && (
-          <div className="mt-1.5 rounded border border-slate-200 bg-white p-2">
+          <div className="mt-1.5 rounded border border-line bg-panel p-2">
             <input
-              className="mb-1.5 w-full rounded border border-slate-300 px-2 py-1 text-[12px]"
+              className="mb-1.5 w-full rounded border border-line-strong px-2 py-1 text-[12px]"
               placeholder="搜索变量（支持拼音首字母，如 wcl → 完成率）"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            {grouped.length === 0 && <p className="text-[11.5px] text-slate-400">没有匹配的变量——先在数据源或管道中创建</p>}
+            {grouped.length === 0 && <p className="text-[11.5px] text-ink-faint">没有匹配的变量——先在数据源或管道中创建</p>}
             {grouped.map((g) => (
               <div key={g.group} className="mb-1.5">
-                <p className="text-[11.5px] font-semibold text-slate-400">{g.group}</p>
+                <p className="text-[11.5px] font-semibold text-ink-faint">{g.group}</p>
                 <div className="flex flex-wrap gap-1">
                   {g.items.map((v) => (
                     <button
@@ -286,7 +286,7 @@ function TextInspector({ cfg, onChange }: { cfg: TextBlockConfig; onChange: (p: 
                         e.dataTransfer.effectAllowed = 'copy';
                       }}
                       title={v.value !== undefined ? `当前值：${String(v.value)}` : v.hint}
-                      className="cursor-grab rounded bg-slate-100 px-1.5 py-0.5 text-[11.5px] text-slate-600 hover:bg-blue-100 hover:text-blue-700 active:cursor-grabbing"
+                      className="cursor-grab rounded bg-hover px-1.5 py-0.5 text-[11.5px] text-ink-dim hover:bg-brand-line hover:text-brand active:cursor-grabbing"
                       onClick={() => insertVar(v.name)}
                     >
                       {v.name}
@@ -368,7 +368,7 @@ function ImageInspector({ block, onChange }: { block: Extract<CanvasBlock, { typ
             移除
           </Btn>
         )}
-        {compressNote && <span className="self-center text-[10.5px] text-emerald-600">{compressNote}</span>}
+        {compressNote && <span className="self-center text-[10.5px] text-ok">{compressNote}</span>}
       </div>
       <Field label="宽度 %">
         <NumberInput value={cfg.widthPct} min={10} max={100} onChange={(v) => onChange({ widthPct: v })} />
@@ -387,7 +387,7 @@ function ImageInspector({ block, onChange }: { block: Extract<CanvasBlock, { typ
       <Field label="圆角">
         <NumberInput value={cfg.borderRadius} min={0} max={48} onChange={(v) => onChange({ borderRadius: v })} />
       </Field>
-      <p className="text-[11.5px] text-slate-400">图片会随模板保存，建议使用小图，避免模板体积过大。</p>
+      <p className="text-[11.5px] text-ink-faint">图片会随模板保存，建议使用小图，避免模板体积过大。</p>
     </>
   );
 }
@@ -596,29 +596,29 @@ function ChartInspector({
             />
           </Field>
           {(cfg.funnelMode ?? 'table') === 'table' ? (
-            <p className="rounded bg-blue-50 px-2 py-1 text-[11px] leading-relaxed text-blue-700">
+            <p className="rounded bg-brand-soft px-2 py-1 text-[11px] leading-relaxed text-brand">
               表格模式：维度列=阶段名，使用<b>第一个数值列</b>；标签显示数值 + 较上层/占首层转化率，建议排序选「降序」。
             </p>
           ) : (
             <>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-medium text-slate-500">漏斗层级（顺序即漏斗顺序）</span>
-                  <span className="text-[10.5px] text-slate-400">{stages.length} 层</span>
+                  <span className="text-[12px] font-medium text-ink-dim">漏斗层级（顺序即漏斗顺序）</span>
+                  <span className="text-[10.5px] text-ink-faint">{stages.length} 层</span>
                 </div>
                 {stages.map((st, i) => (
-                  <div key={i} className="rounded-md border border-slate-200 bg-slate-50/60 p-1.5">
+                  <div key={i} className="rounded-md border border-line bg-soft/60 p-1.5">
                     <div className="flex items-center gap-1">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-600">{i + 1}</span>
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-line text-[10px] font-semibold text-brand">{i + 1}</span>
                       <input
-                        className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[11.5px] text-slate-700 hover:border-slate-300 focus:border-blue-400 focus:bg-white focus:outline-none"
+                        className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-[11.5px] text-ink hover:border-line-strong focus:border-brand-line focus:bg-panel focus:outline-none"
                         value={st.name}
                         placeholder="层级名（空=按绑定自动命名）"
                         onChange={(e) => setStages(stages.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
                       />
-                      <button type="button" title="上移" disabled={i === 0} className="shrink-0 rounded px-1 py-0.5 text-[11px] text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, -1)}>↑</button>
-                      <button type="button" title="下移" disabled={i === stages.length - 1} className="shrink-0 rounded px-1 py-0.5 text-[11px] text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-25" onClick={() => moveStage(i, 1)}>↓</button>
-                      <button type="button" title="删除层级" className="shrink-0 rounded px-1 py-0.5 text-[11px] text-slate-400 hover:bg-red-50 hover:text-red-500" onClick={() => setStages(stages.filter((_, j) => j !== i))}>✕</button>
+                      <button type="button" title="上移" disabled={i === 0} className="shrink-0 rounded px-1 py-0.5 text-[11px] text-ink-faint hover:bg-panel hover:text-ink disabled:opacity-25" onClick={() => moveStage(i, -1)}>↑</button>
+                      <button type="button" title="下移" disabled={i === stages.length - 1} className="shrink-0 rounded px-1 py-0.5 text-[11px] text-ink-faint hover:bg-panel hover:text-ink disabled:opacity-25" onClick={() => moveStage(i, 1)}>↓</button>
+                      <button type="button" title="删除层级" className="shrink-0 rounded px-1 py-0.5 text-[11px] text-ink-faint hover:bg-danger-soft hover:text-danger" onClick={() => setStages(stages.filter((_, j) => j !== i))}>✕</button>
                     </div>
                     <div className="mt-1">
                       <BindingPicker
@@ -637,7 +637,7 @@ function ChartInspector({
                   + 添加层级
                 </Btn>
               </div>
-              <p className="rounded bg-blue-50 px-2 py-1 text-[11px] leading-relaxed text-blue-700">
+              <p className="rounded bg-brand-soft px-2 py-1 text-[11px] leading-relaxed text-brand">
                 每层绑定一个标量：取数节点 / 表单项 / 常量都可；<b>手动录入数字选「现场公式」直接填数值</b>。标签显示数值 + 较上层/占首层转化率。
               </p>
             </>
@@ -646,11 +646,11 @@ function ChartInspector({
       )}
       {!(cfg.chartType === 'funnel' && cfg.funnelMode === 'scalars') && (
       <div className="space-y-1">
-        <span className="text-[12px] font-medium text-slate-500">数值列</span>
+        <span className="text-[12px] font-medium text-ink-dim">数值列</span>
         {metrics.map((m, i) => (
           <div key={i} className="flex gap-1">
             <select
-              className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+              className="min-w-0 flex-1 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
               value={m.col}
               onChange={(e) => setMetrics(metrics.map((x, j) => (j === i ? { ...x, col: e.target.value, label: x.label || e.target.value } : x)))}
             >
@@ -662,12 +662,12 @@ function ChartInspector({
               ))}
             </select>
             <input
-              className="w-16 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+              className="w-16 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
               value={m.label}
               placeholder="图例名"
               onChange={(e) => setMetrics(metrics.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
             />
-            <button type="button" className="text-slate-400 hover:text-red-500" onClick={() => setMetrics(metrics.filter((_, j) => j !== i))}>
+            <button type="button" className="text-ink-faint hover:text-danger" onClick={() => setMetrics(metrics.filter((_, j) => j !== i))}>
               ×
             </button>
           </div>
@@ -845,14 +845,14 @@ function TableInspector({
           className="group flex min-w-0 flex-1 items-center gap-1.5"
           {...dragProps(i)}
         >
-          <HolderOutlined className="shrink-0 cursor-grab text-[12px] text-slate-300 hover:text-slate-500" />
-          <span className="min-w-0 truncate text-[12.5px] text-slate-700">{c.label || rawLabelOf(c.col) || '未选列'}</span>
-          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-px text-[10.5px] text-slate-500">{FORMAT_LABEL[c.format]}</span>
+          <HolderOutlined className="shrink-0 cursor-grab text-[12px] text-ink-faint hover:text-ink-dim" />
+          <span className="min-w-0 truncate text-[12.5px] text-ink">{c.label || rawLabelOf(c.col) || '未选列'}</span>
+          <span className="shrink-0 rounded bg-hover px-1.5 py-px text-[10.5px] text-ink-dim">{FORMAT_LABEL[c.format]}</span>
           <Dropdown trigger={['click']} placement="bottomRight" menu={{ items: menuItems }}>
             <button
               type="button"
               title="列操作（复制/删除）"
-              className="ml-auto shrink-0 rounded px-0.5 text-[13px] leading-none text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+              className="ml-auto shrink-0 rounded px-0.5 text-[13px] leading-none text-ink-faint transition-colors hover:bg-hover hover:text-ink"
               onClick={(e) => e.stopPropagation()}
             >
               <EllipsisOutlined />
@@ -968,7 +968,7 @@ function TableInspector({
       {/* 列：手风琴（默认折叠单行摘要，点开展开编辑），支持拖拽排序 */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium tracking-wide text-slate-500">列（{cols.length}）</span>
+          <span className="text-[12px] font-medium tracking-wide text-ink-dim">列（{cols.length}）</span>
           {cols.length === 0 && (
             <Btn size="xs" onClick={fillAll}>
               用全部列
@@ -982,7 +982,7 @@ function TableInspector({
             size="small"
             activeKey={activeIdx === null ? [] : [String(activeIdx)]}
             onChange={(keys) => setActiveIdx(keys.length ? Number(keys[keys.length - 1]) : null)}
-            className="[&_.ant-collapse-body]:!px-0 [&_.ant-collapse-body]:!pb-2 [&_.ant-collapse-body]:!pt-1 [&_.ant-collapse-header]:!px-0 [&_.ant-collapse-header]:!py-1.5 [&_.ant-collapse-item:not(:last-child)]:!border-b [&_.ant-collapse-item]:!border-slate-100"
+            className="[&_.ant-collapse-body]:!px-0 [&_.ant-collapse-body]:!pb-2 [&_.ant-collapse-body]:!pt-1 [&_.ant-collapse-header]:!px-0 [&_.ant-collapse-header]:!py-1.5 [&_.ant-collapse-item:not(:last-child)]:!border-b [&_.ant-collapse-item]:!border-line"
             items={items}
           />
         )}
@@ -993,7 +993,7 @@ function TableInspector({
 
       {/* 样式区：两列复选 + 合计文案（勾选才出现）+ 行数/字号 */}
       <div className="space-y-1.5">
-        <span className="text-[12px] font-medium tracking-wide text-slate-500">样式</span>
+        <span className="text-[12px] font-medium tracking-wide text-ink-dim">样式</span>
         <div className="grid grid-cols-2 gap-y-1">
           <Check checked={cfg.zebra} label="斑马纹" onChange={(v) => onChange({ zebra: v })} />
           <Check checked={cfg.showHeader} label="表头" onChange={(v) => onChange({ showHeader: v })} />
@@ -1020,11 +1020,11 @@ function TableInspector({
       </div>
 
       <div className="space-y-1">
-        <span className="text-[12px] font-medium tracking-wide text-slate-500">整行高亮规则</span>
+        <span className="text-[12px] font-medium tracking-wide text-ink-dim">整行高亮规则</span>
         {cfg.highlightRules.map((r, i) => (
           <div key={i} className="flex gap-1">
             <select
-              className="min-w-0 flex-1 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+              className="min-w-0 flex-1 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
               value={r.col}
               onChange={(e) => onChange({ highlightRules: cfg.highlightRules.map((x, j) => (j === i ? { ...x, col: e.target.value } : x)) })}
             >
@@ -1036,7 +1036,7 @@ function TableInspector({
               ))}
             </select>
             <select
-              className="rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+              className="rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
               value={r.op}
               onChange={(e) => onChange({ highlightRules: cfg.highlightRules.map((x, j) => (j === i ? { ...x, op: e.target.value as HighlightRule['op'] } : x)) })}
             >
@@ -1050,17 +1050,17 @@ function TableInspector({
             </select>
             <input
               type="number"
-              className="w-12 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+              className="w-12 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
               value={r.value}
               onChange={(e) => onChange({ highlightRules: cfg.highlightRules.map((x, j) => (j === i ? { ...x, value: Number(e.target.value) } : x)) })}
             />
             <input
               type="color"
-              className="h-6 w-6 rounded border border-slate-300 p-0"
+              className="h-6 w-6 rounded border border-line-strong p-0"
               value={r.color || '#F59E0B'}
               onChange={(e) => onChange({ highlightRules: cfg.highlightRules.map((x, j) => (j === i ? { ...x, color: e.target.value } : x)) })}
             />
-            <button type="button" className="text-slate-400 hover:text-red-500" onClick={() => onChange({ highlightRules: cfg.highlightRules.filter((_, j) => j !== i) })}>
+            <button type="button" className="text-ink-faint hover:text-danger" onClick={() => onChange({ highlightRules: cfg.highlightRules.filter((_, j) => j !== i) })}>
               ×
             </button>
           </div>
@@ -1165,26 +1165,26 @@ function RowInspector({ block, onChange }: { block: Extract<CanvasBlock, { type:
 
   return (
     <>
-      <p className="text-[11.5px] text-slate-400">
+      <p className="text-[11.5px] text-ink-faint">
         一行内并排 1~3 个区块；宽度按比例分配。点击画布中的子块可直接编辑与绑定数据。
       </p>
       {cfg.children.map((c, i) => (
-        <div key={c.id} className="flex items-center gap-1 rounded border border-slate-200 px-1.5 py-1">
-          <span className="w-4 text-[11.5px] text-slate-400">{i + 1}</span>
-          <button type="button" className="flex-1 truncate text-left text-[12px] text-slate-600 hover:text-blue-600" onClick={() => selectBlock(c.id)}>
+        <div key={c.id} className="flex items-center gap-1 rounded border border-line px-1.5 py-1">
+          <span className="w-4 text-[11.5px] text-ink-faint">{i + 1}</span>
+          <button type="button" className="flex-1 truncate text-left text-[12px] text-ink-dim hover:text-brand" onClick={() => selectBlock(c.id)}>
             {typeName(c.type)}
           </button>
           <input
             type="number"
-            className="w-12 rounded border border-slate-300 px-1 py-0.5 text-[11.5px]"
+            className="w-12 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
             value={cfg.widths[i] ?? 0}
             min={5}
             onChange={(e) => onChange({ widths: cfg.widths.map((w, j) => (j === i ? Number(e.target.value) : w)) })}
           />
-          <span className="text-[10.5px] text-slate-400">
+          <span className="text-[10.5px] text-ink-faint">
             {Math.round(((cfg.widths[i] ?? 0) / cfg.widths.reduce((a, b) => a + b, 0)) * 100)}%
           </span>
-          <button type="button" className="text-slate-400 hover:text-red-500" onClick={() => removeBlock(c.id)}>
+          <button type="button" className="text-ink-faint hover:text-danger" onClick={() => removeBlock(c.id)}>
             ×
           </button>
         </div>
@@ -1227,15 +1227,15 @@ function ShellInspector({ block }: { block: CanvasBlock }) {
 
   return (
     // 无卡片外框：仅用上分隔线与上方检查器内容区隔，避免双层框体挤压
-    <div className="space-y-2.5 border-t border-slate-100 pt-2.5">
+    <div className="space-y-2.5 border-t border-line pt-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-medium tracking-wide text-slate-500">通用设置</span>
-        <span className="text-[11px] text-slate-300">作用于区块外壳</span>
+        <span className="text-[12px] font-medium tracking-wide text-ink-dim">通用设置</span>
+        <span className="text-[11px] text-ink-faint">作用于区块外壳</span>
       </div>
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[12px] font-medium text-slate-500">边距</span>
+          <span className="text-[12px] font-medium text-ink-dim">边距</span>
           <button
             type="button"
             title={linked ? '四向联动中，点击解除可单边微调' : '点击开启四向联动'}
@@ -1244,7 +1244,7 @@ function ShellInspector({ block }: { block: CanvasBlock }) {
               setLinked(!linked);
             }}
             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] transition-colors ${
-              linked ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-400 hover:text-slate-600'
+              linked ? 'border-brand-line bg-brand-soft text-brand' : 'border-line text-ink-faint hover:text-ink-dim'
             }`}
           >
             {linked ? <LinkOutlined /> : <DisconnectOutlined />}
@@ -1260,8 +1260,8 @@ function ShellInspector({ block }: { block: CanvasBlock }) {
               min={0}
               max={64}
               controls={false}
-              prefix={<span className="text-slate-400">{dir}</span>}
-              suffix={<span className="text-slate-300">px</span>}
+              prefix={<span className="text-ink-faint">{dir}</span>}
+              suffix={<span className="text-ink-faint">px</span>}
               onChange={(v) => setMargin(i as 0 | 1 | 2 | 3, Math.max(0, Math.min(64, typeof v === 'number' ? v : 0)))}
             />
           ))}
@@ -1270,7 +1270,7 @@ function ShellInspector({ block }: { block: CanvasBlock }) {
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[12px] font-medium text-slate-500">圆角</span>
+          <span className="text-[12px] font-medium text-ink-dim">圆角</span>
           <div className="flex items-center gap-1.5">
             {RADIUS_PRESETS.map((p) => (
               <button
@@ -1278,7 +1278,7 @@ function ShellInspector({ block }: { block: CanvasBlock }) {
                 type="button"
                 onClick={() => setRadius(p.v)}
                 className={`rounded-full border px-2 py-0.5 text-[12px] transition-colors ${
-                  radius === p.v ? 'border-blue-300 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-400 hover:text-slate-600'
+                  radius === p.v ? 'border-brand-line bg-brand-soft text-brand' : 'border-line text-ink-faint hover:text-ink-dim'
                 }`}
               >
                 {p.label}
@@ -1294,7 +1294,7 @@ function ShellInspector({ block }: { block: CanvasBlock }) {
             min={0}
             max={24}
             controls={false}
-            suffix={<span className="text-slate-300">px</span>}
+            suffix={<span className="text-ink-faint">px</span>}
             onChange={(v) => setRadius(typeof v === 'number' ? v : 0)}
           />
         </div>

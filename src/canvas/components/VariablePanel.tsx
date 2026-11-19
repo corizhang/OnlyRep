@@ -85,7 +85,7 @@ export default function VariablePanel() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-7 shrink-0 flex-col items-center gap-1 border-l border-slate-200 bg-slate-50 py-3 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+        className="flex w-7 shrink-0 flex-col items-center gap-1 border-l border-line bg-soft py-3 text-ink-faint hover:bg-brand-soft hover:text-brand"
         title="展开变量面板"
       >
         <span className="text-[12px] font-medium">ƒx</span>
@@ -97,13 +97,13 @@ export default function VariablePanel() {
   }
 
   return (
-    <aside className="flex w-[240px] shrink-0 flex-col border-l border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-100 px-2.5 py-2">
-        <span className="text-[12px] font-semibold text-slate-700">变量面板</span>
+    <aside className="flex w-[240px] shrink-0 flex-col border-l border-line bg-panel">
+      <div className="flex items-center justify-between border-b border-line px-2.5 py-2">
+        <span className="text-[12px] font-semibold text-ink">变量面板</span>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-[12px] text-slate-400 hover:text-slate-600"
+          className="text-[12px] text-ink-faint hover:text-ink-dim"
           title="收起"
         >
           »
@@ -111,17 +111,17 @@ export default function VariablePanel() {
       </div>
       <div className="px-2.5 pt-2">
         <input
-          className="w-full rounded border border-slate-300 px-2 py-1 text-[12px] outline-none focus:border-blue-400"
+          className="w-full rounded border border-line-strong px-2 py-1 text-[12px] outline-none focus:border-brand-line"
           placeholder="搜索（支持拼音首字母）"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="mt-1 flex items-center justify-between gap-1">
-          <p className="text-[10.5px] leading-3 text-slate-400">点击复制 / 拖入输入框；{'{{'} 内拖入自动插裸名</p>
+          <p className="text-[10.5px] leading-3 text-ink-faint">点击复制 / 拖入输入框；{'{{'} 内拖入自动插裸名</p>
           <button
             type="button"
             onClick={() => setCopyMode((m) => (m === 'full' ? 'bare' : 'full'))}
-            className="shrink-0 rounded border border-slate-300 px-1 py-0.5 text-[10.5px] text-slate-500 hover:border-blue-400 hover:text-blue-600"
+            className="shrink-0 rounded border border-line-strong px-1 py-0.5 text-[10.5px] text-ink-dim hover:border-brand-line hover:text-brand"
             title="切换点击复制的格式"
           >
             {copyMode === 'full' ? '{{x}}' : 'x'}
@@ -129,10 +129,10 @@ export default function VariablePanel() {
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2">
-        {grouped.length === 0 && <p className="text-[11.5px] text-slate-400">没有匹配的变量</p>}
+        {grouped.length === 0 && <p className="text-[11.5px] text-ink-faint">没有匹配的变量</p>}
         {grouped.map((g) => (
           <div key={g.group} className="mb-2">
-            <p className="mb-1 text-[11.5px] font-semibold text-slate-400">{g.group}</p>
+            <p className="mb-1 text-[11.5px] font-semibold text-ink-faint">{g.group}</p>
             <div className="space-y-0.5">
               {g.items.map((v) => (
                 <button
@@ -146,15 +146,15 @@ export default function VariablePanel() {
                   }}
                   onClick={() => void copy(v.name)}
                   title={`${v.name}${v.value !== undefined ? ` = ${displayVarValue(v)}` : ''}${v.hint ? ` · ${v.hint}` : ''}\n点击复制 / 拖入输入框插入`}
-                  className={`flex w-full cursor-grab items-baseline gap-1 rounded px-1.5 py-1 text-left text-[12px] hover:bg-slate-100 active:cursor-grabbing ${
-                    copied === v.name ? 'bg-emerald-50' : ''
+                  className={`flex w-full cursor-grab items-baseline gap-1 rounded px-1.5 py-1 text-left text-[12px] hover:bg-hover active:cursor-grabbing ${
+                    copied === v.name ? 'bg-ok-soft' : ''
                   }`}
                 >
                   <span className={`min-w-0 flex-1 truncate font-medium ${GROUP_COLOR[v.group]}`}>
                     {copied === v.name ? '✓ 已复制' : v.name}
                   </span>
                   {v.value !== undefined && (
-                    <span className="shrink-0 text-[10.5px] text-slate-400">{displayVarValue(v)}</span>
+                    <span className="shrink-0 text-[10.5px] text-ink-faint">{displayVarValue(v)}</span>
                   )}
                 </button>
               ))}

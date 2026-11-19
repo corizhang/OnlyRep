@@ -62,14 +62,14 @@ export default function ExportPanel() {
   const scaleBtn = (s: 1 | 2 | 4): string =>
     `rounded border px-2 py-1 text-xs ${
       config.exportScale === s
-        ? 'border-blue-500 bg-blue-50 font-medium text-blue-700'
-        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+        ? 'border-brand bg-brand-soft font-medium text-brand'
+        : 'border-line bg-panel text-ink-dim hover:border-brand-line'
     }`;
 
   return (
     <div className="space-y-3 text-xs">
       <div>
-        <span className="mb-1 block font-medium text-slate-600">分辨率倍率</span>
+        <span className="mb-1 block font-medium text-ink-dim">分辨率倍率</span>
         <div className="flex gap-1">
           <button type="button" onClick={() => patchConfig({ exportScale: 1 })} className={scaleBtn(1)}>
             1x
@@ -84,15 +84,15 @@ export default function ExportPanel() {
       </div>
 
       <label className="block">
-        <span className="mb-1 block font-medium text-slate-600">文件名（默认「标题_YYYYMMDD」）</span>
+        <span className="mb-1 block font-medium text-ink-dim">文件名（默认「标题_YYYYMMDD」）</span>
         <input
           type="text"
           value={config.exportFileName}
           onChange={(e) => patchConfig({ exportFileName: e.target.value })}
           placeholder={defaultName}
-          className="w-full rounded border border-slate-300 px-2 py-1"
+          className="w-full rounded border border-line-strong px-2 py-1"
         />
-        <div className="mt-1 text-slate-400">将保存为：{fileName}.png</div>
+        <div className="mt-1 text-ink-faint">将保存为：{fileName}.png</div>
       </label>
 
       <label className="flex cursor-pointer items-center gap-2">
@@ -108,32 +108,32 @@ export default function ExportPanel() {
         type="button"
         onClick={() => void onExport()}
         disabled={busy}
-        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        className="w-full rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover disabled:opacity-50"
       >
         {busy ? `导出中… ${progress}%` : '导出 PNG'}
       </button>
 
       {busy && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
+        <div className="h-1.5 overflow-hidden rounded-full bg-base">
+          <div className="h-full rounded-full bg-brand" style={{ width: `${progress}%` }} />
         </div>
       )}
-      {error && <div className="text-red-600">{error}</div>}
-      {info && <div className="text-amber-600">{info}</div>}
+      {error && <div className="text-danger">{error}</div>}
+      {info && <div className="text-warn">{info}</div>}
 
       {/* 模板（R7-02） */}
-      <div className="flex gap-2 border-t border-slate-200 pt-2">
+      <div className="flex gap-2 border-t border-line pt-2">
         <button
           type="button"
           onClick={exportTemplate}
-          className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-slate-600 hover:border-blue-300"
+          className="flex-1 rounded border border-line-strong bg-panel px-2 py-1 text-ink-dim hover:border-brand-line"
         >
           保存为模板
         </button>
         <button
           type="button"
           onClick={() => tplInputRef.current?.click()}
-          className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-slate-600 hover:border-blue-300"
+          className="flex-1 rounded border border-line-strong bg-panel px-2 py-1 text-ink-dim hover:border-brand-line"
         >
           导入模板
         </button>

@@ -17,12 +17,12 @@ export default function SheetPicker() {
             onClick={() => void selectSheet(sh.name)}
             className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm ${
               active
-                ? 'border-blue-500 bg-blue-50 font-medium text-blue-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                ? 'border-brand bg-brand-soft font-medium text-brand'
+                : 'border-line bg-panel text-ink-dim hover:border-brand-line'
             }`}
           >
             <span className="truncate">{sh.name}</span>
-            <span className="ml-2 shrink-0 text-xs text-slate-400">
+            <span className="ml-2 shrink-0 text-xs text-ink-faint">
               {sh.rows} 行 × {sh.cols} 列
             </span>
           </button>

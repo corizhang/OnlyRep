@@ -34,7 +34,7 @@ interface FlowNodeCardProps {
 /** 类型徽标配色 */
 function accentOf(node: PipelineNode, bad: boolean): string {
   if (bad) return 'bg-red-500/90 text-white';
-  if (node.type === 'source') return 'bg-blue-500/90 text-white';
+  if (node.type === 'source') return 'bg-brand/90 text-white';
   if (node.type === 'scalarOut' || node.type === 'formula') return 'bg-emerald-500/90 text-white';
   return 'bg-slate-500/70 text-[var(--nb-header-text)]';
 }
@@ -199,13 +199,13 @@ function NodeName({ node }: { node: PipelineNode }) {
           }
         }}
         onFocus={(e) => e.target.select()}
-        className="min-w-0 flex-1 rounded border border-blue-500 bg-[var(--nb-input-bg)] px-1 py-px text-[12px] text-[var(--nb-text)] outline-none"
+        className="min-w-0 flex-1 rounded border border-brand bg-[var(--nb-input-bg)] px-1 py-px text-[12px] text-[var(--nb-text)] outline-none"
       />
     );
   }
   return (
     <span
-      className="min-w-0 flex-1 cursor-text truncate rounded px-0.5 text-[12px] font-medium text-[var(--nb-header-text)] hover:bg-white/10"
+      className="min-w-0 flex-1 cursor-text truncate rounded px-0.5 text-[12px] font-medium text-[var(--nb-header-text)] hover:bg-panel/10"
       title="点击修改名称"
       onPointerDown={(e) => e.stopPropagation()}
       onClick={() => setEditing(true)}
@@ -250,7 +250,7 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
         onPointerDown={onShellDown}
         style={{ left: x, top: y, width: NODE_W }}
         className={`absolute cursor-grab select-none overflow-visible rounded-lg border bg-[var(--nb-surface)] shadow-md transition-shadow ${
-          selected ? 'border-blue-500 ring-2 ring-blue-500/60' : 'border-[var(--nb-border)]'
+          selected ? 'border-brand ring-2 ring-brand/60' : 'border-[var(--nb-border)]'
         } ${bad && !selected ? 'border-red-500/70' : ''} ${dragging ? 'cursor-grabbing shadow-lg' : ''} ${node.enabled ? '' : 'opacity-60'}`}
       >
         {/* 头部：拖拽手柄 */}
