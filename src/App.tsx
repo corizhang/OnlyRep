@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, theme as antdAlgorithm } from 'antd';
 import PanelLayout from './components/PanelLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import CanvasApp from './canvas/components/CanvasApp';
 import { useRankStore } from './store/useRankStore';
+import { useCanvasStore } from './store/useCanvasStore';
 import { appStorage } from './storage/safeStorage';
 
 /**
@@ -26,6 +27,7 @@ const antdTheme = {
 };
 
 export default function App() {
+  const uiTheme = useCanvasStore((st) => st.uiTheme);
   const [mode, setMode] = useState<Mode>(() => {
     const saved = appStorage.getItem(KEY);
     return saved === 'rank' ? 'rank' : 'canvas';
@@ -56,7 +58,12 @@ export default function App() {
   }, [mode]);
 
   return (
-    <ConfigProvider theme={{ token: antdTheme.token }}>
+    <ConfigProvider
+      theme={{
+        token: antdTheme.token,
+        algorithm: uiTheme === 'dark' ? antdAlgorithm.darkAlgorithm : antdAlgorithm.defaultAlgorithm,
+      }}
+    >
       <ErrorBoundary>
         {mode === 'canvas' ? (
           <CanvasApp onOpenLegacy={() => setMode('rank')} />

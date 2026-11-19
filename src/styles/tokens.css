@@ -46,5 +46,33 @@
   --ui-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
-/* 深色编辑器预留：实现时在此覆盖 --ui-* 即可，组件类名不动 */
-/* [data-theme='dark'] { --ui-bg: #0f172a; ... } */
+/* 深色编辑器：data-theme="dark" 时整体覆盖（组件类名不动） */
+[data-theme='dark'] {
+  --ui-bg: #0b1220;
+  --ui-panel: #151d2e;
+  --ui-panel-soft: #1b2536;
+  --ui-panel-hover: #223047;
+
+  --ui-line: #28344b;
+  --ui-line-strong: #3a4a66;
+
+  --ui-ink: #e2e8f0;
+  --ui-ink-dim: #94a3b8;
+  --ui-ink-faint: #64748b;
+
+  /* 深色下品牌蓝提亮一档（对比度） */
+  --ui-brand: #3b82f6;
+  --ui-brand-hover: #60a5fa;
+  --ui-brand-soft: rgba(59, 130, 246, 0.16);
+  --ui-brand-line: rgba(59, 130, 246, 0.4);
+
+  --ui-ok: #34d399;
+  --ui-ok-soft: rgba(16, 185, 129, 0.14);
+  --ui-warn: #fbbf24;
+  --ui-warn-soft: rgba(251, 191, 36, 0.14);
+  --ui-danger: #f87171;
+  --ui-danger-soft: rgba(248, 113, 113, 0.14);
+
+  --ui-shadow-pop: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --ui-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+}

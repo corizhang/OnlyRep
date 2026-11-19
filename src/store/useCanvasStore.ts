@@ -83,6 +83,9 @@ export interface CanvasStore {
   setLibCollapsed: (v: boolean) => void;
   /** 节点画布 UI 主题（dark=ComfyUI 深色 / light=浅灰卡深灰头；仅节点画布域，App 外壳恒浅色） */
   nodeTheme: 'dark' | 'light';
+  /** 编辑器外壳主题（--ui-* tokens）；节点画布主题跟随它（统一观感） */
+  uiTheme: 'light' | 'dark';
+  toggleUiTheme: () => void;
   setNodeTheme: (v: 'dark' | 'light') => void;
 
   setShowFlow: (v: boolean) => void;
@@ -319,6 +322,13 @@ export const useCanvasStore = create<CanvasStore>()(
         setLibCollapsed: (v) => set({ libCollapsed: v }),
         nodeTheme: 'dark',
         setNodeTheme: (v) => set({ nodeTheme: v }),
+        uiTheme: (appStorage.getItem('rankboard-ui-theme') === 'dark' ? 'dark' : 'light') as 'light' | 'dark',
+        toggleUiTheme: () => {
+          const next = get().uiTheme === 'dark' ? 'light' : 'dark';
+          appStorage.setItem('rankboard-ui-theme', next);
+          document.documentElement.dataset.theme = next;
+          set({ uiTheme: next });
+        },
 
         setShowFlow: (v) => set({ showFlow: v }),
 

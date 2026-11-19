@@ -56,7 +56,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const flowSelectedIds = useCanvasStore((s) => s.flowSelectedIds);
   const setFlowSelectedIds = useCanvasStore((s) => s.setFlowSelectedIds);
   const toggleFlowSelected = useCanvasStore((s) => s.toggleFlowSelected);
-  const nodeTheme = useCanvasStore((s) => s.nodeTheme);
+  const nodeTheme = useCanvasStore((s) => s.uiTheme); // 节点主题跟随编辑器全局主题（统一观感）
   const setNodeTheme = useCanvasStore((s) => s.setNodeTheme);
 
   const [zoom, setZoom] = useState(0.85);
@@ -560,13 +560,6 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             <Btn size="xs" onClick={() => { resetFlowPos(); setDelta(null); setTimeout(fit, 20); }}>
               自动排列
             </Btn>
-            <Btn
-              size="xs"
-              title={nodeTheme === 'dark' ? '切换为浅色节点（浅灰卡+深灰头）' : '切换为深色节点（ComfyUI 深色）'}
-              onClick={() => setNodeTheme((nodeTheme === 'dark' ? 'light' : 'dark') as NodeTheme)}
-            >
-              {nodeTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-            </Btn>
             <Btn size="xs" onClick={() => setShowFlow(false)}>
               关闭
             </Btn>
@@ -590,13 +583,6 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             </Btn>
             <Btn size="xs" onClick={() => { resetFlowPos(); setDelta(null); setTimeout(fit, 20); }}>
               自动排列
-            </Btn>
-            <Btn
-              size="xs"
-              title={nodeTheme === 'dark' ? '切换为浅色节点（浅灰卡+深灰头）' : '切换为深色节点（ComfyUI 深色）'}
-              onClick={() => setNodeTheme((nodeTheme === 'dark' ? 'light' : 'dark') as NodeTheme)}
-            >
-              {nodeTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
             </Btn>
           </div>
         </div>

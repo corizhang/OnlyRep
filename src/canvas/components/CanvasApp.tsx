@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { message, Segmented, Tooltip } from 'antd';
+import { MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
@@ -35,6 +36,8 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
   const canUndo = useCanvasStore((s) => s.history.past.length > 0);
   const canRedo = useCanvasStore((s) => s.history.future.length > 0);
   const storageError = useCanvasStore((s) => s.storageError);
+  const uiTheme = useCanvasStore((s) => s.uiTheme);
+  const toggleUiTheme = useCanvasStore((s) => s.toggleUiTheme);
   const externalUpdate = useCanvasStore((s) => s.externalUpdate);
   const activeTemplateId = useCanvasStore((s) => s.activeTemplateId);
   const templates = useCanvasStore((s) => s.templates);
@@ -130,6 +133,15 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
             >
               <FolderOpenOutlined style={{ fontSize: 12 }} />
               <span className="truncate">{activeTplName ?? '模板库'}</span>
+            </button>
+          </Tooltip>
+          <Tooltip title={uiTheme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}>
+            <button
+              type="button"
+              onClick={toggleUiTheme}
+              className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+            >
+              {uiTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
             </button>
           </Tooltip>
           <Tooltip title="设置（导出路径等）">
