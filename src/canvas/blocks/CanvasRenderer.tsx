@@ -26,6 +26,8 @@ export interface CanvasEditHandlers {
   onDuplicateChild?: (rowId: string, childId: string) => void;
   /** 拖放到容器指定列的指定位置（payload：已有块 id 或库组件类型） */
   onDropToColumn?: (rowId: string, colIdx: number, index: number, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }) => void;
+  /** 拖拽列宽手柄结束：提交新的宽度权重数组 */
+  onResizeRow?: (rowId: string, widths: number[]) => void;
 }
 
 export interface CanvasRendererProps {
@@ -353,29 +355,8 @@ export function renderBlock(block: CanvasBlock, ctx: RenderCtx, edit?: CanvasEdi
       return <DataTable cfg={block.config} ctx={bctx} />;
     case 'rankList':
       return <RankBlock cfg={block.config} ctx={bctx} />;
-    case 'row': {
-      const cols = block.config.columns;
-      const widths =
-        block.config.widths.length === cols.length
-          ? block.config.widths
-          : cols.map(() => Math.round(100 / Math.max(1, cols.length)));
-      return (
-        <div style={{ display: 'flex', gap: ctx.gap, alignItems: block.config.align === 'top' ? 'flex-start' : 'stretch' }}>
-          {cols.map((col, i) => (
-            <ColumnStack
-              key={i}
-              rowId={block.id}
-              colIdx={i}
-              width={Math.max(1, widths[i] ?? 1)}
-              col={col}
-              edit={edit}
-              ctx={ctx}
-              gap={ctx.gap}
-            />
-          ))}
-        </div>
-      );
-    }
+    case 'row':
+      return <RowContainer block={block} edit={edit} ctx={ctx} />;
     default:
       return null;
   }
@@ -483,6 +464,81 @@ function ColumnStack({
           空列：拖组件到这里
         </div>
       )}
+    </div>
+  );
+}
+
+
+/** 分栏容器：列堆栈 + 列间宽度拖拽手柄（拖动中本地预览，松手一次提交 widths） */
+function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type: 'row' }>; edit?: CanvasEditHandlers; ctx: RenderCtx }) {
+  const cols = block.config.columns;
+  const baseWidths =
+    block.config.widths.length === cols.length ? block.config.widths : cols.map(() => Math.round(100 / Math.max(1, cols.length)));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [preview, setPreview] = useState<number[] | null>(null);
+  const widths = preview ?? baseWidths;
+
+  const startResize = (e: React.MouseEvent, handleIdx: number): void => {
+    if (!edit) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rootW = rootRef.current?.getBoundingClientRect().width ?? 1;
+    const startX = e.clientX;
+    const start = [...baseWidths];
+    const pairSum = start[handleIdx] + start[handleIdx + 1];
+    const onMove = (ev: MouseEvent): void => {
+      const deltaW = ((ev.clientX - startX) / rootW) * start.reduce((a, b) => a + b, 0);
+      const next = [...start];
+      next[handleIdx] = Math.max(5, Math.min(pairSum - 5, start[handleIdx] + deltaW));
+      next[handleIdx + 1] = pairSum - next[handleIdx];
+      setPreview(next);
+    };
+    const onUp = (ev: MouseEvent): void => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      const deltaW = ((ev.clientX - startX) / rootW) * start.reduce((a, b) => a + b, 0);
+      const next = [...start];
+      next[handleIdx] = Math.max(5, Math.min(pairSum - 5, Math.round(start[handleIdx] + deltaW)));
+      next[handleIdx + 1] = pairSum - next[handleIdx];
+      setPreview(null);
+      edit.onResizeRow?.(block.id, next);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <div ref={rootRef} style={{ display: 'flex', gap: ctx.gap, alignItems: block.config.align === 'top' ? 'flex-start' : 'stretch' }}>
+      {cols.map((col, i) => (
+        <Fragment key={i}>
+          {edit && i > 0 && (
+            <div
+              onMouseDown={(e) => startResize(e, i - 1)}
+              title="拖拽调整列宽"
+              style={{
+                width: 8,
+                margin: `0 -${(8 + ctx.gap) / 2}px`,
+                cursor: 'col-resize',
+                zIndex: 5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div style={{ width: 3, height: 32, borderRadius: 2, background: preview ? ctx.accent : `${ctx.accent}44` }} />
+            </div>
+          )}
+          <ColumnStack
+            rowId={block.id}
+            colIdx={i}
+            width={Math.max(1, widths[i] ?? 1)}
+            col={col}
+            edit={edit}
+            ctx={ctx}
+            gap={ctx.gap}
+          />
+        </Fragment>
+      ))}
     </div>
   );
 }

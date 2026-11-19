@@ -205,6 +205,7 @@ export default function CanvasStage() {
                       onDelete: removeBlock,
                       onDuplicate: duplicate,
                       onDropReorder: reorder,
+                      onResizeRow: (rowId, widths) => useCanvasStore.getState().updateBlock(rowId, { widths }),
                       onDropToColumn: (rowId, colIdx, index, payload) => {
                         if (payload.kind === 'new') {
                           addBlockToRow(rowId, colIdx, createBlock(payload.type), index);
