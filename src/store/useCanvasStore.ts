@@ -144,6 +144,8 @@ export interface CanvasStore {
   removeRowColumn: (rowId: string, colIdx: number) => void;
   /** 解散容器：所有列块平铺到容器原位 */
   dissolveRow: (rowId: string) => void;
+  /** 原子移动：从任意位置（顶层/容器列）移到目标堆栈位置（单条撤销记录） */
+  moveBlockTo: (dragId: string, target: { rowId: string | null; colIdx: number; index: number }) => void;
   updateBlock: (id: string, patch: Record<string, unknown>) => void;
   /** 更新区块外壳通用设置（边距/圆角，块根级字段，不进各 config） */
   updateBlockShell: (id: string, patch: { shellMargin?: [number, number, number, number]; radius?: number }) => void;
@@ -670,6 +672,67 @@ export const useCanvasStore = create<CanvasStore>()(
             return { ...c, blocks };
           });
         },
+
+        moveBlockTo: (dragId, target) =>
+          mutateConfig((c) => {
+            // 1) 从原位置摘出（递归，记录来源堆栈）
+            let moved: CanvasBlock | null = null;
+            let fromRowId: string | null = null;
+            let fromCol = -1;
+            let fromIdx = -1;
+            const detach = (blocks: CanvasBlock[], rowId: string | null, colIdx: number): CanvasBlock[] => {
+              const out: CanvasBlock[] = [];
+              blocks.forEach((b, i) => {
+                if (b.id === dragId && moved === null) {
+                  moved = b;
+                  fromRowId = rowId;
+                  fromCol = colIdx;
+                  fromIdx = i;
+                  return;
+                }
+                if (b.type === 'row') {
+                  out.push({
+                    ...b,
+                    config: { ...b.config, columns: b.config.columns.map((col, ci) => ({ blocks: detach(col.blocks, b.id, ci) })) },
+                  } as CanvasBlock);
+                  return;
+                }
+                out.push(b);
+              });
+              return out;
+            };
+            let blocks = detach(c.blocks, null, -1);
+            if (moved === null) return c;
+            const movedBlock = moved as CanvasBlock;
+            // 2) 同堆栈内移动：摘除后索引前移修正
+            let index = target.index;
+            if (fromRowId === target.rowId && fromCol === target.colIdx && fromIdx >= 0 && fromIdx < index) index -= 1;
+            // 3) 插入目标堆栈
+            if (target.rowId === null) {
+              const list = [...blocks];
+              list.splice(Math.max(0, Math.min(index, list.length)), 0, movedBlock);
+              blocks = list;
+            } else {
+              const insert = (bs: CanvasBlock[]): CanvasBlock[] =>
+                bs.map((b) => {
+                  if (b.id === target.rowId && b.type === 'row') {
+                    const cols = b.config.columns.map((col, ci) => {
+                      if (ci !== target.colIdx) return col;
+                      const list = [...col.blocks];
+                      list.splice(Math.max(0, Math.min(index, list.length)), 0, movedBlock);
+                      return { blocks: list };
+                    });
+                    return { ...b, config: { ...b.config, columns: cols } } as CanvasBlock;
+                  }
+                  if (b.type === 'row') {
+                    return { ...b, config: { ...b.config, columns: b.config.columns.map((col) => ({ blocks: insert(col.blocks) })) } } as CanvasBlock;
+                  }
+                  return b;
+                });
+              blocks = insert(blocks);
+            }
+            return { ...c, blocks };
+          }),
 
         selectBlock: (id) => set({ selectedId: id }),
 

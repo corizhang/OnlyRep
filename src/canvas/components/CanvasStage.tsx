@@ -53,13 +53,9 @@ export default function CanvasStage() {
   };
 
   const reorder = (dragId: string, targetId: string): void => {
-    const blocks = [...config.blocks];
-    const from = blocks.findIndex((b) => b.id === dragId);
-    const to = blocks.findIndex((b) => b.id === targetId);
-    if (from < 0 || to < 0) return;
-    const [moved] = blocks.splice(from, 1);
-    blocks.splice(to, 0, moved);
-    useCanvasStore.setState({ config: { ...config, blocks } });
+    const to = config.blocks.findIndex((b) => b.id === targetId);
+    if (to < 0) return;
+    useCanvasStore.getState().moveBlockTo(dragId, { rowId: null, colIdx: -1, index: to });
   };
 
   /** 复制容器子块并加入同一列 */
@@ -173,9 +169,16 @@ export default function CanvasStage() {
           }
         }}
         onDrop={(e) => {
-          const type = e.dataTransfer.getData('text/new-block');
           setDropHint(false);
           setDropIndex(null);
+          const dragId = e.dataTransfer.getData('text/canvas-block');
+          if (dragId) {
+            // 已有块移到顶层指定位置（容器列内的子块也可拖出）
+            e.preventDefault();
+            useCanvasStore.getState().moveBlockTo(dragId, { rowId: null, colIdx: -1, index: computeDropIndex(e.clientY) });
+            return;
+          }
+          const type = e.dataTransfer.getData('text/new-block');
           if (type) {
             e.preventDefault();
             insertBlockAt(createBlock(type as Parameters<typeof createBlock>[0]), computeDropIndex(e.clientY));
@@ -202,6 +205,13 @@ export default function CanvasStage() {
                       onDelete: removeBlock,
                       onDuplicate: duplicate,
                       onDropReorder: reorder,
+                      onDropToColumn: (rowId, colIdx, index, payload) => {
+                        if (payload.kind === 'new') {
+                          addBlockToRow(rowId, colIdx, createBlock(payload.type), index);
+                        } else {
+                          useCanvasStore.getState().moveBlockTo(payload.id, { rowId, colIdx, index });
+                        }
+                      },
                       onDuplicateChild: duplicateChild,
                     }
               }

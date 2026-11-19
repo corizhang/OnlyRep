@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { CanvasBlock, CanvasConfig } from '../types';
 import TextBlock from './textBlock';
@@ -24,6 +24,8 @@ export interface CanvasEditHandlers {
   onDropReorder: (dragId: string, targetId: string) => void;
   /** 复制行容器内的子块（加入同一行） */
   onDuplicateChild?: (rowId: string, childId: string) => void;
+  /** 拖放到容器指定列的指定位置（payload：已有块 id 或库组件类型） */
+  onDropToColumn?: (rowId: string, colIdx: number, index: number, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }) => void;
 }
 
 export interface CanvasRendererProps {
@@ -173,8 +175,16 @@ function BlockShell({
 
   if (!edit) return <div style={shell} data-shell="1"><div style={innerStyle}>{children}</div></div>;
 
+  // 子块（容器列内）：可拖出（放置由列容器/顶层接管）；顶层块：可拖且可作放置重排目标
   const dragProps = isChild
-    ? {}
+    ? {
+        draggable: true,
+        onDragStart: (e: React.DragEvent) => {
+          e.stopPropagation();
+          e.dataTransfer.setData('text/canvas-block', block.id);
+          e.dataTransfer.effectAllowed = 'move';
+        },
+      }
     : {
         draggable: true,
         onDragStart: (e: React.DragEvent) => {
@@ -352,33 +362,16 @@ export function renderBlock(block: CanvasBlock, ctx: RenderCtx, edit?: CanvasEdi
       return (
         <div style={{ display: 'flex', gap: ctx.gap, alignItems: block.config.align === 'top' ? 'flex-start' : 'stretch' }}>
           {cols.map((col, i) => (
-            <div
+            <ColumnStack
               key={i}
-              data-row-col={`${block.id}:${i}`}
-              style={{ flex: `${Math.max(1, widths[i] ?? 1)} 1 0%`, minWidth: 0, display: 'flex', flexDirection: 'column', gap: ctx.gap }}
-            >
-              {col.blocks.map((child) => (
-                <BlockShell key={child.id} block={child} edit={edit} ctx={ctx} parentRowId={block.id}>
-                  {renderBlock(child, ctx, edit)}
-                </BlockShell>
-              ))}
-              {edit && col.blocks.length === 0 && (
-                <div
-                  style={{
-                    border: `1.5px dashed ${ctx.accent}55`,
-                    borderRadius: 8,
-                    minHeight: 48,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: ctx.theme.secondaryColor,
-                    fontSize: ctx.baseFont * 0.8,
-                  }}
-                >
-                  空列：拖组件到这里
-                </div>
-              )}
-            </div>
+              rowId={block.id}
+              colIdx={i}
+              width={Math.max(1, widths[i] ?? 1)}
+              col={col}
+              edit={edit}
+              ctx={ctx}
+              gap={ctx.gap}
+            />
           ))}
         </div>
       );
@@ -390,4 +383,106 @@ export function renderBlock(block: CanvasBlock, ctx: RenderCtx, edit?: CanvasEdi
 
 function alignToFlex(align: 'left' | 'center' | 'right'): string {
   return align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+}
+
+
+/** 容器列堆栈：编辑模式下作为独立放置区（列内指示线 + 精确落点） */
+function ColumnStack({
+  rowId,
+  colIdx,
+  width,
+  col,
+  edit,
+  ctx,
+  gap,
+}: {
+  rowId: string;
+  colIdx: number;
+  width: number;
+  col: { blocks: CanvasBlock[] };
+  edit?: CanvasEditHandlers;
+  ctx: RenderCtx;
+  gap: number;
+}) {
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const computeIdx = (clientY: number): number => {
+    const el = ref.current;
+    if (!el) return col.blocks.length;
+    const shells = Array.from(el.querySelectorAll(':scope > [data-shell="1"]')) as HTMLElement[];
+    let idx = 0;
+    for (const sh of shells) {
+      const r = sh.getBoundingClientRect();
+      if (clientY > r.top + r.height / 2) idx += 1;
+    }
+    return idx;
+  };
+
+  const dndProps = edit
+    ? {
+        onDragOver: (e: React.DragEvent) => {
+          if (!e.dataTransfer.types.includes('text/new-block') && !e.dataTransfer.types.includes('text/canvas-block')) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setDropIdx(computeIdx(e.clientY));
+        },
+        onDragLeave: (e: React.DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropIdx(null);
+        },
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const idx = dropIdx ?? col.blocks.length;
+          setDropIdx(null);
+          const blockId = e.dataTransfer.getData('text/canvas-block');
+          if (blockId) {
+            edit.onDropToColumn?.(rowId, colIdx, idx, { kind: 'block', id: blockId });
+            return;
+          }
+          const t = e.dataTransfer.getData('text/new-block');
+          if (t) edit.onDropToColumn?.(rowId, colIdx, idx, { kind: 'new', type: t as CanvasBlock['type'] });
+        },
+      }
+    : {};
+
+  const children: ReactNode[] = [];
+  col.blocks.forEach((child, i) => {
+    if (edit && dropIdx === i) children.push(<DropLine key={`dl-${i}`} accent={ctx.accent} />);
+    children.push(
+      <BlockShell key={child.id} block={child} edit={edit} ctx={ctx} parentRowId={rowId}>
+        {renderBlock(child, ctx, edit)}
+      </BlockShell>,
+    );
+  });
+  if (edit && dropIdx !== null && dropIdx >= col.blocks.length) {
+    children.push(<DropLine key="dl-end" accent={ctx.accent} />);
+  }
+
+  return (
+    <div
+      ref={ref}
+      data-row-col={`${rowId}:${colIdx}`}
+      style={{ flex: `${width} 1 0%`, minWidth: 0, display: 'flex', flexDirection: 'column', gap }}
+      {...dndProps}
+    >
+      {children}
+      {edit && col.blocks.length === 0 && dropIdx === null && (
+        <div
+          style={{
+            border: `1.5px dashed ${ctx.accent}55`,
+            borderRadius: 8,
+            minHeight: 48,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: ctx.theme.secondaryColor,
+            fontSize: ctx.baseFont * 0.8,
+          }}
+        >
+          空列：拖组件到这里
+        </div>
+      )}
+    </div>
+  );
 }
