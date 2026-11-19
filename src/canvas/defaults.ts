@@ -159,7 +159,7 @@ export function createBlock(type: CanvasBlockType): CanvasBlock {
         config: {
           widths: [50, 50],
           align: 'stretch',
-          children: [createBlock('kpiCard'), createBlock('kpiCard')],
+          columns: [{ blocks: [createBlock('kpiCard')] }, { blocks: [createBlock('kpiCard')] }],
         },
       };
   }
@@ -320,8 +320,7 @@ export function createDailyReportPreset(): CanvasConfig {
       config: {
         widths: [34, 33, 33],
         align: 'stretch',
-        children: [
-          {
+        columns: [{ blocks: [{
             id: 'b_kpi1',
             type: 'kpiCard',
             config: {
@@ -335,8 +334,7 @@ export function createDailyReportPreset(): CanvasConfig {
               accent: '',
               cardBg: '',
             },
-          },
-          {
+          }] }, { blocks: [{
             id: 'b_kpi2',
             type: 'kpiCard',
             config: {
@@ -350,8 +348,7 @@ export function createDailyReportPreset(): CanvasConfig {
               accent: '',
               cardBg: '',
             },
-          },
-          {
+          }] }, { blocks: [{
             id: 'b_kpi3',
             type: 'kpiCard',
             config: {
@@ -365,8 +362,7 @@ export function createDailyReportPreset(): CanvasConfig {
               accent: '',
               cardBg: '',
             },
-          },
-        ],
+          }] }],
       },
     },
     {
@@ -409,8 +405,7 @@ export function createDailyReportPreset(): CanvasConfig {
       config: {
         widths: [50, 50],
         align: 'stretch',
-        children: [
-          {
+        columns: [{ blocks: [{
             id: 'b_tbl_wx',
             type: 'dataTable',
             config: {
@@ -433,8 +428,7 @@ export function createDailyReportPreset(): CanvasConfig {
               showIndex: false,
               cardBg: '',
             },
-          },
-          {
+          }] }, { blocks: [{
             id: 'b_tbl_mp',
             type: 'dataTable',
             config: {
@@ -457,8 +451,7 @@ export function createDailyReportPreset(): CanvasConfig {
               showIndex: false,
               cardBg: '',
             },
-          },
-        ],
+          }] }],
       },
     },
     {

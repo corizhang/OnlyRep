@@ -62,18 +62,17 @@ export default function CanvasStage() {
     useCanvasStore.setState({ config: { ...config, blocks } });
   };
 
-  /** 复制行容器子块并加入同一行（上限 3） */
+  /** 复制容器子块并加入同一列 */
   const duplicateChild = (rowId: string, childId: string): void => {
-    const row = config.blocks.find((b) => b.id === rowId);
+    const row = findInBlocks(config.blocks, rowId);
     if (!row || row.type !== 'row') return;
-    if (row.config.children.length >= 3) {
-      setToast('行容器最多并排 3 个区块');
-      setTimeout(() => setToast(''), 3000);
-      return;
+    for (let ci = 0; ci < row.config.columns.length; ci++) {
+      const child = row.config.columns[ci].blocks.find((c) => c.id === childId);
+      if (child) {
+        addBlockToRow(rowId, ci, cloneBlock(child));
+        return;
+      }
     }
-    const child = row.config.children.find((c) => c.id === childId);
-    if (!child) return;
-    addBlockToRow(rowId, cloneBlock(child));
   };
 
   /**
@@ -218,8 +217,10 @@ function findInBlocks(blocks: CanvasBlock[], id: string): CanvasBlock | null {
   for (const b of blocks) {
     if (b.id === id) return b;
     if (b.type === 'row') {
-      const hit = findInBlocks(b.config.children, id);
-      if (hit) return hit;
+      for (const col of b.config.columns) {
+        const hit = findInBlocks(col.blocks, id);
+        if (hit) return hit;
+      }
     }
   }
   return null;
@@ -232,12 +233,12 @@ function cloneBlock(b: CanvasBlock): CanvasBlock {
       ...b,
       id,
       type: 'row',
-      config: { ...b.config, children: b.config.children.map((c) => cloneBlock(c)) },
+      config: { ...b.config, columns: b.config.columns.map((col) => ({ blocks: col.blocks.map((c) => cloneBlock(c)) })) },
     };
   }
   return { ...b, id, config: { ...b.config } } as CanvasBlock;
 }
 
 function countBlocks(blocks: CanvasBlock[]): number {
-  return blocks.reduce((n, b) => n + 1 + (b.type === 'row' ? b.config.children.length : 0), 0);
+  return blocks.reduce((n, b) => n + 1 + (b.type === 'row' ? b.config.columns.reduce((m, col) => m + countBlocks(col.blocks), 0) : 0), 0);
 }

@@ -16,7 +16,7 @@ import { totalNumberOf } from '../blocks/tableTotal';
 function* walkBlocks(blocks: CanvasBlock[]): Generator<CanvasBlock> {
   for (const b of blocks) {
     yield b;
-    if (b.type === 'row') yield* walkBlocks(b.config.children);
+    if (b.type === 'row') { for (const col of b.config.columns) yield* walkBlocks(col.blocks); }
   }
 }
 

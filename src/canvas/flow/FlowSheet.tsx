@@ -3,7 +3,7 @@ import { Dropdown } from 'antd';
 import { DeleteOutlined, MoonOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, PoweroffOutlined, SunOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
-import type { NodeOutput, NodeType, PipelineNode } from '../types';
+import type { NodeOutput, NodeType, PipelineNode , CanvasBlock } from '../types';
 import { computeFlowLayout, edgeMid, edgePath, NODE_H, NODE_W, rectsIntersect, type FlowPos } from './layout';
 import FlowNodeCard from './FlowNodeCard';
 import { nodeThemeVars, type NodeTheme } from './nodeTheme';
@@ -1368,7 +1368,9 @@ function countBlockRefs(config: { blocks: unknown[] }, nodeId: string): number {
       if (table?.nodeRef === nodeId) n += 1;
       if (value?.nodeRef === nodeId) n += 1;
       if (ratio?.nodeRef === nodeId) n += 1;
-      if (Array.isArray(cfg.children)) walk(cfg.children);
+      if (Array.isArray((cfg as { columns?: { blocks: CanvasBlock[] }[] }).columns)) {
+        for (const col of (cfg as { columns: { blocks: CanvasBlock[] }[] }).columns) walk(col.blocks);
+      }
     }
   };
   walk(config.blocks);

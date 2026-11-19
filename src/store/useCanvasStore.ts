@@ -136,7 +136,14 @@ export interface CanvasStore {
   addBlock: (block: CanvasBlock, afterId?: string) => void;
   /** 插入到顶层指定索引（拖入画布时按指针位置落点） */
   insertBlockAt: (block: CanvasBlock, index: number) => void;
-  addBlockToRow: (rowId: string, block: CanvasBlock) => void;
+  /** 把块插入容器的指定列（atIndex 缺省追加列尾） */
+  addBlockToRow: (rowId: string, colIdx: number, block: CanvasBlock, atIndex?: number) => void;
+  /** 容器加列（上限 4，宽度等比重算） */
+  addRowColumn: (rowId: string) => void;
+  /** 容器删列（内容并入前一列；至少保留 1 列） */
+  removeRowColumn: (rowId: string, colIdx: number) => void;
+  /** 解散容器：所有列块平铺到容器原位 */
+  dissolveRow: (rowId: string) => void;
   updateBlock: (id: string, patch: Record<string, unknown>) => void;
   /** 更新区块外壳通用设置（边距/圆角，块根级字段，不进各 config） */
   updateBlockShell: (id: string, patch: { shellMargin?: [number, number, number, number]; radius?: number }) => void;
@@ -515,23 +522,101 @@ export const useCanvasStore = create<CanvasStore>()(
             return { ...c, blocks };
           }),
 
-        addBlockToRow: (rowId, block) =>
-          mutateConfig((c) => ({
-            ...c,
-            blocks: c.blocks.map((b) => {
-              if (b.id !== rowId || b.type !== 'row') return b;
-              if (b.config.children.length >= 3) return b;
-              const n = b.config.children.length + 1;
-              return {
-                ...b,
-                config: {
-                  ...b.config,
-                  children: [...b.config.children, block],
-                  widths: Array.from({ length: n }, () => Math.round(100 / n)),
-                },
-              };
-            }),
-          })),
+        addBlockToRow: (rowId, colIdx, block, atIndex) =>
+          mutateConfig((c) => {
+            const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
+              blocks.map((b) => {
+                if (b.id === rowId && b.type === 'row') {
+                  const cols = b.config.columns.map((col, i) => {
+                    if (i !== colIdx) return col;
+                    const list = [...col.blocks];
+                    const at = atIndex === undefined ? list.length : Math.max(0, Math.min(atIndex, list.length));
+                    list.splice(at, 0, block);
+                    return { blocks: list };
+                  });
+                  return { ...b, config: { ...b.config, columns: cols } } as CanvasBlock;
+                }
+                if (b.type === 'row') {
+                  return { ...b, config: { ...b.config, columns: b.config.columns.map((c2) => ({ blocks: applyTo(c2.blocks) })) } } as CanvasBlock;
+                }
+                return b;
+              });
+            return { ...c, blocks: applyTo(c.blocks) };
+          }),
+
+        // 容器加列（≤4）：宽度等比重算
+        addRowColumn: (rowId) =>
+          mutateConfig((c) => {
+            const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
+              blocks.map((b) => {
+                if (b.id === rowId && b.type === 'row') {
+                  if (b.config.columns.length >= 4) return b;
+                  const n = b.config.columns.length + 1;
+                  return {
+                    ...b,
+                    config: {
+                      ...b.config,
+                      columns: [...b.config.columns, { blocks: [] }],
+                      widths: Array.from({ length: n }, () => Math.round(100 / n)),
+                    },
+                  } as CanvasBlock;
+                }
+                if (b.type === 'row') {
+                  return { ...b, config: { ...b.config, columns: b.config.columns.map((c2) => ({ blocks: applyTo(c2.blocks) })) } } as CanvasBlock;
+                }
+                return b;
+              });
+            return { ...c, blocks: applyTo(c.blocks) };
+          }),
+
+        // 容器删列：内容并入前一列（首列则并入后一列）；至少保留 1 列
+        removeRowColumn: (rowId, colIdx) =>
+          mutateConfig((c) => {
+            const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
+              blocks.map((b) => {
+                if (b.id === rowId && b.type === 'row') {
+                  if (b.config.columns.length <= 1) return b;
+                  const cols = b.config.columns.map((col) => ({ blocks: [...col.blocks] }));
+                  const removed = cols.splice(colIdx, 1)[0];
+                  const target = Math.max(0, colIdx - 1);
+                  cols[target].blocks.push(...removed.blocks);
+                  return {
+                    ...b,
+                    config: {
+                      ...b.config,
+                      columns: cols,
+                      widths: Array.from({ length: cols.length }, () => Math.round(100 / cols.length)),
+                    },
+                  } as CanvasBlock;
+                }
+                if (b.type === 'row') {
+                  return { ...b, config: { ...b.config, columns: b.config.columns.map((c2) => ({ blocks: applyTo(c2.blocks) })) } } as CanvasBlock;
+                }
+                return b;
+              });
+            return { ...c, blocks: applyTo(c.blocks) };
+          }),
+
+        // 解散容器：所有列的块按列序平铺到容器原位
+        dissolveRow: (rowId) =>
+          mutateConfig((c) => {
+            const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] => {
+              const out: CanvasBlock[] = [];
+              for (const b of blocks) {
+                if (b.id === rowId && b.type === 'row') {
+                  for (const col of b.config.columns) out.push(...col.blocks);
+                  continue;
+                }
+                if (b.type === 'row') {
+                  out.push({ ...b, config: { ...b.config, columns: b.config.columns.map((c2) => ({ blocks: applyTo(c2.blocks) })) } } as CanvasBlock);
+                  continue;
+                }
+                out.push(b);
+              }
+              return out;
+            };
+            return { ...c, blocks: applyTo(c.blocks) };
+          }),
 
         updateBlock: (id, patch) => {
           const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
@@ -540,7 +625,7 @@ export const useCanvasStore = create<CanvasStore>()(
                 return { ...b, config: { ...(b.config as object), ...patch } } as unknown as CanvasBlock;
               }
               if (b.type === 'row') {
-                return { ...b, config: { ...b.config, children: applyTo(b.config.children) } } as CanvasBlock;
+                return { ...b, config: { ...b.config, columns: b.config.columns.map((c) => ({ blocks: applyTo(c.blocks) })) } } as CanvasBlock;
               }
               return b;
             });
@@ -552,7 +637,7 @@ export const useCanvasStore = create<CanvasStore>()(
             blocks.map((b) => {
               if (b.id === id) return { ...b, ...patch } as CanvasBlock;
               if (b.type === 'row') {
-                return { ...b, config: { ...b.config, children: applyTo(b.config.children) } } as CanvasBlock;
+                return { ...b, config: { ...b.config, columns: b.config.columns.map((c) => ({ blocks: applyTo(c.blocks) })) } } as CanvasBlock;
               }
               return b;
             });
@@ -561,7 +646,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
         replaceBlock: (id, block) => {
           const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
-            blocks.map((b) => (b.id === id ? block : b.type === 'row' ? { ...b, config: { ...b.config, children: applyTo(b.config.children) } } as CanvasBlock : b));
+            blocks.map((b) => (b.id === id ? block : b.type === 'row' ? { ...b, config: { ...b.config, columns: b.config.columns.map((c) => ({ blocks: applyTo(c.blocks) })) } } as CanvasBlock : b));
           mutateConfig((c) => ({ ...c, blocks: applyTo(c.blocks) }));
         },
 
@@ -569,7 +654,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
             blocks
               .filter((b) => b.id !== id)
-              .map((b) => (b.type === 'row' ? ({ ...b, config: { ...b.config, children: applyTo(b.config.children) } } as CanvasBlock) : b));
+              .map((b) => (b.type === 'row' ? ({ ...b, config: { ...b.config, columns: b.config.columns.map((c) => ({ blocks: applyTo(c.blocks) })) } } as CanvasBlock) : b));
           mutateConfig((c) => ({ ...c, blocks: applyTo(c.blocks) }));
           if (get().selectedId === id) set({ selectedId: null });
         },
@@ -877,7 +962,18 @@ export const useCanvasStore = create<CanvasStore>()(
             appStorage.setItem(`rankboard-canvas-backup-v${version}`, JSON.stringify(persisted));
           }
           const p = persisted as { config?: Partial<CanvasConfig> } | undefined;
-          return { config: { ...createDefaultCanvasConfig(), ...(p?.config ?? {}) } };
+          const config = { ...createDefaultCanvasConfig(), ...(p?.config ?? {}) };
+          // 容器结构迁移：旧版 row.children（每子块一列）→ columns（列=垂直堆栈）
+          config.blocks = (config.blocks ?? []).map((b) => {
+            if (b.type !== 'row') return b;
+            const cfg = b.config as unknown as { children?: CanvasBlock[]; columns?: { blocks: CanvasBlock[] }[]; widths: number[]; align: 'stretch' | 'top' };
+            if (!Array.isArray(cfg.columns)) {
+              const children = Array.isArray(cfg.children) ? cfg.children : [];
+              return { ...b, config: { widths: cfg.widths, align: cfg.align, columns: children.map((c2) => ({ blocks: [c2] })) } } as CanvasBlock;
+            }
+            return b;
+          });
+          return { config };
         } catch {
           return { config: createDefaultCanvasConfig() };
         }
@@ -931,8 +1027,10 @@ export function findBlock(blocks: CanvasBlock[], id: string): CanvasBlock | null
   for (const b of blocks) {
     if (b.id === id) return b;
     if (b.type === 'row') {
-      const hit = findBlock(b.config.children, id);
-      if (hit) return hit;
+      for (const col of b.config.columns) {
+        const hit = findBlock(col.blocks, id);
+        if (hit) return hit;
+      }
     }
   }
   return null;
@@ -943,7 +1041,9 @@ export function walkBlocks(blocks: CanvasBlock[], fn: (b: CanvasBlock, parent: C
   for (const b of blocks) {
     fn(b, null);
     if (b.type === 'row') {
-      for (const c of b.config.children) fn(c, b);
+      for (const col of b.config.columns) {
+        for (const c of col.blocks) fn(c, b);
+      }
     }
   }
 }

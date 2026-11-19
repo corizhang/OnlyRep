@@ -20,7 +20,7 @@ const GROUPS: { title: string; items: { type: CanvasBlockType; label: string; de
       { type: 'chart', label: '图表', desc: '条形/折线/环形/仪表', icon: '▤' },
       { type: 'rankList', label: '排行榜', desc: '名次/进度条/双列', icon: '☰' },
       { type: 'goalProgress', label: '目标完成率', desc: '大百分比+进度条', icon: '◎' },
-      { type: 'row', label: '行容器', desc: '一行并排 1~3 块', icon: '▭' },
+      { type: 'row', label: '容器', desc: '分栏布局（1~4 列，可嵌套）', icon: '▭' },
     ],
   },
 ];
@@ -91,8 +91,9 @@ export default function BlockLibrary() {
                   }}
                   onClick={() => {
                     const block = createBlock(it.type);
-                    if (selectedRow && it.type !== 'row' && selectedRow.config.children.length < 3) {
-                      addBlockToRow(selectedRow.id, block);
+                    if (selectedRow && it.type !== 'row') {
+                      // 选中容器时点击组件：加入其最后一列（拖入可精确到列与位置）
+                      addBlockToRow(selectedRow.id, selectedRow.config.columns.length - 1, block);
                     } else {
                       addBlock(block);
                     }
@@ -110,7 +111,7 @@ export default function BlockLibrary() {
           </div>
         ))}
         <p className="rounded-md bg-hover px-2 py-1.5 text-[11px] leading-relaxed text-ink-faint">
-          提示：选中行容器后点击组件，会直接放进该行；也可以把组件拖到画布上。
+          提示：容器可把画布分为多列，列内可再叠组件或嵌套容器。
         </p>
       </div>
     </aside>

@@ -1161,42 +1161,81 @@ function RowInspector({ block, onChange }: { block: Extract<CanvasBlock, { type:
   const selectBlock = useCanvasStore((s) => s.selectBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
   const addBlockToRow = useCanvasStore((s) => s.addBlockToRow);
+  const addRowColumn = useCanvasStore((s) => s.addRowColumn);
+  const removeRowColumn = useCanvasStore((s) => s.removeRowColumn);
+  const dissolveRow = useCanvasStore((s) => s.dissolveRow);
   const [newType, setNewType] = useState<CanvasBlock['type']>('kpiCard');
+  const [targetCol, setTargetCol] = useState(0);
+
+  const total = cfg.widths.reduce((a, b) => a + b, 0) || 1;
+  // 允许嵌套容器（行容器也可作为列内组件）
+  const childTypes = [...ROW_CHILD_TYPES, { value: 'row' as const, label: '容器（嵌套分栏）' }];
 
   return (
     <>
       <p className="text-[11.5px] text-ink-faint">
-        一行内并排 1~3 个区块；宽度按比例分配。点击画布中的子块可直接编辑与绑定数据。
+        分栏容器：1~4 列按比例分宽，每列可叠放多个组件、可再嵌容器。点列内组件名直接编辑。
       </p>
-      {cfg.children.map((c, i) => (
-        <div key={c.id} className="flex items-center gap-1 rounded border border-line px-1.5 py-1">
-          <span className="w-4 text-[11.5px] text-ink-faint">{i + 1}</span>
-          <button type="button" className="flex-1 truncate text-left text-[12px] text-ink-dim hover:text-brand" onClick={() => selectBlock(c.id)}>
-            {typeName(c.type)}
-          </button>
-          <input
-            type="number"
-            className="w-12 rounded border border-line-strong px-1 py-0.5 text-[11.5px]"
-            value={cfg.widths[i] ?? 0}
-            min={5}
-            onChange={(e) => onChange({ widths: cfg.widths.map((w, j) => (j === i ? Number(e.target.value) : w)) })}
-          />
-          <span className="text-[10.5px] text-ink-faint">
-            {Math.round(((cfg.widths[i] ?? 0) / cfg.widths.reduce((a, b) => a + b, 0)) * 100)}%
-          </span>
-          <button type="button" className="text-ink-faint hover:text-danger" onClick={() => removeBlock(c.id)}>
-            ×
-          </button>
+
+      {cfg.columns.map((col, i) => (
+        <div key={i} className="rounded-md border border-line bg-soft p-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11.5px] font-medium text-ink-dim">列 {i + 1}</span>
+            <span className="text-[10.5px] text-ink-faint">{col.blocks.length} 个组件</span>
+            <input
+              type="number"
+              className="ml-auto w-14 rounded border border-line-strong bg-panel px-1 py-0.5 text-[11.5px]"
+              value={cfg.widths[i] ?? 0}
+              min={5}
+              onChange={(e) => onChange({ widths: cfg.widths.map((w, j) => (j === i ? Math.max(5, Number(e.target.value) || 5) : w)) })}
+              title="宽度权重"
+            />
+            <span className="text-[10.5px] text-ink-faint">{Math.round(((cfg.widths[i] ?? 0) / total) * 100)}%</span>
+            {cfg.columns.length > 1 && (
+              <button type="button" title="删除此列（内容并入前一列）" className="text-ink-faint hover:text-danger" onClick={() => removeRowColumn(block.id, i)}>
+                ✕
+              </button>
+            )}
+          </div>
+          {col.blocks.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {col.blocks.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-1 rounded bg-panel px-1.5 py-0.5 text-[11px] text-ink-dim border border-line">
+                  <button type="button" className="hover:text-brand" onClick={() => selectBlock(c.id)}>
+                    {typeName(c.type)}
+                  </button>
+                  <button type="button" className="text-ink-faint hover:text-danger" onClick={() => removeBlock(c.id)}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       ))}
-      {cfg.children.length < 3 && (
-        <div className="flex items-center gap-1">
-          <Select value={newType} options={ROW_CHILD_TYPES} onChange={(v) => setNewType(v as CanvasBlock['type'])} />
-          <Btn size="xs" tone="primary" onClick={() => addBlockToRow(block.id, createBlock(newType))}>
-            + 加入
+
+      <div className="flex gap-1.5">
+        {cfg.columns.length < 4 && (
+          <Btn size="xs" onClick={() => addRowColumn(block.id)}>
+            + 加列
           </Btn>
-        </div>
-      )}
+        )}
+        <Btn size="xs" tone="danger" onClick={() => dissolveRow(block.id)} title="移除容器，所有组件平铺到原位">
+          解散容器
+        </Btn>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <Select value={newType} options={childTypes} onChange={(v) => setNewType(v as CanvasBlock['type'])} />
+        <Select
+          value={String(targetCol)}
+          options={cfg.columns.map((_, i) => ({ value: String(i), label: `列${i + 1}` }))}
+          onChange={(v) => setTargetCol(Number(v))}
+        />
+        <Btn size="xs" tone="primary" onClick={() => addBlockToRow(block.id, Math.min(targetCol, cfg.columns.length - 1), createBlock(newType))}>
+          + 加入
+        </Btn>
+      </div>
     </>
   );
 }

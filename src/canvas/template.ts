@@ -58,17 +58,30 @@ export function sanitizeCanvasBlock(raw: unknown, depth = 0): CanvasBlock | null
   const id = typeof raw.id === 'string' && raw.id !== '' ? raw.id : newBlockId();
 
   if (type === 'row') {
-    if (depth >= 1) return null; // v1：row 不允许嵌套
-    const children = Array.isArray(merged.children)
-      ? merged.children.map((c) => sanitizeCanvasBlock(c, depth + 1)).filter((c): c is CanvasBlock => c !== null).slice(0, 3)
-      : [];
+    if (depth >= 3) return null; // 嵌套深度护栏：容器最多 3 层
+    const sanitizeCol = (list: unknown): { blocks: CanvasBlock[] } => ({
+      blocks: (Array.isArray(list) ? list : [])
+        .map((c) => sanitizeCanvasBlock(c, depth + 1))
+        .filter((c): c is CanvasBlock => c !== null),
+    });
+    // 兼容旧版 children（每子块一列）
+    let columns: { blocks: CanvasBlock[] }[];
+    if (Array.isArray(merged.columns)) {
+      columns = (merged.columns as { blocks?: unknown }[]).map((c) => sanitizeCol(c?.blocks)).slice(0, 4);
+    } else {
+      columns = (Array.isArray(merged.children) ? (merged.children as unknown[]) : [])
+        .map((c) => sanitizeCanvasBlock(c, depth + 1))
+        .filter((c): c is CanvasBlock => c !== null)
+        .slice(0, 4)
+        .map((b) => ({ blocks: [b] }));
+    }
     const widths = Array.isArray(merged.widths) ? (merged.widths as unknown[]).map((w) => (Number.isFinite(Number(w)) ? Number(w) : 50)) : [];
     return {
       id,
       type: 'row',
       config: {
-        children,
-        widths: children.map((_, i) => widths[i] ?? Math.round(100 / Math.max(1, children.length))),
+        columns,
+        widths: columns.map((_, i) => widths[i] ?? Math.round(100 / Math.max(1, columns.length))),
         align: merged.align === 'top' ? 'top' : 'stretch',
       },
     };

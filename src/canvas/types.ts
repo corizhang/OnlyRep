@@ -319,10 +319,16 @@ export interface RankBlockConfig {
   accent: string;
 }
 
+/** 容器（原行容器）的一列：垂直堆栈；块可为容器 → 递归分栏 */
+export interface RowColumn {
+  blocks: CanvasBlock[];
+}
+
 export interface RowBlockConfig {
-  /** 与 children 等长，按比例分配宽度（1~3 个子块） */
+  /** 与 columns 等长，按比例分配宽度（1~4 列） */
   widths: number[];
-  children: CanvasBlock[];
+  /** 分栏容器的列（每列是垂直堆栈，可无限堆叠组件） */
+  columns: RowColumn[];
   align: 'stretch' | 'top';
 }
 

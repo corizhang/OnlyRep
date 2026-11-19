@@ -344,17 +344,40 @@ export function renderBlock(block: CanvasBlock, ctx: RenderCtx, edit?: CanvasEdi
     case 'rankList':
       return <RankBlock cfg={block.config} ctx={bctx} />;
     case 'row': {
+      const cols = block.config.columns;
       const widths =
-        block.config.widths.length === block.config.children.length
+        block.config.widths.length === cols.length
           ? block.config.widths
-          : block.config.children.map(() => 100 / Math.max(1, block.config.children.length));
+          : cols.map(() => Math.round(100 / Math.max(1, cols.length)));
       return (
         <div style={{ display: 'flex', gap: ctx.gap, alignItems: block.config.align === 'top' ? 'flex-start' : 'stretch' }}>
-          {block.config.children.map((child, i) => (
-            <div key={child.id} style={{ flex: `${Math.max(1, widths[i] ?? 1)} 1 0%`, minWidth: 0 }}>
-              <BlockShell block={child} edit={edit} ctx={ctx} parentRowId={block.id}>
-                {renderBlock(child, ctx)}
-              </BlockShell>
+          {cols.map((col, i) => (
+            <div
+              key={i}
+              data-row-col={`${block.id}:${i}`}
+              style={{ flex: `${Math.max(1, widths[i] ?? 1)} 1 0%`, minWidth: 0, display: 'flex', flexDirection: 'column', gap: ctx.gap }}
+            >
+              {col.blocks.map((child) => (
+                <BlockShell key={child.id} block={child} edit={edit} ctx={ctx} parentRowId={block.id}>
+                  {renderBlock(child, ctx, edit)}
+                </BlockShell>
+              ))}
+              {edit && col.blocks.length === 0 && (
+                <div
+                  style={{
+                    border: `1.5px dashed ${ctx.accent}55`,
+                    borderRadius: 8,
+                    minHeight: 48,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: ctx.theme.secondaryColor,
+                    fontSize: ctx.baseFont * 0.8,
+                  }}
+                >
+                  空列：拖组件到这里
+                </div>
+              )}
             </div>
           ))}
         </div>
