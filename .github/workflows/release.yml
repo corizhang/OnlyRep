@@ -1,0 +1,92 @@
+name: release
+
+# 打标签即发版：git tag vX.Y.Z && git push origin vX.Y.Z
+# 流程：质量门（tsc+单测）→ Windows 构建 Tauri → 自动创建 GitHub Release 并上传全部产物
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    name: 质量门（tsc + 单测）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+
+  build-release:
+    name: 构建并发布 Release
+    needs: gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust 依赖缓存
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+
+      - name: 校验 tag 与 package.json 版本一致
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG 与 package.json 版本 $PKG 不一致"
+            exit 1
+          fi
+
+      - name: 读取发布说明（RELEASE-NOTES-<tag>.md）
+        id: notes
+        shell: bash
+        run: |
+          F="RELEASE-NOTES-${GITHUB_REF_NAME}.md"
+          if [ -f "$F" ]; then
+            { echo 'body<<EOF'; cat "$F"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+          else
+            echo 'body=详见提交记录' >> "$GITHUB_OUTPUT"
+          fi
+
+      # tauri-action：执行 npm run tauri:build（自动先跑 beforeBuildCommand=vite build），
+      # 创建 Release 并自动上传 NSIS/MSI 安装包
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'RankBoard ${{ github.ref_name }}'
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+          args: --bundles nsis,msi
+
+      # tauri-action 只挂 bundle 产物；免安装 exe 与单文件网页版手动补传
+      - name: 准备补充资产
+        shell: bash
+        run: |
+          cp src-tauri/target/release/rankboard.exe rankboard-standalone.exe
+          cp dist/index.html RankBoard-web-standalone.html
+
+      - name: 上传免安装 exe 与单文件网页版
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            rankboard-standalone.exe
+            RankBoard-web-standalone.html
