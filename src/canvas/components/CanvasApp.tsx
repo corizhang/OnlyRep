@@ -21,7 +21,7 @@ import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
 
 /** 日报画布主界面（v2 双视图）：顶部 Tab 切「日报画布 / 数据节点」，左栏与右栏随视图联动，变量面板共用 */
-export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }) {
+export default function CanvasApp() {
   const config = useCanvasStore((s) => s.config);
   const selectedId = useCanvasStore((s) => s.selectedId);
   const errors = useCanvasStore((s) => s.errors);
@@ -184,16 +184,9 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-ink-faint">管道 {lastRunMs}ms</span>
-          <span className="rounded-full bg-ok-soft px-2.5 py-1 text-[11px] text-ok">
-            数据仅在本地处理，不会上传服务器
-          </span>
           <span className="text-[10.5px] text-ink-faint" title={`构建时间：${__BUILD_TIME__}`}>
             v{__APP_VERSION__} · {__BUILD_TIME__}
           </span>
-          <button type="button" onClick={onOpenLegacy} className="text-[11px] text-ink-faint underline hover:text-ink-dim">
-            打开旧版排行榜编辑器
-          </button>
         </div>
       </header>
 

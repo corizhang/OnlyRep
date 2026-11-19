@@ -66,7 +66,7 @@ export default function App() {
     >
       <ErrorBoundary>
         {mode === 'canvas' ? (
-          <CanvasApp onOpenLegacy={() => setMode('rank')} />
+          <CanvasApp />
         ) : (
           <div className="relative">
             <button

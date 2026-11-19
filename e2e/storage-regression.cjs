@@ -78,16 +78,16 @@ function watchErrors(page, bucket) {
       /* 无欢迎页则跳过 */
     }
 
-    // 模式切换会写入 appStorage；内存降级下也必须正常工作
+    // 主题切换会写入 appStorage（rankboard-ui-theme）；内存降级下也必须正常工作
     let modeOk = false;
     try {
-      await page.getByText('打开旧版排行榜编辑器').first().click({ timeout: 5000 });
-      await page.waitForTimeout(600);
-      modeOk = await page.getByText('返回日报画布').first().isVisible();
+      await page.locator('header button:has(.anticon-moon)').first().click({ timeout: 5000 });
+      await page.waitForTimeout(400);
+      modeOk = (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark';
     } catch {
       modeOk = false;
     }
-    record('降级后模式切换仍可用（写入内存生效）', modeOk);
+    record('降级后主题切换仍可用（写入内存生效）', modeOk);
     record('localStorage 不可用场景下无页面异常', errors.length === 0, errors.join('; ').slice(0, 200));
     await page.close();
   }
