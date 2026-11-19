@@ -34,7 +34,7 @@ import {
 import { DisconnectOutlined, LinkOutlined } from '@ant-design/icons';
 import BindingPicker from './BindingPicker';
 import { compressImageFile } from '../../utils/imageCompress';
-import { Btn, Check, ColorInput, Field, NumberInput, Section, Select, SliderBar, Textarea, TextInput } from './ui';
+import { Btn, Check, ColorInput, Field, IconSegment, NumberInput, Section, Select, SliderBar, Textarea, TextInput } from './ui';
 
 /** 选中区块的属性面板：所有数值槽位均可绑定（PRD R3-01） */
 export default function BlockInspector({ block }: { block: CanvasBlock }) {
@@ -316,12 +316,12 @@ function TextInspector({ cfg, onChange }: { cfg: TextBlockConfig; onChange: (p: 
           <NumberInput value={cfg.fontSizeScale} min={0.5} max={3} step={0.05} onChange={(v) => onChange({ fontSizeScale: v })} />
         </Field>
         <Field label="对齐">
-          <Select
+          <IconSegment
             value={cfg.align}
             options={[
-              { value: 'left', label: '左' },
-              { value: 'center', label: '中' },
-              { value: 'right', label: '右' },
+              { value: 'left', icon: <AlignLeftOutlined />, title: '左对齐' },
+              { value: 'center', icon: <AlignCenterOutlined />, title: '居中' },
+              { value: 'right', icon: <AlignRightOutlined />, title: '右对齐' },
             ]}
             onChange={(v) => onChange({ align: v as TextBlockConfig['align'] })}
           />
@@ -370,16 +370,16 @@ function ImageInspector({ block, onChange }: { block: Extract<CanvasBlock, { typ
         )}
         {compressNote && <span className="self-center text-[10.5px] text-ok">{compressNote}</span>}
       </div>
-      <Field label="宽度 %">
-        <NumberInput value={cfg.widthPct} min={10} max={100} onChange={(v) => onChange({ widthPct: v })} />
+      <Field label="宽度">
+        <NumberInput value={cfg.widthPct} min={10} max={100} prefix="%" onChange={(v) => onChange({ widthPct: v })} />
       </Field>
       <Field label="对齐">
-        <Select
+        <IconSegment
           value={cfg.align}
           options={[
-            { value: 'left', label: '左' },
-            { value: 'center', label: '中' },
-            { value: 'right', label: '右' },
+            { value: 'left', icon: <AlignLeftOutlined />, title: '左对齐' },
+            { value: 'center', icon: <AlignCenterOutlined />, title: '居中' },
+            { value: 'right', icon: <AlignRightOutlined />, title: '右对齐' },
           ]}
           onChange={(v) => onChange({ align: v })}
         />
@@ -707,8 +707,8 @@ function ChartInspector({
         </Field>
         </>
         )}
-        <Field label="高度 px">
-          <NumberInput value={cfg.height} min={80} max={800} onChange={(v) => onChange({ height: v })} />
+        <Field label="高度">
+          <NumberInput value={cfg.height} min={80} max={800} prefix="px" onChange={(v) => onChange({ height: v })} />
         </Field>
       </div>
 
