@@ -70,6 +70,14 @@ function watchErrors(page, bucket) {
     });
     record('localStorage 抛 SecurityError 不白屏', rendered);
 
+    // 降级存储下 onboarded 标记读不到 → 首屏欢迎页会出现，真实用户也是先关掉它再操作
+    try {
+      const blankBtn = page.getByText('从空白开始');
+      if (await blankBtn.isVisible({ timeout: 1000 })) await blankBtn.click();
+    } catch {
+      /* 无欢迎页则跳过 */
+    }
+
     // 模式切换会写入 appStorage；内存降级下也必须正常工作
     let modeOk = false;
     try {
