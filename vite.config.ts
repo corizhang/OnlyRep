@@ -22,6 +22,10 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_TIME__: JSON.stringify(buildTime),
   },
+  esbuild: {
+    // 剥离 /*! ... */ 法律注释（如 Tailwind banner 的官网链接会被"产物无外链"静态扫描误判）
+    legalComments: 'none',
+  },
   build: {
     target: 'es2020',
     outDir: 'dist',
