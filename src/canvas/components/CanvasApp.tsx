@@ -266,9 +266,8 @@ export default function CanvasApp({ onOpenLegacy }: { onOpenLegacy: () => void }
           {isCanvas ? (
             <>
               {selected ? (
-                <div className="rounded-lg border border-line bg-panel p-3 shadow-sm">
-                  <BlockInspector block={selected} />
-                </div>
+                // Figma 式平面面板：不再套卡片，分区靠留白与细分隔线（ui.Section 已扁平化）
+                <BlockInspector block={selected} />
               ) : (
                 <CanvasSettings />
               )}
