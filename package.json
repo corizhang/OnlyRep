@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "verify": "tsc --noEmit && vitest run && vite build"
+    "verify": "tsc --noEmit && vitest run && vite build",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
