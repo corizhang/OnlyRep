@@ -19,6 +19,7 @@ import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
 import TemplateLibraryModal from './TemplateLibraryModal';
 import SettingsModal from './SettingsModal';
 import ProjectLibraryModal from './ProjectLibraryModal';
+import SourceGuideModal from './SourceGuideModal';
 import { findPath } from '../blocks/rowTree';
 import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
@@ -316,6 +317,7 @@ export default function CanvasApp() {
       <TemplateLibraryModal open={showTplLib} onClose={() => setShowTplLib(false)} />
       <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
       <ProjectLibraryModal open={showPrjLib} onClose={() => setShowPrjLib(false)} />
+      <SourceGuideModal />
 
       {/* 首屏欢迎页（仅首次使用出现一次） */}
       <WelcomeModal />

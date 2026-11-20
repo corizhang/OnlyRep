@@ -12,6 +12,7 @@ const fresh = () => {
     templates: [],
     activeTemplateId: null,
     sources: {},
+    sourceGuideOpen: false,
   });
 };
 
@@ -65,5 +66,34 @@ describe('项目库', () => {
     st().deleteProject(id);
     expect(useCanvasStore.getState().projects).toHaveLength(0);
     expect(useCanvasStore.getState().activeProjectId).toBeNull();
+  });
+});
+
+describe('模板→项目 数据源引导', () => {
+  beforeEach(fresh);
+
+  it('载入含空 import 源的模板 → 打开填充引导', async () => {
+    const st = () => useCanvasStore.getState();
+    // 造含 import 源的模板（无快照缓存）
+    const cfg = createDefaultCanvasConfig();
+    cfg.dataSources.push({ id: 'ds_imp', name: '活动明细表', kind: 'import', fileName: 'a.xlsx', sheetName: '' });
+    st().saveTemplate('含数据源的模板');
+    // 改工作区再载入模板
+    st().patchConfig({ title: '别的' });
+    const tplId = useCanvasStore.getState().templates[0].id;
+    st().templates.find((t) => t.id === tplId)!; // ensure
+    useCanvasStore.setState((s) => ({ templates: s.templates.map((t) => (t.id === tplId ? { ...t, config: cfg } : t)) }));
+    expect(st().loadTemplateById(tplId)).toBe(true);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(useCanvasStore.getState().sourceGuideOpen).toBe(true);
+  });
+
+  it('模板无 import 源 → 不弹引导', async () => {
+    const st = () => useCanvasStore.getState();
+    st().saveTemplate('纯壳模板');
+    const tplId = useCanvasStore.getState().templates[0].id;
+    expect(st().loadTemplateById(tplId)).toBe(true);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(useCanvasStore.getState().sourceGuideOpen).toBe(false);
   });
 });

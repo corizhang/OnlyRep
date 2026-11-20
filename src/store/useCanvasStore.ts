@@ -120,6 +120,10 @@ export interface CanvasStore {
   templates: SavedTemplate[];
   activeTemplateId: string | null;
   /** 保存当前工作区：有当前模板则覆盖，否则以 name 新建（空则自动命名）；返回模板 id */
+  /** 模板新建项目后的数据源填充引导（有待填的 import 源时弹） */
+  sourceGuideOpen: boolean;
+  setSourceGuideOpen: (v: boolean) => void;
+
   // ---- 项目库（壳+数据；数据快照按源 id 存 IndexedDB，切换自动恢复） ----
   projects: SavedProject[];
   activeProjectId: string | null;
@@ -331,6 +335,8 @@ export const useCanvasStore = create<CanvasStore>()(
         templates: [],
         projects: [],
         activeProjectId: null,
+        sourceGuideOpen: false,
+        setSourceGuideOpen: (v) => set({ sourceGuideOpen: v }),
         activeTemplateId: null,
         sources: {},
         outputs: {},
@@ -590,6 +596,18 @@ export const useCanvasStore = create<CanvasStore>()(
           get().loadTemplate(t.config);
           set({ activeTemplateId: id });
           saveTemplateLibrary({ activeId: id, items: get().templates });
+          // 模板→新项目：有待填的 import 源且无快照时弹数据源填充引导
+          void (async () => {
+            const pending = get().config.dataSources.filter((d) => d.kind === 'import');
+            if (pending.length === 0) return;
+            for (const d of pending) {
+              const snap = await loadSourceSnapshot(d.id);
+              if (!snap) {
+                set({ sourceGuideOpen: true });
+                return;
+              }
+            }
+          })();
           return true;
         },
 
