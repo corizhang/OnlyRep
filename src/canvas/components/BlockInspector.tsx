@@ -203,7 +203,7 @@ function typeName(t: CanvasBlock['type']): string {
     chart: '图表',
     dataTable: '数据表格',
     rankList: '排行榜',
-    row: '行容器',
+    row: '容器',
   }[t];
 }
 
@@ -1192,61 +1192,58 @@ const ROW_CHILD_TYPES: { value: CanvasBlock['type']; label: string }[] = [
 function RowInspector({ block, onChange }: { block: Extract<CanvasBlock, { type: 'row' }>; onChange: (p: Partial<RowBlockConfig>) => void }) {
   // 防御：老数据可能是 children 结构（渲染前归一化，幂等）
   const cfg = normalizeRowConfig(block.config);
-  const selectBlock = useCanvasStore((s) => s.selectBlock);
-  const removeBlock = useCanvasStore((s) => s.removeBlock);
-  const addBlockToRow = useCanvasStore((s) => s.addBlockToRow);
   const addRowColumn = useCanvasStore((s) => s.addRowColumn);
-  const removeRowColumn = useCanvasStore((s) => s.removeRowColumn);
   const dissolveRow = useCanvasStore((s) => s.dissolveRow);
-  const [newType, setNewType] = useState<CanvasBlock['type']>('kpiCard');
-  const [targetCol, setTargetCol] = useState(0);
 
   const total = cfg.widths.reduce((a, b) => a + b, 0) || 1;
-  // 允许嵌套容器（行容器也可作为列内组件）
-  const childTypes = [...ROW_CHILD_TYPES, { value: 'row' as const, label: '容器（嵌套分栏）' }];
+  const pcts = cfg.columns.map((_, i) => Math.round(((cfg.widths[i] ?? 0) / total) * 100));
+
+  const PRESETS: { label: string; widths: number[] }[] = [
+    { label: '50/50', widths: [50, 50] },
+    { label: '60/40', widths: [60, 40] },
+    { label: '40/60', widths: [40, 60] },
+    { label: '均分', widths: cfg.columns.map(() => 1) },
+  ];
 
   return (
     <>
-      <p className="text-[11.5px] text-ink-faint">
-        分栏容器：1~4 列按比例分宽，每列可叠放多个组件、可再嵌容器。点列内组件名直接编辑。
-      </p>
-
-      {cfg.columns.map((col, i) => (
-        <div key={i} className="rounded-md border border-line bg-soft p-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11.5px] font-medium text-ink-dim">列 {i + 1}</span>
-            <span className="text-[10.5px] text-ink-faint">{col.blocks.length} 个组件</span>
-            <input
-              type="number"
-              className="ml-auto w-14 rounded border border-line-strong bg-panel px-1 py-0.5 text-[11.5px]"
-              value={cfg.widths[i] ?? 0}
-              min={5}
-              onChange={(e) => onChange({ widths: cfg.widths.map((w, j) => (j === i ? Math.max(5, Number(e.target.value) || 5) : w)) })}
-              title="宽度权重"
-            />
-            <span className="text-[10.5px] text-ink-faint">{Math.round(((cfg.widths[i] ?? 0) / total) * 100)}%</span>
-            {cfg.columns.length > 1 && (
-              <button type="button" title="删除此列（内容并入前一列）" className="text-ink-faint hover:text-danger" onClick={() => removeRowColumn(block.id, i)}>
-                ✕
-              </button>
-            )}
+      {/* 可视化比例条：分段即列，宽度即比例 */}
+      <div className="flex h-6 w-full gap-0.5 overflow-hidden rounded-md">
+        {cfg.columns.map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-center bg-brand-soft text-[10.5px] font-medium text-brand"
+            style={{ width: `${Math.max(6, pcts[i])}%` }}
+            title={`列${i + 1}：${pcts[i]}%`}
+          >
+            {pcts[i] >= 14 ? `${pcts[i]}%` : ''}
           </div>
-          {col.blocks.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {col.blocks.map((c) => (
-                <span key={c.id} className="inline-flex items-center gap-1 rounded bg-panel px-1.5 py-0.5 text-[11px] text-ink-dim border border-line">
-                  <button type="button" className="hover:text-brand" onClick={() => selectBlock(c.id)}>
-                    {typeName(c.type)}
-                  </button>
-                  <button type="button" className="text-ink-faint hover:text-danger" onClick={() => removeBlock(c.id)}>
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
+
+      {/* 常用比例预设（数量匹配当前列数才可用） */}
+      <div className="flex flex-wrap gap-1">
+        {PRESETS.filter((pr) => pr.widths.length === cfg.columns.length || pr.label === '均分').map((pr) => {
+          const w = pr.label === '均分' ? cfg.columns.map(() => Math.round(100 / cfg.columns.length)) : pr.widths;
+          const active = JSON.stringify(cfg.widths) === JSON.stringify(w);
+          return (
+            <button
+              key={pr.label}
+              type="button"
+              onClick={() => onChange({ widths: w })}
+              className={`rounded-md border px-2 py-1 text-[11px] ${active ? 'border-brand bg-brand-soft text-brand' : 'border-line text-ink-dim hover:border-line-strong'}`}
+            >
+              {pr.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 结构树：嵌套层级缩进，点击选中任意层级 */}
+      <div className="rounded-md border border-line bg-soft p-1.5">
+        <div className="mb-1 text-[11px] font-medium text-ink-faint">结构</div>
+        <StructureTree blocks={[block]} depth={0} />
+      </div>
 
       <div className="flex gap-1.5">
         {cfg.columns.length < 4 && (
@@ -1258,22 +1255,38 @@ function RowInspector({ block, onChange }: { block: Extract<CanvasBlock, { type:
           解散容器
         </Btn>
       </div>
-
-      <div className="flex items-center gap-1">
-        <Select value={newType} options={childTypes} onChange={(v) => setNewType(v as CanvasBlock['type'])} />
-        <Select
-          value={String(targetCol)}
-          options={cfg.columns.map((_, i) => ({ value: String(i), label: `列${i + 1}` }))}
-          onChange={(v) => setTargetCol(Number(v))}
-        />
-        <Btn size="xs" tone="primary" onClick={() => addBlockToRow(block.id, Math.min(targetCol, cfg.columns.length - 1), createBlock(newType))}>
-          + 加入
-        </Btn>
-      </div>
     </>
   );
 }
 
+/** 结构树节点：块名 + 容器递归展开列 */
+function StructureTree({ blocks, depth }: { blocks: CanvasBlock[]; depth: number }) {
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const selectBlock = useCanvasStore((s) => s.selectBlock);
+  return (
+    <div className={depth > 0 ? 'ml-3 border-l border-line pl-2' : ''}>
+      {blocks.map((b) => (
+        <div key={b.id}>
+          <button
+            type="button"
+            onClick={() => selectBlock(b.id)}
+            className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11.5px] ${
+              selectedId === b.id ? 'bg-brand-soft font-medium text-brand' : 'text-ink-dim hover:bg-hover'
+            }`}
+          >
+            {b.type === 'row' ? `▭ 容器（${b.config.columns.length} 列）` : typeName(b.type)}
+          </button>
+          {b.type === 'row' && b.config.columns.map((col, ci) => (
+            <div key={ci} className="ml-3 border-l border-dashed border-line pl-2">
+              <div className="text-[10px] text-ink-faint">列{ci + 1}</div>
+              <StructureTree blocks={col.blocks} depth={depth + 1} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 // ---------- 通用设置（外壳边距 / 圆角） ----------
 const RADIUS_PRESETS: { v: number; label: string }[] = [
   { v: 0, label: '直角' },
