@@ -17,7 +17,7 @@ import type {
 } from '../types';
 import { createBlock, defaultNumberFormat } from '../defaults';
 import { resolveTable } from '../binding/resolve';
-import { normalizeRowConfig } from '../blocks/rowTree';
+import { findPath, normalizeRowConfig } from '../blocks/rowTree';
 import { useFormulaVariables } from '../formula/FormulaInput';
 import { groupVariables } from '../formula/variableEnv';
 import { matchQuery } from '../formula/pinyin';
@@ -58,8 +58,40 @@ export default function BlockInspector({ block }: { block: CanvasBlock }) {
   })();
   const colOptions = (currentTable?.columns ?? []).map((c) => ({ value: c.key, label: c.rawName || c.key }));
 
+  // 父链路径（嵌套导航：点任意一级跳转选中）
+  const path = findPath(config.blocks, block.id);
+  const selectBlock = useCanvasStore.getState().selectBlock;
+
   return (
     <div className="space-y-3">
+      {path.length > 1 && (
+        <nav className="flex flex-wrap items-center gap-1 rounded-md bg-soft px-2 py-1.5 text-[11.5px]">
+          {path.map((node, i) => {
+            const colIdx = (node as CanvasBlock & { __colIdx?: number }).__colIdx;
+            const label = typeName(node.type);
+            const last = i === path.length - 1;
+            // 列号独立成段（跟随父容器之后）：容器 › 列2 › 容器 › 列1 › 文本
+            return (
+              <span key={node.id + String(i)} className="flex items-center gap-1">
+                {i > 0 && <span className="text-ink-faint">›</span>}
+                {last ? (
+                  <span className="font-medium text-ink">{label}</span>
+                ) : (
+                  <button type="button" className="text-ink-dim hover:text-brand hover:underline" onClick={() => selectBlock(node.id)}>
+                    {label}
+                  </button>
+                )}
+                {!last && colIdx !== undefined && (
+                  <>
+                    <span className="text-ink-faint">›</span>
+                    <span className="text-ink-faint">列{colIdx + 1}</span>
+                  </>
+                )}
+              </span>
+            );
+          })}
+        </nav>
+      )}
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold text-ink">{typeName(block.type)}</span>
         <div className="ml-auto flex gap-1">

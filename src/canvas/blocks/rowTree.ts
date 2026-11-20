@@ -55,6 +55,24 @@ export function findBlock(blocks: CanvasBlock[], id: string): CanvasBlock | null
   return null;
 }
 
+/** 从根到目标块的路径（含自身；找不到返回空数组）——面包屑/父链导航用 */
+export function findPath(blocks: CanvasBlock[], id: string): CanvasBlock[] {
+  for (const b of blocks) {
+    if (b.id === id) return [b];
+    if (b.type === 'row') {
+      for (let c = 0; c < b.config.columns.length; c++) {
+        const inner = findPath(b.config.columns[c].blocks, id);
+        if (inner.length > 0) {
+          // 路径上标注列位（面包屑显示「容器·列2」用）
+          const row = { ...b, __colIdx: c } as CanvasBlock & { __colIdx?: number };
+          return [row, ...inner];
+        }
+      }
+    }
+  }
+  return [];
+}
+
 /** 定位块的父堆栈（顶层则 parent 为 null，stack 为根数组语义） */
 export function locateBlock(
   blocks: CanvasBlock[],

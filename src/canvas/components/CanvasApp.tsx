@@ -17,6 +17,7 @@ import CanvasStage from './CanvasStage';
 import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
 import TemplateLibraryModal from './TemplateLibraryModal';
 import SettingsModal from './SettingsModal';
+import { findPath } from '../blocks/rowTree';
 import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
 
@@ -105,6 +106,22 @@ export default function CanvasApp() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [undo, redo]);
+
+  // Esc 逐级上钻：选中嵌套块→选父容器，顶层块→取消选中（Figma 惯例）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const st = useCanvasStore.getState();
+      if (!st.selectedId) return;
+      const path = findPath(st.config.blocks, st.selectedId);
+      // 路径长度 ≥2 说明在容器内：上钻一级；否则取消选中
+      st.selectBlock(path.length >= 2 ? path[path.length - 2].id : null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const selected = selectedId ? findBlock(config.blocks, selectedId) : null;
   const isCanvas = viewMode === 'canvas';

@@ -499,6 +499,12 @@ function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type
     const onUp = (ev: MouseEvent): void => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      // 位移 <3px 视为点击：选中容器本身（嵌套层级下容器难选中问题的画布侧入口）
+      if (Math.abs(ev.clientX - startX) < 3) {
+        setPreview(null);
+        edit.onSelect(block.id);
+        return;
+      }
       const deltaW = ((ev.clientX - startX) / rootW) * start.reduce((a, b) => a + b, 0);
       const next = [...start];
       next[handleIdx] = Math.max(5, Math.min(pairSum - 5, Math.round(start[handleIdx] + deltaW)));
