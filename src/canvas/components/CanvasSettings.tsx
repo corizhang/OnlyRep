@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { useCanvasStore } from '../../store/useCanvasStore';
-import { CANVAS_PRESETS } from '../defaults';
-import { downloadCanvasTemplate, downloadJsonFile, makeAllDataBackup, validateAllDataBackup, validateCanvasTemplate } from '../template';
+import { downloadJsonFile, makeAllDataBackup, validateAllDataBackup } from '../template';
 import { loadTemplateLibrary, saveTemplateLibrary, type TemplateLibraryData } from '../templateLibrary';
 import { appStorage } from '../../storage/safeStorage';
 import { isTauri, tauriPersistStorage } from '../../storage/tauriKv';
@@ -15,10 +14,7 @@ const CANVAS_PERSIST_KEY = 'rankboard-canvas-v3';
 export default function CanvasSettings() {
   const config = useCanvasStore((s) => s.config);
   const patch = useCanvasStore((s) => s.patchConfig);
-  const applyPreset = useCanvasStore((s) => s.applyPreset);
-  const loadTemplate = useCanvasStore((s) => s.loadTemplate);
   const [msg, setMsg] = useState('');
-  const fileRef = useRef<HTMLInputElement>(null);
   const allRef = useRef<HTMLInputElement>(null);
 
   /** 导出全量数据（工作区 + 模板库）：跨环境搬家（浏览器 ↔ 桌面 exe） */
@@ -49,48 +45,6 @@ export default function CanvasSettings() {
 
   return (
     <div className="space-y-3">
-      <Section title="模板">
-        <Field label="从模板开始">
-          <Select
-            value=""
-            placeholder="选择内置模板…"
-            options={CANVAS_PRESETS.map((p) => ({ value: p.id, label: p.name }))}
-            onChange={(v) => {
-              if (v) applyPreset(v);
-            }}
-          />
-        </Field>
-        <div className="flex flex-wrap gap-1">
-          <Btn size="xs" onClick={() => downloadCanvasTemplate(config)}>
-            导出模板 JSON
-          </Btn>
-          <Btn size="xs" onClick={() => fileRef.current?.click()}>
-            导入模板
-          </Btn>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try {
-                const json = JSON.parse(await f.text());
-                loadTemplate(validateCanvasTemplate(json));
-                setMsg('模板已载入，请重新导入数据文件');
-              } catch (err) {
-                setMsg(err instanceof Error ? err.message : '模板解析失败');
-              }
-              e.target.value = '';
-            }}
-          />
-        </div>
-        {msg && <p className="text-[11.5px] text-warn">{msg}</p>}
-        <p className="text-[11.5px] text-ink-faint">
-          模板含数据源定义、处理步骤、绑定与手填数据；导入源的文件不会保存。
-        </p>
-      </Section>
 
       <Section title="数据迁移">
         <div className="flex flex-wrap gap-1">

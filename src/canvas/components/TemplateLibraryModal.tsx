@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Modal, Popconfirm, Tooltip } from 'antd';
-import { CheckCircleFilled, CopyOutlined, DeleteOutlined, EditOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { CheckCircleFilled, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { templateSummary } from '../templateLibrary';
+import { downloadCanvasTemplate } from '../template';
 
 /**
  * 模板库面板（头部「模板库」按钮打开）：
@@ -136,6 +137,15 @@ export default function TemplateLibraryModal({ open, onClose }: { open: boolean;
                     >
                       {isActive ? (dirty ? '还原' : '当前') : '载入'}
                     </button>
+                    <Tooltip title="导出模板 JSON（可分享给同事）">
+                      <button
+                        type="button"
+                        className="rounded p-1 text-ink-faint hover:bg-hover hover:text-ink-dim"
+                        onClick={() => downloadCanvasTemplate(t.config)}
+                      >
+                        <DownloadOutlined style={{ fontSize: 12 }} />
+                      </button>
+                    </Tooltip>
                     <Tooltip title="重命名">
                       <button
                         type="button"
