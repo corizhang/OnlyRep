@@ -216,6 +216,7 @@ export default function CanvasStage() {
                         }
                       },
                       onAddColumnAt: (rowId, atIdx) => useCanvasStore.getState().addRowColumn(rowId, atIdx),
+                      onRemoveColumn: (rowId, colIdx) => useCanvasStore.getState().removeRowColumn(rowId, colIdx),
                       onInsertAsNewColumn: (rowId, payload, side) => {
                         const st = useCanvasStore.getState();
                         if (payload.kind === 'new') {

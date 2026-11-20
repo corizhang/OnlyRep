@@ -1263,6 +1263,7 @@ function RowInspector({ block, onChange }: { block: Extract<CanvasBlock, { type:
 function StructureTree({ blocks, depth }: { blocks: CanvasBlock[]; depth: number }) {
   const selectedId = useCanvasStore((s) => s.selectedId);
   const selectBlock = useCanvasStore((s) => s.selectBlock);
+  const removeRowColumn = useCanvasStore((s) => s.removeRowColumn);
   return (
     <div className={depth > 0 ? 'ml-3 border-l border-line pl-2' : ''}>
       {blocks.map((b) => (
@@ -1278,7 +1279,19 @@ function StructureTree({ blocks, depth }: { blocks: CanvasBlock[]; depth: number
           </button>
           {b.type === 'row' && b.config.columns.map((col, ci) => (
             <div key={ci} className="ml-3 border-l border-dashed border-line pl-2">
-              <div className="text-[10px] text-ink-faint">列{ci + 1}</div>
+              <div className="flex items-center gap-1 text-[10px] text-ink-faint">
+                <span>列{ci + 1}</span>
+                {b.config.columns.length > 1 && (
+                  <button
+                    type="button"
+                    title="删除此列（内容并入前一列）"
+                    className="ml-auto text-ink-faint hover:text-danger"
+                    onClick={() => removeRowColumn(b.id, ci)}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
               <StructureTree blocks={col.blocks} depth={depth + 1} />
             </div>
           ))}

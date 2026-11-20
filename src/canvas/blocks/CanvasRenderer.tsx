@@ -33,6 +33,8 @@ export interface CanvasEditHandlers {
   onSplitBeside?: (targetId: string, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }, side: 'left' | 'right') => void;
   /** 分栏线 ⊕：在该线位置之后插入空列 */
   onAddColumnAt?: (rowId: string, atIdx: number) => void;
+  /** 删除容器某列（内容并入前一列） */
+  onRemoveColumn?: (rowId: string, colIdx: number) => void;
   /** 拖到容器左/右边缘：新增一列放入 */
   onInsertAsNewColumn?: (rowId: string, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }, side: 'left' | 'right') => void;
 }
@@ -406,6 +408,7 @@ function ColumnStack({
   edit,
   ctx,
   gap,
+  colCount,
 }: {
   rowId: string;
   colIdx: number;
@@ -414,6 +417,7 @@ function ColumnStack({
   edit?: CanvasEditHandlers;
   ctx: RenderCtx;
   gap: number;
+  colCount: number;
 }) {
   const [dropIdx, setDropIdx] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -492,6 +496,19 @@ function ColumnStack({
           }}
         >
           空列：拖组件到这里
+          {colCount > 1 && edit.onRemoveColumn && (
+            <button
+              type="button"
+              title="删除此空列"
+              onClick={(e) => {
+                e.stopPropagation();
+                edit.onRemoveColumn!(rowId, colIdx);
+              }}
+              style={{ cursor: 'pointer', color: ctx.theme.secondaryColor, border: 'none', background: 'none', padding: '0 2px' }}
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -618,6 +635,7 @@ function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type
             edit={edit}
             ctx={ctx}
             gap={ctx.gap}
+            colCount={cols.length}
           />
         </Fragment>
       ))}
