@@ -138,8 +138,8 @@ export interface CanvasStore {
   insertBlockAt: (block: CanvasBlock, index: number) => void;
   /** 把块插入容器的指定列（atIndex 缺省追加列尾） */
   addBlockToRow: (rowId: string, colIdx: number, block: CanvasBlock, atIndex?: number) => void;
-  /** 容器加列（上限 4，宽度等比重算） */
-  addRowColumn: (rowId: string) => void;
+  /** 容器加列（上限 4，宽度等比重算；atIdx 指定插入位置） */
+  addRowColumn: (rowId: string, atIdx?: number) => void;
   /** 容器删列（内容并入前一列；至少保留 1 列） */
   removeRowColumn: (rowId: string, colIdx: number) => void;
   /** 解散容器：所有列块平铺到容器原位 */
@@ -550,19 +550,22 @@ export const useCanvasStore = create<CanvasStore>()(
             return { ...c, blocks: applyTo(c.blocks) };
           }),
 
-        // 容器加列（≤4）：宽度等比重算
-        addRowColumn: (rowId) =>
+        // 容器加列（≤4）：宽度等比重算；atIdx 指定插入位置（缺省加在末尾）
+        addRowColumn: (rowId, atIdx) =>
           mutateConfig((c) => {
             const applyTo = (blocks: CanvasBlock[]): CanvasBlock[] =>
               blocks.map((b) => {
                 if (b.id === rowId && b.type === 'row') {
                   if (b.config.columns.length >= 4) return b;
                   const n = b.config.columns.length + 1;
+                  const cols = [...b.config.columns];
+                  const at = atIdx === undefined ? cols.length : Math.max(0, Math.min(atIdx, cols.length));
+                  cols.splice(at, 0, { blocks: [] });
                   return {
                     ...b,
                     config: {
                       ...b.config,
-                      columns: [...b.config.columns, { blocks: [] }],
+                      columns: cols,
                       widths: Array.from({ length: n }, () => Math.round(100 / n)),
                     },
                   } as CanvasBlock;

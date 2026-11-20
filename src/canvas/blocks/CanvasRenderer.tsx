@@ -31,6 +31,8 @@ export interface CanvasEditHandlers {
   onResizeRow?: (rowId: string, widths: number[]) => void;
   /** 拖到块左/右侧边缘：创建分栏容器（target 与 payload 各占一列） */
   onSplitBeside?: (targetId: string, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }, side: 'left' | 'right') => void;
+  /** 分栏线 ⊕：在该线位置之后插入空列 */
+  onAddColumnAt?: (rowId: string, atIdx: number) => void;
   /** 拖到容器左/右边缘：新增一列放入 */
   onInsertAsNewColumn?: (rowId: string, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }, side: 'left' | 'right') => void;
 }
@@ -599,21 +601,14 @@ function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type
       {cols.map((col, i) => (
         <Fragment key={i}>
           {edit && i > 0 && (
-            <div
-              onMouseDown={(e) => startResize(e, i - 1)}
-              title="拖拽调整列宽"
-              style={{
-                width: 8,
-                margin: `0 -${(8 + ctx.gap) / 2}px`,
-                cursor: 'col-resize',
-                zIndex: 5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <div style={{ width: 3, height: 32, borderRadius: 2, background: preview ? ctx.accent : `${ctx.accent}44` }} />
-            </div>
+            <ColumnHandle
+              key={`h-${i}`}
+              accent={ctx.accent}
+              gap={ctx.gap}
+              active={preview !== null}
+              onResizeStart={(e) => startResize(e, i - 1)}
+              onAddColumn={cols.length < 4 && edit.onAddColumnAt ? () => edit.onAddColumnAt!(block.id, i) : undefined}
+            />
           )}
           <ColumnStack
             rowId={block.id}
@@ -626,6 +621,81 @@ function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type
           />
         </Fragment>
       ))}
+    </div>
+  );
+}
+
+
+/** 分栏线手柄：悬停整线高亮 + 顶部浮现 ⊕ 加列；mousedown 拖动调宽 */
+function ColumnHandle({
+  accent,
+  gap,
+  active,
+  onResizeStart,
+  onAddColumn,
+}: {
+  accent: string;
+  gap: number;
+  active: boolean;
+  onResizeStart: (e: React.MouseEvent) => void;
+  onAddColumn?: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const lit = hover || active;
+  return (
+    <div
+      onMouseDown={onResizeStart}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="拖拽调整列宽；点击选中容器"
+      style={{
+        width: 10,
+        margin: `0 -${(10 + gap) / 2}px`,
+        cursor: 'col-resize',
+        zIndex: 6,
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'stretch',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
+          width: 3,
+          borderRadius: 2,
+          background: lit ? accent : `${accent}44`,
+          transition: 'background 0.15s',
+        }}
+      />
+      {hover && onAddColumn && (
+        <button
+          type="button"
+          title="在此插入一列"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddColumn();
+          }}
+          style={{
+            position: 'absolute',
+            top: -2,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            background: accent,
+            color: '#fff',
+            fontSize: 12,
+            lineHeight: '18px',
+            border: 'none',
+            cursor: 'pointer',
+            zIndex: 7,
+          }}
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }

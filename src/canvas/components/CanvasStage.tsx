@@ -215,6 +215,7 @@ export default function CanvasStage() {
                           if (blk) st.splitBeside(targetId, blk, side, payload.id);
                         }
                       },
+                      onAddColumnAt: (rowId, atIdx) => useCanvasStore.getState().addRowColumn(rowId, atIdx),
                       onInsertAsNewColumn: (rowId, payload, side) => {
                         const st = useCanvasStore.getState();
                         if (payload.kind === 'new') {
