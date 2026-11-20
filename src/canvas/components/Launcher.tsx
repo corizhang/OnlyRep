@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Popconfirm, Tooltip } from 'antd';
 import {
   DeleteOutlined,
@@ -210,19 +210,38 @@ export default function Launcher({ onEnter }: { onEnter: () => void }) {
   );
 }
 
-/** 保存目录行（仅桌面端）：显示 + 更改（复用导出目录设置） */
+/** 项目保存目录行（仅桌面端）：显示 + 更改（原生文件夹选择器） */
 function SaveDirRow() {
   const [dir, setDir] = useState<string>('');
-  useState(() => {
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
     void (async () => {
       const { tauriPersistStorage } = await import('../../storage/tauriKv');
-      setDir((await tauriPersistStorage.getItem('rankboard-export-dir')) ?? '');
+      setDir((await tauriPersistStorage.getItem('rankboard-project-dir')) ?? '');
+      setLoaded(true);
     })();
-  });
+  }, []);
   return (
     <div className="ml-auto flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-[11.5px] text-ink-dim">
       <FolderOpenOutlined className="text-ink-faint" style={{ fontSize: 12 }} />
-      <span className="max-w-[260px] truncate">{dir || '默认：下载\\RankBoard'}</span>
+      <span className="max-w-[260px] truncate" title={dir || undefined}>
+        {loaded ? (dir ? dir : '默认：文档\\RankBoard\\Projects') : '…'}
+      </span>
+      <button
+        type="button"
+        className="text-brand hover:underline"
+        onClick={async () => {
+          const { open } = await import('@tauri-apps/plugin-dialog');
+          const { tauriPersistStorage } = await import('../../storage/tauriKv');
+          const picked = await open({ directory: true, title: '选择项目保存目录' });
+          if (typeof picked === 'string' && picked) {
+            setDir(picked);
+            await tauriPersistStorage.setItem('rankboard-project-dir', picked);
+          }
+        }}
+      >
+        更改
+      </button>
     </div>
   );
 }

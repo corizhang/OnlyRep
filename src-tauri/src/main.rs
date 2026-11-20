@@ -91,6 +91,44 @@ fn export_file(app: tauri::AppHandle, state: State<DbState>, name: String, data_
     Ok(path.to_string_lossy().to_string())
 }
 
+/// 保存项目文件（.rkb）到项目目录：kv 键 rankboard-project-dir 自定义，缺省 文档/RankBoard/Projects
+#[tauri::command]
+fn save_project_file(app: tauri::AppHandle, state: State<DbState>, name: String, data_base64: String) -> Result<String, String> {
+    let bytes = STANDARD.decode(data_base64).map_err(|e| format!("base64 解码失败: {e}"))?;
+    let custom_dir = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT value FROM kv WHERE key = 'rankboard-project-dir'")
+            .map_err(|e| e.to_string())?;
+        let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
+        match rows.next().map_err(|e| e.to_string())? {
+            Some(row) => row.get::<_, String>(0).ok(),
+            None => None,
+        }
+    };
+    let dir = match custom_dir.filter(|d| !d.trim().is_empty()) {
+        Some(d) => std::path::PathBuf::from(d),
+        None => app
+            .path()
+            .document_dir()
+            .map_err(|e| e.to_string())?
+            .join("RankBoard")
+            .join("Projects"),
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // 文件名清洗（Windows 非法字符）
+    let safe: String = name
+        .chars()
+        .map(|c| match c {
+            '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect();
+    let path = dir.join(format!("{}.rkb", safe));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 /// 在资源管理器中打开导出文件所在文件夹并选中该文件（Windows 桌面版）
 #[tauri::command]
 fn open_export_folder(path: String) -> Result<(), String> {
@@ -116,7 +154,7 @@ fn main() {
             app.manage(DbState(Mutex::new(conn)));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![kv_get, kv_set, kv_remove, export_file, open_export_folder])
+        .invoke_handler(tauri::generate_handler![kv_get, kv_set, kv_remove, export_file, open_export_folder, save_project_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

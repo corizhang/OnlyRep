@@ -6,6 +6,12 @@ import { genTemplateName, loadTemplateLibrary, newTemplateId, saveTemplateLibrar
 import { genProjectName, loadProjectLibrary, newProjectId, saveProjectLibrary, type SavedProject } from '../canvas/projectLibrary';
 import { buildProjectFile, ingestProjectFile, parseProjectFile } from '../canvas/projectFile';
 import { captureCanvasThumb } from '../canvas/captureThumb';
+import { invoke } from '@tauri-apps/api/core';
+
+/** 字符串 → base64（unicode 安全） */
+function fileToBase64Sync(text: string): string {
+  return btoa(unescape(encodeURIComponent(text)));
+}
 import { downloadJsonFile } from '../canvas/template';
 import type {
   AnyBlockConfig,
@@ -498,6 +504,19 @@ export const useCanvasStore = create<CanvasStore>()(
             const items = [...s.projects, item];
             saveProjectLibrary({ activeId: id, items });
             set({ projects: items, activeProjectId: id });
+          }
+          // 桌面端双写：项目目录自动落一份 .rkb（真实文件可备份可拷走；失败不打扰）
+          if (isTauri()) {
+            void (async () => {
+              try {
+                const projName = get().projects.find((pr) => pr.id === id)?.name ?? '项目';
+                const rkb = await buildProjectFile(projName, get().config);
+                const b64 = fileToBase64Sync(JSON.stringify(rkb));
+                await invoke('save_project_file', { name: projName, dataBase64: b64 });
+              } catch {
+                /* 目录不可写等：静默，下次保存再试 */
+              }
+            })();
           }
           // 缩略图异步补抓（失败不阻塞保存）
           void captureCanvasThumb().then((thumb) => {
