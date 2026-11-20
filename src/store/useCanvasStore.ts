@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { appStorage, onStorageError } from '../storage/safeStorage';
 import { isTauri, tauriPersistStorage } from '../storage/tauriKv';
 import { genTemplateName, loadTemplateLibrary, newTemplateId, saveTemplateLibrary, type SavedTemplate } from '../canvas/templateLibrary';
+import { genProjectName, loadProjectLibrary, newProjectId, saveProjectLibrary, type SavedProject } from '../canvas/projectLibrary';
 import type {
   AnyBlockConfig,
   CanvasBlock,
@@ -115,6 +116,19 @@ export interface CanvasStore {
   templates: SavedTemplate[];
   activeTemplateId: string | null;
   /** 保存当前工作区：有当前模板则覆盖，否则以 name 新建（空则自动命名）；返回模板 id */
+  // ---- 项目库（壳+数据；数据快照按源 id 存 IndexedDB，切换自动恢复） ----
+  projects: SavedProject[];
+  activeProjectId: string | null;
+  /** 保存当前工作区为项目（有活动项目则回写，否则新建），返回项目 id */
+  saveProject: (name?: string) => string;
+  /** 切换项目：当前项目自动回写后载入目标（数据快照自动恢复） */
+  loadProjectById: (id: string) => boolean;
+  renameProject: (id: string, name: string) => void;
+  deleteProject: (id: string) => void;
+  duplicateProject: (id: string) => void;
+  /** 把项目另存为模板（只存壳，供分享/起始创建） */
+  saveProjectAsTemplate: (projectId: string, name?: string) => void;
+
   saveTemplate: (name?: string) => string;
   /** 载入库中模板覆盖当前工作区（清撤销历史，导入文件源需重新选文件） */
   loadTemplateById: (id: string) => boolean;
@@ -307,6 +321,8 @@ export const useCanvasStore = create<CanvasStore>()(
         externalUpdate: false,
         dismissExternalUpdate: () => set({ externalUpdate: false }),
         templates: [],
+        projects: [],
+        activeProjectId: null,
         activeTemplateId: null,
         sources: {},
         outputs: {},
@@ -409,7 +425,8 @@ export const useCanvasStore = create<CanvasStore>()(
           const s = get();
           // 模板库载入（独立于工作区的存档点）
           const lib = loadTemplateLibrary();
-          set({ templates: lib.items, activeTemplateId: lib.activeId });
+          const plib = loadProjectLibrary();
+          set({ templates: lib.items, activeTemplateId: lib.activeId, projects: plib.items, activeProjectId: plib.activeId });
           recomputeWith(s.config, s.sources);
           // 异步恢复导入源缓存快照（IndexedDB），完成后重算并更新提示
           void restoreImportCaches(recomputeWith, (store) => {
@@ -441,12 +458,85 @@ export const useCanvasStore = create<CanvasStore>()(
 
         loadTemplate: (config) => {
           engineCache.clear();
-          void clearSourceSnapshots();
+          // 数据快照按源 id 保留（不再清空）：模板/项目切换后自动恢复，切回不丢数据
           set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null });
           recomputeWith(config, {});
+          void restoreImportCaches(recomputeWith, (store) => {
+            const pending = store.config.dataSources.filter((d) => d.kind === 'import' && !store.sources[d.id]?.table).length;
+            if (pending === 0) return null;
+            return `已载入；${pending} 个导入源待重新选择数据文件（或点「重读文件」）`;
+          });
         },
 
         // ---- 模板库 ----
+        saveProject: (name) => {
+          const s = get();
+          if (s.activeProjectId) {
+            const id = s.activeProjectId;
+            const items = s.projects.map((pr) => (pr.id === id ? { ...pr, config: s.config, updatedAt: Date.now() } : pr));
+            saveProjectLibrary({ activeId: id, items });
+            set({ projects: items });
+            return id;
+          }
+          const id = newProjectId();
+          const item: SavedProject = { id, name: name?.trim() || genProjectName(s.projects), updatedAt: Date.now(), config: s.config };
+          const items = [...s.projects, item];
+          saveProjectLibrary({ activeId: id, items });
+          set({ projects: items, activeProjectId: id });
+          return id;
+        },
+
+        loadProjectById: (id) => {
+          const s = get();
+          const target = s.projects.find((x) => x.id === id);
+          if (!target) return false;
+          // 切换前自动回写当前项目（防丢）
+          if (s.activeProjectId && s.activeProjectId !== id) {
+            const items = s.projects.map((pr) => (pr.id === s.activeProjectId ? { ...pr, config: s.config, updatedAt: Date.now() } : pr));
+            saveProjectLibrary({ activeId: id, items });
+            set({ projects: items });
+          }
+          get().loadTemplate(target.config); // 含数据快照恢复（P0 后不再清缓存）
+          set({ activeProjectId: id });
+          saveProjectLibrary({ activeId: id, items: get().projects });
+          return true;
+        },
+
+        renameProject: (id, name) => {
+          const trimmed = name.trim();
+          if (!trimmed) return;
+          const items = get().projects.map((pr) => (pr.id === id ? { ...pr, name: trimmed, updatedAt: Date.now() } : pr));
+          saveProjectLibrary({ activeId: get().activeProjectId, items });
+          set({ projects: items });
+        },
+
+        deleteProject: (id) => {
+          const items = get().projects.filter((pr) => pr.id !== id);
+          const activeId = get().activeProjectId === id ? null : get().activeProjectId;
+          saveProjectLibrary({ activeId, items });
+          set({ projects: items, activeProjectId: activeId });
+        },
+
+        duplicateProject: (id) => {
+          const s = get();
+          const src = s.projects.find((x) => x.id === id);
+          if (!src) return;
+          const copy: SavedProject = { id: newProjectId(), name: `${src.name} 副本`, updatedAt: Date.now(), config: src.config };
+          const items = [...s.projects, copy];
+          saveProjectLibrary({ activeId: s.activeProjectId, items });
+          set({ projects: items });
+        },
+
+        saveProjectAsTemplate: (projectId, name) => {
+          const pr = get().projects.find((x) => x.id === projectId);
+          if (!pr) return;
+          const id = newTemplateId();
+          const item: SavedTemplate = { id, name: name?.trim() || `${pr.name}（模板）`, updatedAt: Date.now(), config: pr.config };
+          const items = [...get().templates, item];
+          saveTemplateLibrary({ activeId: get().activeTemplateId, items });
+          set({ templates: items });
+        },
+
         saveTemplate: (name) => {
           const s = get();
           if (s.activeTemplateId) {

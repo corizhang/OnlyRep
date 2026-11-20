@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { message, Segmented, Tooltip } from 'antd';
-import { MoonOutlined, SunOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
 import { initTemplateLibraryStorage } from '../templateLibrary';
+import { initProjectLibraryStorage } from '../projectLibrary';
 import { isTauri } from '../../storage/tauriKv';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
@@ -17,6 +18,7 @@ import CanvasStage from './CanvasStage';
 import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
 import TemplateLibraryModal from './TemplateLibraryModal';
 import SettingsModal from './SettingsModal';
+import ProjectLibraryModal from './ProjectLibraryModal';
 import { findPath } from '../blocks/rowTree';
 import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
@@ -43,6 +45,8 @@ export default function CanvasApp() {
   const activeTemplateId = useCanvasStore((s) => s.activeTemplateId);
   const templates = useCanvasStore((s) => s.templates);
   const [showTplLib, setShowTplLib] = useState(false);
+  const [showPrjLib, setShowPrjLib] = useState(false);
+  const activePrjName = useCanvasStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? null);
   const [showSettings, setShowSettings] = useState(false);
   const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
@@ -53,6 +57,7 @@ export default function CanvasApp() {
       if (isTauri()) {
         await useCanvasStore.persist.rehydrate();
         await initTemplateLibraryStorage();
+        await initProjectLibraryStorage();
       }
       // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
       const preset = new URLSearchParams(window.location.search).get('preset');
@@ -141,6 +146,17 @@ export default function CanvasApp() {
             ]}
           />
           <span className="text-[11.5px] text-ink-faint">一次搭好，换数据即出图</span>
+          {/* 项目库入口：带数据的工作单元 */}
+          <Tooltip title="项目库（版式+数据，多项目切换）">
+            <button
+              type="button"
+              onClick={() => setShowPrjLib(true)}
+              className="flex max-w-[180px] items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[11.5px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+            >
+              <DatabaseOutlined style={{ fontSize: 12 }} />
+              <span className="truncate">{activePrjName ?? '项目库'}</span>
+            </button>
+          </Tooltip>
           {/* 模板库入口：显示当前模板名（无则"未保存的工作区"） */}
           <Tooltip title="模板库（多模板保存/切换）">
             <button
@@ -299,6 +315,7 @@ export default function CanvasApp() {
 
       <TemplateLibraryModal open={showTplLib} onClose={() => setShowTplLib(false)} />
       <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+      <ProjectLibraryModal open={showPrjLib} onClose={() => setShowPrjLib(false)} />
 
       {/* 首屏欢迎页（仅首次使用出现一次） */}
       <WelcomeModal />
