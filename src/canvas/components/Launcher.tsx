@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { isTauri } from '../../storage/tauriKv';
+import { ensureAppInit } from '../appInit';
 import NewProjectModal from './NewProjectModal';
 
 /**
@@ -29,6 +30,10 @@ export function shouldShowLauncher(): boolean {
 }
 
 export default function Launcher({ onEnter }: { onEnter: () => void }) {
+  // 启动页先到时也要初始化 store（项目库/工作区都在 bootstrap 里载入）
+  useEffect(() => {
+    void ensureAppInit();
+  }, []);
   const projects = useCanvasStore((s) => s.projects);
   const loadProjectById = useCanvasStore((s) => s.loadProjectById);
   const deleteProject = useCanvasStore((s) => s.deleteProject);

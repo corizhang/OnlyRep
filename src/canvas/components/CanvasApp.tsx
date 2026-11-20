@@ -4,8 +4,7 @@ import { DatabaseOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
-import { initTemplateLibraryStorage } from '../templateLibrary';
-import { initProjectLibraryStorage } from '../projectLibrary';
+import { ensureAppInit } from '../appInit';
 import { isTauri } from '../../storage/tauriKv';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
@@ -48,22 +47,14 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   const [showTplLib, setShowTplLib] = useState(false);
   const [showPrjLib, setShowPrjLib] = useState(false);
   const activePrjName = useCanvasStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? null);
+  const projectDirty = useCanvasStore((s) => s.projectDirty);
   const [showSettings, setShowSettings] = useState(false);
   const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
   useEffect(() => {
     const start = async (): Promise<void> => {
-      // Tauri：persist 为异步 SQLite 后端，先等 rehydrate 与模板库镜像就绪，再 bootstrap
-      // （否则会用默认空配置重算，随后配置换入导致结果过期）
-      if (isTauri()) {
-        await useCanvasStore.persist.rehydrate();
-        await initTemplateLibraryStorage();
-        await initProjectLibraryStorage();
-      }
-      // ?preset=demo|daily-report 可直接载入内置模板（用于演示与截图）
-      const preset = new URLSearchParams(window.location.search).get('preset');
-      if (preset) useCanvasStore.getState().applyPreset(preset);
-      else bootstrap();
+      // 统一走 ensureAppInit（幂等）：启动页先到时也会初始化，项目库不再空
+      await ensureAppInit();
       // ?flow=1（兼容旧链接）/ ?view=node 直接进入数据节点视图
       const params = new URLSearchParams(window.location.search);
       if (params.get('flow') === '1' || params.get('view') === 'node') {
@@ -100,6 +91,16 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === 's' || e.key === 'S') {
+        // Ctrl+S 快捷保存到当前项目（无项目则新建）
+        e.preventDefault();
+        const st = useCanvasStore.getState();
+        const nameBefore = st.projects.find((p) => p.id === st.activeProjectId)?.name;
+        const id = st.saveProject();
+        const name = st.projects.find((p) => p.id === id)?.name ?? '项目';
+        message.success({ content: nameBefore ? `已保存到「${name}」` : `已保存为新项目「${name}」`, duration: 1.5 });
+        return;
+      }
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
         if (e.shiftKey) toast(redo(), '已重做');
@@ -155,6 +156,24 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
                 className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
               >
                 ⌂
+              </button>
+            </Tooltip>
+          )}
+          {/* 保存按钮：有活动项目时常驻，脏时点标记 + Ctrl+S 提示 */}
+          {activePrjName && (
+            <Tooltip title={projectDirty ? '有未保存修改（Ctrl+S 保存）' : '已保存（Ctrl+S）'}>
+              <button
+                type="button"
+                onClick={() => {
+                  const st = useCanvasStore.getState();
+                  const id = st.saveProject();
+                  const name = st.projects.find((p) => p.id === id)?.name ?? '项目';
+                  message.success({ content: `已保存到「${name}」`, duration: 1.5 });
+                }}
+                className="relative flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              >
+                💾
+                {projectDirty && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-warn" />}
               </button>
             </Tooltip>
           )}

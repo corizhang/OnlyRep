@@ -127,6 +127,9 @@ export interface CanvasStore {
   templates: SavedTemplate[];
   activeTemplateId: string | null;
   /** 保存当前工作区：有当前模板则覆盖，否则以 name 新建（空则自动命名）；返回模板 id */
+  /** 当前项目有未保存修改（mutateConfig 任一变更即置位；saveProject/loadProject 清除） */
+  projectDirty: boolean;
+
   /** 模板新建项目后的数据源填充引导（有待填的 import 源时弹） */
   sourceGuideOpen: boolean;
   setSourceGuideOpen: (v: boolean) => void;
@@ -330,7 +333,8 @@ export const useCanvasStore = create<CanvasStore>()(
         pushHistory(label);
         const prev = get().config;
         const config = fn(prev);
-        set({ config });
+        // 有活动项目时标记未保存（Ctrl+S 提示的依据）
+        set({ config, projectDirty: get().activeProjectId ? true : get().projectDirty });
         if (rerun) recomputeWith(config, get().sources);
       };
 
@@ -343,6 +347,7 @@ export const useCanvasStore = create<CanvasStore>()(
         projects: [],
         activeProjectId: null,
         sourceGuideOpen: false,
+        projectDirty: false,
         setSourceGuideOpen: (v) => set({ sourceGuideOpen: v }),
         activeTemplateId: null,
         sources: {},
@@ -505,6 +510,7 @@ export const useCanvasStore = create<CanvasStore>()(
             saveProjectLibrary({ activeId: id, items });
             set({ projects: items, activeProjectId: id });
           }
+          set({ projectDirty: false });
           // 桌面端双写：项目目录自动落一份 .rkb（真实文件可备份可拷走；失败不打扰）
           if (isTauri()) {
             void (async () => {
@@ -539,7 +545,7 @@ export const useCanvasStore = create<CanvasStore>()(
             set({ projects: items });
           }
           get().loadTemplate(target.config); // 含数据快照恢复（P0 后不再清缓存）
-          set({ activeProjectId: id });
+          set({ activeProjectId: id, projectDirty: false });
           saveProjectLibrary({ activeId: id, items: get().projects });
           return true;
         },
