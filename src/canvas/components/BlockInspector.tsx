@@ -17,6 +17,7 @@ import type {
 } from '../types';
 import { createBlock, defaultNumberFormat } from '../defaults';
 import { resolveTable } from '../binding/resolve';
+import { normalizeRowConfig } from '../blocks/rowTree';
 import { useFormulaVariables } from '../formula/FormulaInput';
 import { groupVariables } from '../formula/variableEnv';
 import { matchQuery } from '../formula/pinyin';
@@ -1157,7 +1158,8 @@ const ROW_CHILD_TYPES: { value: CanvasBlock['type']; label: string }[] = [
 ];
 
 function RowInspector({ block, onChange }: { block: Extract<CanvasBlock, { type: 'row' }>; onChange: (p: Partial<RowBlockConfig>) => void }) {
-  const cfg = block.config;
+  // 防御：老数据可能是 children 结构（渲染前归一化，幂等）
+  const cfg = normalizeRowConfig(block.config);
   const selectBlock = useCanvasStore((s) => s.selectBlock);
   const removeBlock = useCanvasStore((s) => s.removeBlock);
   const addBlockToRow = useCanvasStore((s) => s.addBlockToRow);

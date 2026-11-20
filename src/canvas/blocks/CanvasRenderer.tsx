@@ -1,6 +1,7 @@
 import { Fragment, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { CanvasBlock, CanvasConfig } from '../types';
+import { normalizeRowConfig } from './rowTree';
 import TextBlock from './textBlock';
 import KpiCard from './kpiCard';
 import GoalProgress from './goalProgress';
@@ -471,7 +472,9 @@ function ColumnStack({
 
 /** 分栏容器：列堆栈 + 列间宽度拖拽手柄（拖动中本地预览，松手一次提交 widths） */
 function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type: 'row' }>; edit?: CanvasEditHandlers; ctx: RenderCtx }) {
-  const cols = block.config.columns;
+  // 防御：老模板/老持久化数据可能是 children 结构（归一化幂等）
+  const cfg = normalizeRowConfig(block.config);
+  const cols = cfg.columns;
   const baseWidths =
     block.config.widths.length === cols.length ? block.config.widths : cols.map(() => Math.round(100 / Math.max(1, cols.length)));
   const rootRef = useRef<HTMLDivElement>(null);

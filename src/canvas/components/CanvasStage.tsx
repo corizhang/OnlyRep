@@ -251,5 +251,5 @@ function cloneBlock(b: CanvasBlock): CanvasBlock {
 }
 
 function countBlocks(blocks: CanvasBlock[]): number {
-  return blocks.reduce((n, b) => n + 1 + (b.type === 'row' ? b.config.columns.reduce((m, col) => m + countBlocks(col.blocks), 0) : 0), 0);
+  return blocks.reduce((n, b) => n + 1 + (b.type === 'row' ? (b.config.columns ?? []).reduce((m, col) => m + countBlocks(col.blocks), 0) : 0), 0);
 }

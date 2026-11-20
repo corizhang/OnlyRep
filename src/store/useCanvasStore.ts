@@ -1010,7 +1010,7 @@ export const useCanvasStore = create<CanvasStore>()(
     },
     {
       name: 'rankboard-canvas-v3',
-      version: 3,
+      version: 4,
       // Tauri 桌面壳：config 落 SQLite（无 5MB 配额）；浏览器：safeStorage（探测+内存降级）
       storage: createJSONStorage(() => (isTauri() ? tauriPersistStorage : appStorage)),
       partialize: (state) => ({ config: state.config }),
