@@ -16,6 +16,28 @@ export interface SourceSnapshot {
   table: CleanedTable;
   sheets: { name: string; rows: number; cols: number }[];
   savedAt: number;
+  /** 原始文件字节（base64）：项目自包含的关键——换 sheet/重读不再依赖文件句柄 */
+  fileBytes?: string;
+}
+
+/** File → base64（快照入库用） */
+export async function fileToBase64(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+/** base64 → File（离线重读/换 sheet 用） */
+export function base64ToFile(b64: string, name: string, type = ''): File {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], name, { type });
 }
 
 // ========== 指纹 ==========

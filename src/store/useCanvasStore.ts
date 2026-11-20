@@ -4,6 +4,8 @@ import { appStorage, onStorageError } from '../storage/safeStorage';
 import { isTauri, tauriPersistStorage } from '../storage/tauriKv';
 import { genTemplateName, loadTemplateLibrary, newTemplateId, saveTemplateLibrary, type SavedTemplate } from '../canvas/templateLibrary';
 import { genProjectName, loadProjectLibrary, newProjectId, saveProjectLibrary, type SavedProject } from '../canvas/projectLibrary';
+import { buildProjectFile, ingestProjectFile, parseProjectFile } from '../canvas/projectFile';
+import { downloadJsonFile } from '../canvas/template';
 import type {
   AnyBlockConfig,
   CanvasBlock,
@@ -31,6 +33,8 @@ import {
   clearSourceSnapshots,
   ensureHandlePermission,
   supportsFileSystemAccess,
+  base64ToFile,
+  fileToBase64,
 } from '../canvas/datasource/sourceCache';
 
 /**
@@ -128,6 +132,10 @@ export interface CanvasStore {
   duplicateProject: (id: string) => void;
   /** 把项目另存为模板（只存壳，供分享/起始创建） */
   saveProjectAsTemplate: (projectId: string, name?: string) => void;
+  /** 导出项目为 .rkb 文件（壳+原始数据文件），返回文件名（无内容返回 null） */
+  exportProject: (projectId: string) => Promise<string | null>;
+  /** 导入 .rkb 项目文件：入项目库并打开 */
+  importProjectFile: (text: string) => Promise<string | null>;
 
   saveTemplate: (name?: string) => string;
   /** 载入库中模板覆盖当前工作区（清撤销历史，导入文件源需重新选文件） */
@@ -535,6 +543,28 @@ export const useCanvasStore = create<CanvasStore>()(
           const items = [...get().templates, item];
           saveTemplateLibrary({ activeId: get().activeTemplateId, items });
           set({ templates: items });
+        },
+
+        exportProject: async (projectId) => {
+          const proj = get().projects.find((x) => x.id === projectId);
+          if (!proj) return null;
+          const rkb = await buildProjectFile(proj.name, proj.config);
+          const fname = `${proj.name}.rkb`;
+          downloadJsonFile(fname, rkb);
+          return fname;
+        },
+
+        importProjectFile: async (text) => {
+          const rkb = parseProjectFile(text);
+          if (!rkb) return null;
+          const config = await ingestProjectFile(rkb);
+          const id = newProjectId();
+          const item: SavedProject = { id, name: rkb.name || '导入的项目', updatedAt: Date.now(), config };
+          const items = [...get().projects, item];
+          saveProjectLibrary({ activeId: id, items });
+          set({ projects: items });
+          get().loadProjectById(id); // 自动回写当前+载入（快照含字节，restore 自动解析）
+          return rkb.name;
         },
 
         saveTemplate: (name) => {
@@ -1241,7 +1271,18 @@ async function restoreImportCaches(
   let hit = 0;
   for (const def of importDefs) {
     if (def.cacheData === false) continue;
-    const snap = await loadSourceSnapshot(def.id);
+    let snap = await loadSourceSnapshot(def.id);
+    // 表为空但有原始字节（如 .rkb 导入的项目）：离线重建 File 重新解析
+    if (snap && snap.table.rows.length === 0 && snap.fileBytes) {
+      try {
+        const f = base64ToFile(snap.fileBytes, snap.fp.name);
+        const loaded = await loadImportFile(f, { sheetName: def.sheetName || snap.sheetName || undefined });
+        snap = { ...snap, table: loaded.table, sheets: loaded.sheets, sheetName: loaded.sheetName };
+        await saveSourceSnapshot(def.id, snap);
+      } catch {
+        continue;
+      }
+    }
     if (!snap) continue;
     const hasHandle = (await getFileHandle(def.id)) !== null;
     next[def.id] = {

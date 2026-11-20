@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Popconfirm, Tooltip } from 'antd';
-import { CheckCircleFilled, CopyOutlined, DeleteOutlined, EditOutlined, FolderOpenOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { CheckCircleFilled, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, FolderOpenOutlined, ShareAltOutlined, UploadOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../store/useCanvasStore';
 
 /**
@@ -17,9 +17,12 @@ export default function ProjectLibraryModal({ open, onClose }: { open: boolean; 
   const duplicateProject = useCanvasStore((s) => s.duplicateProject);
   const deleteProject = useCanvasStore((s) => s.deleteProject);
   const saveProjectAsTemplate = useCanvasStore((s) => s.saveProjectAsTemplate);
+  const exportProject = useCanvasStore((s) => s.exportProject);
+  const importProjectFile = useCanvasStore((s) => s.importProjectFile);
   const sources = useCanvasStore((s) => s.sources);
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const active = projects.find((p) => p.id === activeProjectId);
 
@@ -57,6 +60,32 @@ export default function ProjectLibraryModal({ open, onClose }: { open: boolean; 
             {active ? `保存到「${active.name}」` : '保存当前为项目'}
           </button>
           <span className="text-[11px] text-ink-faint">项目含数据，切换自动回写当前项目</span>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="ml-auto flex items-center gap-1 rounded-md border border-line-strong bg-panel px-2.5 py-1.5 text-[12px] text-ink-dim hover:bg-hover"
+          >
+            <UploadOutlined style={{ fontSize: 11 }} />
+            导入 .rkb
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".rkb,.json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (!f) return;
+              const text = await f.text();
+              const name = await importProjectFile(text);
+              if (name) {
+                onClose();
+              } else {
+                window.alert('文件不是有效的 RankBoard 项目（.rkb）');
+              }
+            }}
+          />
         </div>
 
         {/* 列表 */}
@@ -115,6 +144,15 @@ export default function ProjectLibraryModal({ open, onClose }: { open: boolean; 
                     >
                       {isActive ? '当前' : '打开'}
                     </button>
+                    <Tooltip title="导出项目（.rkb，含数据，可拷给同事直接用）">
+                      <button
+                        type="button"
+                        className="rounded p-1 text-ink-faint hover:bg-hover hover:text-ink-dim"
+                        onClick={() => void exportProject(proj.id)}
+                      >
+                        <DownloadOutlined style={{ fontSize: 12 }} />
+                      </button>
+                    </Tooltip>
                     <Tooltip title="存为模板（只存版式壳，可分享）">
                       <button
                         type="button"
