@@ -3,6 +3,7 @@ import { ConfigProvider, theme as antdAlgorithm } from 'antd';
 import PanelLayout from './components/PanelLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import CanvasApp from './canvas/components/CanvasApp';
+import Launcher, { shouldShowLauncher } from './canvas/components/Launcher';
 import { useRankStore } from './store/useRankStore';
 import { useCanvasStore } from './store/useCanvasStore';
 import { appStorage } from './storage/safeStorage';
@@ -28,6 +29,8 @@ const antdTheme = {
 
 export default function App() {
   const uiTheme = useCanvasStore((st) => st.uiTheme);
+  // 启动页：默认首屏（可在启动页勾选跳过）
+  const [launcher, setLauncher] = useState(shouldShowLauncher);
   const [mode, setMode] = useState<Mode>(() => {
     const saved = appStorage.getItem(KEY);
     return saved === 'rank' ? 'rank' : 'canvas';
@@ -65,8 +68,10 @@ export default function App() {
       }}
     >
       <ErrorBoundary>
-        {mode === 'canvas' ? (
-          <CanvasApp />
+        {launcher && mode === 'canvas' ? (
+          <Launcher onEnter={() => setLauncher(false)} />
+        ) : mode === 'canvas' ? (
+          <CanvasApp onHome={() => setLauncher(true)} />
         ) : (
           <div className="relative">
             <button

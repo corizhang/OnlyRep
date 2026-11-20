@@ -70,6 +70,15 @@ function watchErrors(page, bucket) {
     });
     record('localStorage 抛 SecurityError 不白屏', rendered);
 
+    // 启动页（降级存储读不到跳过标记，每次必现）：先进工作区
+    try {
+      const cont = page.getByText('继续上次工作区');
+      if (await cont.isVisible({ timeout: 1500 })) await cont.click();
+      await page.waitForTimeout(800);
+    } catch {
+      /* 无启动页则跳过 */
+    }
+
     // 降级存储下 onboarded 标记读不到 → 首屏欢迎页会出现，真实用户也是先关掉它再操作
     try {
       const blankBtn = page.getByText('从空白开始');

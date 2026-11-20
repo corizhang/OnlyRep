@@ -5,6 +5,7 @@ import { isTauri, tauriPersistStorage } from '../storage/tauriKv';
 import { genTemplateName, loadTemplateLibrary, newTemplateId, saveTemplateLibrary, type SavedTemplate } from '../canvas/templateLibrary';
 import { genProjectName, loadProjectLibrary, newProjectId, saveProjectLibrary, type SavedProject } from '../canvas/projectLibrary';
 import { buildProjectFile, ingestProjectFile, parseProjectFile } from '../canvas/projectFile';
+import { captureCanvasThumb } from '../canvas/captureThumb';
 import { downloadJsonFile } from '../canvas/template';
 import type {
   AnyBlockConfig,
@@ -485,18 +486,26 @@ export const useCanvasStore = create<CanvasStore>()(
         // ---- 模板库 ----
         saveProject: (name) => {
           const s = get();
+          let id: string;
           if (s.activeProjectId) {
-            const id = s.activeProjectId;
+            id = s.activeProjectId;
             const items = s.projects.map((pr) => (pr.id === id ? { ...pr, config: s.config, updatedAt: Date.now() } : pr));
             saveProjectLibrary({ activeId: id, items });
             set({ projects: items });
-            return id;
+          } else {
+            id = newProjectId();
+            const item: SavedProject = { id, name: name?.trim() || genProjectName(s.projects), updatedAt: Date.now(), config: s.config };
+            const items = [...s.projects, item];
+            saveProjectLibrary({ activeId: id, items });
+            set({ projects: items, activeProjectId: id });
           }
-          const id = newProjectId();
-          const item: SavedProject = { id, name: name?.trim() || genProjectName(s.projects), updatedAt: Date.now(), config: s.config };
-          const items = [...s.projects, item];
-          saveProjectLibrary({ activeId: id, items });
-          set({ projects: items, activeProjectId: id });
+          // 缩略图异步补抓（失败不阻塞保存）
+          void captureCanvasThumb().then((thumb) => {
+            if (!thumb) return;
+            const items2 = get().projects.map((pr) => (pr.id === id ? { ...pr, thumb } : pr));
+            saveProjectLibrary({ activeId: get().activeProjectId, items: items2 });
+            set({ projects: items2 });
+          });
           return id;
         },
 

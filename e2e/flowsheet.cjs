@@ -22,6 +22,15 @@ function record(name, ok, detail = '') {
   await page.goto(`${BASE}/?preset=demo`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
 
+  // 启动页（默认首屏）：点击继续进入工作区
+  try {
+    const cont = page.getByText('继续上次工作区');
+    if (await cont.isVisible({ timeout: 1500 })) await cont.click();
+    await page.waitForTimeout(800);
+  } catch {
+    /* 无启动页则跳过 */
+  }
+
   // ECharts 6 升级后的运行时回归：图表必须真的渲染出 SVG
   const rootOk = await page.evaluate(() => {
     const r = document.getElementById('root');

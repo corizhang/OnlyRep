@@ -15,6 +15,8 @@ export interface SavedProject {
   name: string;
   updatedAt: number;
   config: CanvasConfig;
+  /** 画布缩略图（dataURL，保存时抓取；启动页卡片用） */
+  thumb?: string;
 }
 
 export interface ProjectLibraryData {

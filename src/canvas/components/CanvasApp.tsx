@@ -25,7 +25,7 @@ import WelcomeModal from './WelcomeModal';
 import { Btn } from './ui';
 
 /** 日报画布主界面（v2 双视图）：顶部 Tab 切「日报画布 / 数据节点」，左栏与右栏随视图联动，变量面板共用 */
-export default function CanvasApp() {
+export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   const config = useCanvasStore((s) => s.config);
   const selectedId = useCanvasStore((s) => s.selectedId);
   const errors = useCanvasStore((s) => s.errors);
@@ -147,6 +147,17 @@ export default function CanvasApp() {
             ]}
           />
           <span className="text-[11.5px] text-ink-faint">一次搭好，换数据即出图</span>
+          {onHome && (
+            <Tooltip title="返回启动页（项目列表）">
+              <button
+                type="button"
+                onClick={onHome}
+                className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              >
+                ⌂
+              </button>
+            </Tooltip>
+          )}
           {/* 项目库入口：带数据的工作单元 */}
           <Tooltip title="项目库（版式+数据，多项目切换）">
             <button
