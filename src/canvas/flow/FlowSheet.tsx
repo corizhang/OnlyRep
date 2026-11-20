@@ -1368,8 +1368,9 @@ function countBlockRefs(config: { blocks: unknown[] }, nodeId: string): number {
       if (table?.nodeRef === nodeId) n += 1;
       if (value?.nodeRef === nodeId) n += 1;
       if (ratio?.nodeRef === nodeId) n += 1;
-      if (Array.isArray((cfg as { columns?: { blocks: CanvasBlock[] }[] }).columns)) {
-        for (const col of (cfg as { columns: { blocks: CanvasBlock[] }[] }).columns) walk(col.blocks);
+      // 注意：dataTable 的 config 也有 columns（列定义，无 blocks）——只有容器（type==='row'）的列才可递归
+      if ((b as { type?: string }).type === 'row' && Array.isArray((cfg as { columns?: { blocks?: CanvasBlock[] }[] }).columns)) {
+        for (const col of (cfg as { columns: { blocks?: CanvasBlock[] }[] }).columns) walk(col.blocks ?? []);
       }
     }
   };
