@@ -1,4 +1,5 @@
 import type { CanvasBlockType } from '../types';
+import { useState } from 'react';
 import { createBlock } from '../defaults';
 import { useCanvasStore } from '../../store/useCanvasStore';
 
@@ -33,6 +34,9 @@ export default function BlockLibrary() {
   const collapsed = useCanvasStore((s) => s.libCollapsed);
   const setCollapsed = useCanvasStore((s) => s.setLibCollapsed);
 
+  const [query, setQuery] = useState('');
+  const [closedGroups, setClosedGroups] = useState<Record<string, boolean>>({});
+
   const selectedRow = (() => {
     if (!selectedId) return null;
     const b = config.blocks.find((x) => x.id === selectedId);
@@ -41,77 +45,104 @@ export default function BlockLibrary() {
 
   const total = GROUPS.reduce((n, g) => n + g.items.length, 0);
 
-  // 收起态：细竖条（竖排字），点击展开
+  // 收起态：左缘品牌色竖条（竖排字+图标），点击展开——对齐参照图的边缘交互
   if (collapsed) {
     return (
       <button
         type="button"
         onClick={() => setCollapsed(false)}
         title="展开组件库"
-        className="flex h-full w-10 shrink-0 flex-col items-center gap-2 border-r border-line bg-soft py-3 text-ink-faint transition-colors hover:bg-brand-soft hover:text-brand"
+        className="flex h-full w-7 shrink-0 flex-col items-center justify-center gap-2 border-r border-line bg-brand py-3 text-white shadow-sm transition-colors hover:bg-brand-hover"
       >
-        <span className="text-[11px]">»</span>
-        <span style={{ writingMode: 'vertical-lr', letterSpacing: 2 }} className="text-[12px] font-medium">
-          组件库 · {total}
+        <span className="text-[12px] leading-none">»</span>
+        <span style={{ writingMode: 'vertical-lr', letterSpacing: 3 }} className="text-[11px] font-medium">
+          组件库
         </span>
       </button>
     );
   }
 
+  const q = query.trim().toLowerCase();
+  const groups = GROUPS.map((g) => ({
+    ...g,
+    items: q ? g.items.filter((it) => it.label.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q)) : g.items,
+  })).filter((g) => g.items.length > 0);
+
   return (
-    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-line bg-soft">
-      <header className="flex items-center justify-between px-3 py-2.5">
-        <h2 className="text-[13px] font-semibold text-ink">组件库</h2>
-        <button
-          type="button"
-          onClick={() => setCollapsed(true)}
-          title="收起组件库"
-          className="rounded p-1 text-[12px] leading-none text-ink-faint hover:bg-base hover:text-ink-dim"
-        >
-          «
-        </button>
+    <aside className="relative flex h-full w-[220px] shrink-0 flex-col border-r border-line bg-soft">
+      {/* 右缘收起条（整条可点，远比角落小按钮好找） */}
+      <button
+        type="button"
+        onClick={() => setCollapsed(true)}
+        title="收起组件库"
+        className="absolute -right-[14px] top-1/2 z-20 flex h-[72px] w-[16px] -translate-y-1/2 items-center justify-center rounded-r-md border-y border-r border-brand-line bg-brand-soft text-[11px] font-medium text-brand shadow-sm transition-colors hover:bg-brand hover:text-white"
+      >
+        «
+      </button>
+
+      <header className="px-3 pb-1.5 pt-3">
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-ink-faint">🔍</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索组件…"
+            className="w-full rounded-md bg-panel py-1.5 pl-7 pr-2 text-[12px] text-ink outline-none transition-shadow placeholder:text-ink-faint focus:ring-2 focus:ring-brand-line"
+          />
+        </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
-        {GROUPS.map((g) => (
-          <div key={g.title} className="mb-3">
-            <div className="mb-1.5 flex items-center gap-2">
-              <span className="text-[11.5px] font-medium text-ink-faint">{g.title}</span>
-              <span className="h-px flex-1 bg-base" />
-              <span className="text-[10.5px] text-ink-faint">{g.items.length}</span>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 pt-1">
+        {groups.length === 0 && <p className="py-8 text-center text-[11.5px] text-ink-faint">没有匹配「{query}」的组件</p>}
+        {groups.map((g) => {
+          const closed = Boolean(closedGroups[g.title]);
+          return (
+            <div key={g.title} className="mb-2">
+              <button
+                type="button"
+                onClick={() => setClosedGroups((prev) => ({ ...prev, [g.title]: !prev[g.title] }))}
+                className="mb-1.5 flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-hover"
+              >
+                <span className={`text-[9px] text-ink-faint transition-transform ${closed ? '-rotate-90' : ''}`}>▼</span>
+                <span className="text-[11.5px] font-semibold text-ink-dim">{g.title}</span>
+                <span className="text-[10.5px] text-ink-faint">({g.items.length})</span>
+              </button>
+              {!closed && (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {g.items.map((it) => (
+                    <button
+                      key={it.type}
+                      type="button"
+                      draggable
+                      title={it.desc}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/new-block', it.type);
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      onClick={() => {
+                        const block = createBlock(it.type);
+                        if (selectedRow && it.type !== 'row') {
+                          // 选中容器时点击组件：加入其最后一列（拖入可精确到列与位置）
+                          addBlockToRow(selectedRow.id, selectedRow.config.columns.length - 1, block);
+                        } else {
+                          addBlock(block);
+                        }
+                      }}
+                      className="group flex flex-col items-center gap-1.5 rounded-lg border border-transparent bg-panel px-1 py-3 text-center transition-all hover:-translate-y-px hover:border-brand-line hover:shadow-card"
+                    >
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-hover text-[16px] text-ink-dim transition-colors group-hover:bg-brand-soft group-hover:text-brand">
+                        {it.icon}
+                      </span>
+                      <span className="text-[11.5px] font-medium leading-tight text-ink">{it.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {g.items.map((it) => (
-                <button
-                  key={it.type}
-                  type="button"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('text/new-block', it.type);
-                    e.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onClick={() => {
-                    const block = createBlock(it.type);
-                    if (selectedRow && it.type !== 'row') {
-                      // 选中容器时点击组件：加入其最后一列（拖入可精确到列与位置）
-                      addBlockToRow(selectedRow.id, selectedRow.config.columns.length - 1, block);
-                    } else {
-                      addBlock(block);
-                    }
-                  }}
-                  className="group flex flex-col gap-1 rounded-lg border border-line bg-panel p-2 text-left transition-colors hover:border-brand-line hover:bg-brand-soft/60"
-                >
-                  <span className="flex h-[34px] w-[34px] items-center justify-center rounded-md bg-hover text-[15px] text-ink-dim transition-colors group-hover:bg-brand-line group-hover:text-brand">
-                    {it.icon}
-                  </span>
-                  <span className="text-[12.5px] font-medium leading-tight text-ink">{it.label}</span>
-                  <span className="text-[11px] leading-tight text-ink-faint">{it.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-        <p className="rounded-md bg-hover px-2 py-1.5 text-[11px] leading-relaxed text-ink-faint">
-          提示：容器可把画布分为多列，列内可再叠组件或嵌套容器。
+          );
+        })}
+        <p className="mt-2 rounded-md bg-hover px-2 py-1.5 text-[11px] leading-relaxed text-ink-faint">
+          提示：容器可把画布分为多列，列内可再叠组件或嵌套容器。共 {total} 个组件。
         </p>
       </div>
     </aside>
