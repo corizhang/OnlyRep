@@ -146,6 +146,10 @@ export interface CanvasStore {
   dissolveRow: (rowId: string) => void;
   /** 原子移动：从任意位置（顶层/容器列）移到目标堆栈位置（单条撤销记录） */
   moveBlockTo: (dragId: string, target: { rowId: string | null; colIdx: number; index: number }) => void;
+  /** 拖到块侧边即分栏：把 target 替换为新容器（target 与 block 各占一列 50/50），side 决定左右 */
+  splitBeside: (targetId: string, block: CanvasBlock, side: 'left' | 'right', moveFromId?: string) => void;
+  /** 拖到容器左/右边缘：新增一列并把块放入（原子，单撤销步） */
+  insertAsNewColumn: (rowId: string, block: CanvasBlock, side: 'left' | 'right', moveFromId?: string) => void;
   updateBlock: (id: string, patch: Record<string, unknown>) => void;
   /** 更新区块外壳通用设置（边距/圆角，块根级字段，不进各 config） */
   updateBlockShell: (id: string, patch: { shellMargin?: [number, number, number, number]; radius?: number }) => void;
@@ -732,6 +736,89 @@ export const useCanvasStore = create<CanvasStore>()(
               blocks = insert(blocks);
             }
             return { ...c, blocks };
+          }),
+
+        splitBeside: (targetId, block, side, moveFromId) =>
+          mutateConfig((c) => {
+            let blocks = c.blocks;
+            // 已有块移动：先摘除（保 id），目标定位在摘除后进行
+            if (moveFromId) {
+              const detach = (bs: CanvasBlock[]): CanvasBlock[] => {
+                const out: CanvasBlock[] = [];
+                for (const b of bs) {
+                  if (b.id === moveFromId) continue;
+                  if (b.type === 'row') {
+                    out.push({ ...b, config: { ...b.config, columns: b.config.columns.map((col) => ({ blocks: detach(col.blocks) })) } } as CanvasBlock);
+                    continue;
+                  }
+                  out.push(b);
+                }
+                return out;
+              };
+              blocks = detach(blocks);
+            }
+            const container: CanvasBlock = {
+              id: `cb_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+              type: 'row',
+              config: {
+                widths: [50, 50],
+                align: 'stretch',
+                columns: side === 'left' ? [{ blocks: [block] }, { blocks: [] }] : [{ blocks: [] }, { blocks: [block] }],
+              },
+            };
+            // 定位 target 并替换为容器（target 放进空列）
+            const place = (bs: CanvasBlock[]): CanvasBlock[] =>
+              bs.map((b) => {
+                if (b.id === targetId) {
+                  const cols = (container.config as { columns: { blocks: CanvasBlock[] }[] }).columns;
+                  const targetCol = side === 'left' ? 1 : 0;
+                  cols[targetCol] = { blocks: [b] };
+                  return container;
+                }
+                if (b.type === 'row') {
+                  return { ...b, config: { ...b.config, columns: b.config.columns.map((col) => ({ blocks: place(col.blocks) })) } } as CanvasBlock;
+                }
+                return b;
+              });
+            return { ...c, blocks: place(blocks) };
+          }),
+
+        insertAsNewColumn: (rowId, block, side, moveFromId) =>
+          mutateConfig((c) => {
+            let blocks = c.blocks;
+            if (moveFromId) {
+              const detach = (bs: CanvasBlock[]): CanvasBlock[] => {
+                const out: CanvasBlock[] = [];
+                for (const b of bs) {
+                  if (b.id === moveFromId) continue;
+                  if (b.type === 'row') {
+                    out.push({ ...b, config: { ...b.config, columns: b.config.columns.map((col) => ({ blocks: detach(col.blocks) })) } } as CanvasBlock);
+                    continue;
+                  }
+                  out.push(b);
+                }
+                return out;
+              };
+              blocks = detach(blocks);
+            }
+            const insert = (bs: CanvasBlock[]): CanvasBlock[] =>
+              bs.map((b) => {
+                if (b.id === rowId && b.type === 'row') {
+                  if (b.config.columns.length >= 4) return b;
+                  const n = b.config.columns.length + 1;
+                  const newCol = { blocks: [block] };
+                  const columns = side === 'left' ? [newCol, ...b.config.columns] : [...b.config.columns, newCol];
+                  return {
+                    ...b,
+                    config: { ...b.config, columns, widths: Array.from({ length: n }, () => Math.round(100 / n)) },
+                  } as CanvasBlock;
+                }
+                if (b.type === 'row') {
+                  return { ...b, config: { ...b.config, columns: b.config.columns.map((col) => ({ blocks: insert(col.blocks) })) } } as CanvasBlock;
+                }
+                return b;
+              });
+            return { ...c, blocks: insert(blocks) };
           }),
 
         selectBlock: (id) => set({ selectedId: id }),

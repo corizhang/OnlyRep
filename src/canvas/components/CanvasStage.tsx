@@ -206,6 +206,24 @@ export default function CanvasStage() {
                       onDuplicate: duplicate,
                       onDropReorder: reorder,
                       onResizeRow: (rowId, widths) => useCanvasStore.getState().updateBlock(rowId, { widths }),
+                      onSplitBeside: (targetId, payload, side) => {
+                        const st = useCanvasStore.getState();
+                        if (payload.kind === 'new') {
+                          st.splitBeside(targetId, createBlock(payload.type), side);
+                        } else {
+                          const blk = findInBlocks(st.config.blocks, payload.id);
+                          if (blk) st.splitBeside(targetId, blk, side, payload.id);
+                        }
+                      },
+                      onInsertAsNewColumn: (rowId, payload, side) => {
+                        const st = useCanvasStore.getState();
+                        if (payload.kind === 'new') {
+                          st.insertAsNewColumn(rowId, createBlock(payload.type), side);
+                        } else {
+                          const blk = findInBlocks(st.config.blocks, payload.id);
+                          if (blk) st.insertAsNewColumn(rowId, blk, side, payload.id);
+                        }
+                      },
                       onDropToColumn: (rowId, colIdx, index, payload) => {
                         if (payload.kind === 'new') {
                           addBlockToRow(rowId, colIdx, createBlock(payload.type), index);

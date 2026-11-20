@@ -29,6 +29,10 @@ export interface CanvasEditHandlers {
   onDropToColumn?: (rowId: string, colIdx: number, index: number, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }) => void;
   /** 拖拽列宽手柄结束：提交新的宽度权重数组 */
   onResizeRow?: (rowId: string, widths: number[]) => void;
+  /** 拖到块左/右侧边缘：创建分栏容器（target 与 payload 各占一列） */
+  onSplitBeside?: (targetId: string, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }, side: 'left' | 'right') => void;
+  /** 拖到容器左/右边缘：新增一列放入 */
+  onInsertAsNewColumn?: (rowId: string, payload: { kind: 'block'; id: string } | { kind: 'new'; type: CanvasBlock['type'] }, side: 'left' | 'right') => void;
 }
 
 export interface CanvasRendererProps {
@@ -156,6 +160,8 @@ function BlockShell({
 }) {
   const [hover, setHover] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  /** 拖放到本块侧边的手势态：'left'|'right' 显示竖向分栏指示 */
+  const [splitEdge, setSplitEdge] = useState<'left' | 'right' | null>(null);
   const selected = edit?.selectedId === block.id;
   const isChild = Boolean(parentRowId);
 
@@ -168,7 +174,8 @@ function BlockShell({
     borderRadius: rad ?? 4,
     // 通用设置：外壳边距 + 圆角（圆角在内层裁切容器上实现，避免裁掉悬浮工具条）
     margin: m ? `${m[0]}px ${m[1]}px ${m[2]}px ${m[3]}px` : undefined,
-    borderTop: edit && !isChild && dragOver ? `2px solid ${ctx.accent}` : '2px solid transparent',
+    borderTop: edit && !isChild && dragOver && !splitEdge ? `2px solid ${ctx.accent}` : '2px solid transparent',
+    boxShadow: splitEdge === 'left' ? `inset 3px 0 0 ${ctx.accent}` : splitEdge === 'right' ? `inset -3px 0 0 ${ctx.accent}` : undefined,
     cursor: edit ? 'pointer' : undefined,
     minHeight: isChild ? 24 : undefined,
   };
@@ -195,18 +202,38 @@ function BlockShell({
           e.dataTransfer.effectAllowed = 'move';
         },
         onDragOver: (e: React.DragEvent) => {
-          if (e.dataTransfer.types.includes('text/canvas-block')) {
-            e.preventDefault();
-            setDragOver(true);
-          }
+          const isMove = e.dataTransfer.types.includes('text/canvas-block');
+          const isNew = e.dataTransfer.types.includes('text/new-block');
+          if (!isMove && !isNew) return;
+          e.preventDefault();
+          e.stopPropagation();
+          // 左右 30% 边缘带 = 侧边分栏手势；中间 = 原有排序落点
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          const ratio = (e.clientX - r.left) / Math.max(1, r.width);
+          const edge = ratio <= 0.3 ? 'left' : ratio >= 0.7 ? 'right' : null;
+          setSplitEdge(edge);
+          setDragOver(edge === null && isMove);
         },
-        onDragLeave: () => setDragOver(false),
+        onDragLeave: () => {
+          setDragOver(false);
+          setSplitEdge(null);
+        },
         onDrop: (e: React.DragEvent) => {
           const dragId = e.dataTransfer.getData('text/canvas-block');
+          const newType = e.dataTransfer.getData('text/new-block');
+          const edge = splitEdge;
           setDragOver(false);
-          if (dragId && dragId !== block.id) {
-            e.preventDefault();
-            e.stopPropagation();
+          setSplitEdge(null);
+          if (!dragId && !newType) return;
+          if (dragId === block.id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const payload = dragId
+            ? ({ kind: 'block', id: dragId } as const)
+            : ({ kind: 'new', type: newType as CanvasBlock['type'] } as const);
+          if (edge) {
+            edit.onSplitBeside?.(block.id, payload, edge);
+          } else if (dragId) {
             edit.onDropReorder(dragId, block.id);
           }
         },
@@ -479,7 +506,47 @@ function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type
     block.config.widths.length === cols.length ? block.config.widths : cols.map(() => Math.round(100 / Math.max(1, cols.length)));
   const rootRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<number[] | null>(null);
+  /** 拖到容器左/右边缘带的加列手势态 */
+  const [edgeSide, setEdgeSide] = useState<'left' | 'right' | null>(null);
   const widths = preview ?? baseWidths;
+
+  const edgeDndProps = edit
+    ? {
+        // 捕获相位：列堆栈（ColumnStack）会 stopPropagation，边缘带判定必须抢在它之前
+        onDragOverCapture: (e: React.DragEvent) => {
+          const isMove = e.dataTransfer.types.includes('text/canvas-block');
+          const isNew = e.dataTransfer.types.includes('text/new-block');
+          if (!isMove && !isNew) return;
+          const r = rootRef.current?.getBoundingClientRect();
+          if (!r) return;
+          const dl = e.clientX - r.left;
+          const dr = r.right - e.clientX;
+          const side = dl <= 24 ? ('left' as const) : dr <= 24 ? ('right' as const) : null;
+          setEdgeSide(side);
+          if (side) {
+            // 拦在捕获期：列内指示不抢戏
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        },
+        onDragLeave: (e: React.DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setEdgeSide(null);
+        },
+        onDropCapture: (e: React.DragEvent) => {
+          if (!edgeSide) return;
+          const dragId = e.dataTransfer.getData('text/canvas-block');
+          const newType = e.dataTransfer.getData('text/new-block');
+          setEdgeSide(null);
+          if (!dragId && !newType) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const payload = dragId
+            ? ({ kind: 'block', id: dragId } as const)
+            : ({ kind: 'new', type: newType as CanvasBlock['type'] } as const);
+          edit.onInsertAsNewColumn?.(block.id, payload, edgeSide);
+        },
+      }
+    : {};
 
   const startResize = (e: React.MouseEvent, handleIdx: number): void => {
     if (!edit) return;
@@ -517,7 +584,18 @@ function RowContainer({ block, edit, ctx }: { block: Extract<CanvasBlock, { type
   };
 
   return (
-    <div ref={rootRef} style={{ display: 'flex', gap: ctx.gap, alignItems: block.config.align === 'top' ? 'flex-start' : 'stretch' }}>
+    <div
+      ref={rootRef}
+      style={{
+        display: 'flex',
+        gap: ctx.gap,
+        alignItems: block.config.align === 'top' ? 'flex-start' : 'stretch',
+        // 加列手势指示：容器边缘内侧蓝色竖条
+        boxShadow: edgeSide === 'left' ? `inset 3px 0 0 ${ctx.accent}` : edgeSide === 'right' ? `inset -3px 0 0 ${ctx.accent}` : undefined,
+        borderRadius: 6,
+      }}
+      {...edgeDndProps}
+    >
       {cols.map((col, i) => (
         <Fragment key={i}>
           {edit && i > 0 && (
