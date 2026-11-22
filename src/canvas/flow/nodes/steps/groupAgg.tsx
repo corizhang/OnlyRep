@@ -1,6 +1,5 @@
 import { useCanvasStore } from '../../../../store/useCanvasStore';
-import { FieldRow, NBtn, NSelect } from '../controls';
-import { Input, Select } from 'antd';
+import { FieldRow, NBtn, NInput, NSelect } from '../controls';
 import { AGG_LABELS } from '../types';
 import type { NodeTypeDef } from '../types';
 import type { AggMethod, PipelineNode } from '../../../types';
@@ -32,29 +31,10 @@ function AggRows({ node, cols }: { node: PipelineNode; cols: { value: string; la
       <span className="text-[10.5px] text-[var(--nb-text-dim,#64748b)]">聚合列</span>
       {aggs.map((a, i) => (
         <div key={i} className="flex gap-1">
-          <Select
-            size="small"
-            className="min-w-0 flex-1"
-            placeholder="列"
-            value={a.col === '' ? undefined : a.col}
-            options={cols}
-            onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, col: v ?? '', as: x.as || v || '' } : x)))}
-          />
-          <Select
-            size="small"
-            className="w-[78px] shrink-0"
-            value={a.method}
-            options={(Object.keys(AGG_LABELS) as AggMethod[]).map((m) => ({ value: m, label: AGG_LABELS[m] }))}
-            onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, method: v as AggMethod } : x)))}
-          />
-          <Input
-            size="small"
-            className="w-14 shrink-0"
-            value={a.as}
-            placeholder="命名"
-            onChange={(e) => set(aggs.map((x, j) => (j === i ? { ...x, as: e.target.value } : x)))}
-          />
-          <button type="button" className="text-[11px] text-[var(--nb-text-faint,#9ca3af)] hover:text-[var(--nb-err,#dc2626)]" onClick={() => set(aggs.filter((_, j) => j !== i))}>
+          <NSelect className="min-w-0 flex-1" placeholder="列" value={a.col} options={cols} onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, col: v, as: x.as || v } : x)))} />
+          <NSelect className="w-[84px] shrink-0" value={a.method} options={(Object.keys(AGG_LABELS) as AggMethod[]).map((m) => ({ value: m, label: AGG_LABELS[m] }))} onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, method: v as AggMethod } : x)))} />
+          <NInput className="w-20 shrink-0" value={a.as} placeholder="输出列名" ariaLabel="聚合结果列名" onChange={(v) => set(aggs.map((x, j) => (j === i ? { ...x, as: v } : x)))} />
+          <button type="button" aria-label={`删除第 ${i + 1} 条聚合规则`} title="删除规则" className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[12px] text-[var(--nb-text-faint,#9ca3af)] hover:bg-red-500/10 hover:text-[var(--nb-err,#dc2626)]" onClick={() => set(aggs.filter((_, j) => j !== i))}>
             ×
           </button>
         </div>

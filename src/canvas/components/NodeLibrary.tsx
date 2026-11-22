@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { message } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { createSourceOfKind, createStepNode, spotRightOf, NODE_TYPE_META, SOURCE_KIND_META } from '../flow/nodeOps';
 import type { DataSource, NodeType } from '../types';
@@ -76,7 +77,7 @@ export default function NodeLibrary() {
         type="button"
         onClick={() => setCollapsed(false)}
         title="展开节点库"
-        className="flex h-full w-7 shrink-0 flex-col items-center justify-center gap-2 border-r border-line bg-brand py-3 text-white shadow-sm transition-colors hover:bg-brand-hover"
+        className="flex h-full w-7 shrink-0 flex-col items-center justify-center gap-2 border-r border-line bg-soft py-3 text-ink-dim transition-colors hover:bg-brand-hover"
       >
         <span className="text-[12px] leading-none">»</span>
         <span style={{ writingMode: 'vertical-lr', letterSpacing: 3 }} className="text-[11px] font-medium">
@@ -100,7 +101,7 @@ export default function NodeLibrary() {
 
       <header className="px-3 pb-1.5 pt-3">
         <div className="relative">
-          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-ink-faint">🔍</span>
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-ink-faint"><SearchOutlined /></span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}

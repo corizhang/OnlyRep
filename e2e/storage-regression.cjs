@@ -90,7 +90,9 @@ function watchErrors(page, bucket) {
     // 主题切换会写入 appStorage（rankboard-ui-theme）；内存降级下也必须正常工作
     let modeOk = false;
     try {
-      await page.locator('header button:has(.anticon-moon)').first().click({ timeout: 5000 });
+      await page.locator('header button:has(.anticon-setting)').first().click({ timeout: 5000 });
+      await page.getByRole('combobox', { name: '界面主题' }).click();
+      await page.getByText('深色 · 石墨灰', { exact: true }).last().click();
       await page.waitForTimeout(400);
       modeOk = (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark';
     } catch {

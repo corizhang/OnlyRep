@@ -2,34 +2,34 @@
  * RankBoard 设计 Token（编辑器外壳）—— 单一事实来源。
  *
  * 分层边界（勿混用）：
- * - 本文件 --ui-*：编辑器 UI（面板/检查器/工具栏/弹窗/库），当前仅浅色；深色预留 [data-theme="dark"]。
+ * - 本文件 --ui-*：编辑器 UI（面板/检查器/工具栏/弹窗/库），浅色与石墨灰深色主题使用 [data-theme="dark"]。
  * - canvas/flow/nodeTheme.ts --nb-*：节点画布内部主题（深/浅），由 FlowSheet 根节点注入。
  * - types/index.ts ThemeTokens：用户作品（日报画布内容）的主题，与编辑器无关，保持独立。
  *
- * 配色基调：冷灰中性 + 银行蓝，状态色去荧光感（warn 用 amber-700 而非刺眼的 500）。
+ * 配色基调：中性灰 + 低饱和蓝，状态色去荧光感（warn 用 amber-700 而非刺眼的 500）。
  */
 
 :root {
   /* 面与底 */
-  --ui-bg: #eef1f5; /* 应用底色（比 slate-100 略冷，承托白色面板） */
+  --ui-bg: #e2e3e5; /* 应用底色（比 slate-100 略冷，承托白色面板） */
   --ui-panel: #ffffff; /* 面板/卡片底 */
-  --ui-panel-soft: #f8fafc; /* 内嵌区/表头底 */
-  --ui-panel-hover: #f1f5f9; /* 悬停底 */
+  --ui-panel-soft: #f2f2f2; /* 内嵌区/表头底 */
+  --ui-panel-hover: #e9eaec; /* 悬停底 */
 
   /* 线条 */
-  --ui-line: #e4e9f0; /* 常规边框/分隔线 */
-  --ui-line-strong: #cbd5e1; /* 强边框（输入框、选中态） */
+  --ui-line: #dedfe1; /* 常规边框/分隔线 */
+  --ui-line-strong: #bfc3c7; /* 强边框（输入框、选中态） */
 
   /* 文字（三级） */
-  --ui-ink: #1e293b; /* 主文字 */
-  --ui-ink-dim: #5b6b82; /* 次要文字（标签/说明） */
-  --ui-ink-faint: #94a3b8; /* 最弱（占位/计数） */
+  --ui-ink: #292d32; /* 主文字 */
+  --ui-ink-dim: #626970; /* 次要文字（标签/说明） */
+  --ui-ink-faint: #94999f; /* 最弱（占位/计数） */
 
   /* 品牌蓝 */
-  --ui-brand: #2563eb;
-  --ui-brand-hover: #1d4ed8;
-  --ui-brand-soft: #eff4ff; /* 品牌浅底（选中态/提示底） */
-  --ui-brand-line: #bfdbfe; /* 品牌描边 */
+  --ui-brand: #4b80ad;
+  --ui-brand-hover: #3e6f98;
+  --ui-brand-soft: #e8f0f6; /* 品牌浅底（选中态/提示底） */
+  --ui-brand-line: #a9c3d8; /* 品牌描边 */
 
   /* 状态色（DEFAULT=文字/强色，soft=底） */
   --ui-ok: #059669;
@@ -39,32 +39,36 @@
   --ui-danger: #dc2626;
   --ui-danger-soft: #fef2f2;
 
+  --ui-grid-dot: #bfc3c7;
+
   /* 结构 */
-  --ui-radius: 8px;
-  --ui-radius-sm: 6px;
+  --ui-radius: 4px;
+  --ui-radius-sm: 3px;
   --ui-shadow-pop: 0 4px 16px rgba(15, 23, 42, 0.12);
   --ui-shadow-card: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 /* 深色编辑器：data-theme="dark" 时整体覆盖（组件类名不动） */
 [data-theme='dark'] {
-  --ui-bg: #0b1220;
-  --ui-panel: #151d2e;
-  --ui-panel-soft: #1b2536;
-  --ui-panel-hover: #223047;
+  color-scheme: dark;
+  --ui-grid-dot: #595959;
+  --ui-bg: #454545;
+  --ui-panel: #292929;
+  --ui-panel-soft: #303030;
+  --ui-panel-hover: #383838;
 
-  --ui-line: #28344b;
-  --ui-line-strong: #3a4a66;
+  --ui-line: #414141;
+  --ui-line-strong: #555555;
 
-  --ui-ink: #e2e8f0;
-  --ui-ink-dim: #94a3b8;
-  --ui-ink-faint: #64748b;
+  --ui-ink: #e0e0e0;
+  --ui-ink-dim: #b0b0b0;
+  --ui-ink-faint: #999999;
 
   /* 深色下品牌蓝提亮一档（对比度） */
-  --ui-brand: #3b82f6;
-  --ui-brand-hover: #60a5fa;
-  --ui-brand-soft: rgba(59, 130, 246, 0.16);
-  --ui-brand-line: rgba(59, 130, 246, 0.4);
+  --ui-brand: #77a7cc;
+  --ui-brand-hover: #91bad9;
+  --ui-brand-soft: rgba(75, 128, 173, 0.22);
+  --ui-brand-line: rgba(119, 167, 204, 0.5);
 
   --ui-ok: #34d399;
   --ui-ok-soft: rgba(16, 185, 129, 0.14);
@@ -73,6 +77,6 @@
   --ui-danger: #f87171;
   --ui-danger-soft: rgba(248, 113, 113, 0.14);
 
-  --ui-shadow-pop: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --ui-shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.3);
   --ui-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
 }

@@ -3,7 +3,7 @@ import type { PipelineNode } from '../types';
 /**
  * 流程视图自动布局（ARCH P2.1）。
  *
- * 规则：按依赖深度从左到右分层（数据源在最左，末端节点在最右），同层按管道内定义顺序纵向排列并整体居中；
+ * 规则：按依赖深度从左到右分层（数据源在最左，末端节点在最右），同层按上游位置排序并对齐，留出节点间距；
  * 用户手动拖动过的节点用 flowPos 覆盖坐标，其余节点继续自动排布。
  * 纯函数、无 DOM 依赖，便于单测。
  */
@@ -30,6 +30,7 @@ export interface LayoutNode extends FlowPos {
 export interface LayoutEdge {
   from: string;
   to: string;
+  lane?: number;
 }
 
 export interface LayoutResult {
@@ -64,6 +65,7 @@ export function computeFlowLayout(
   nodes: PipelineNode[],
   overrides: Record<string, FlowPos> = {},
   heights: Record<string, number> = {},
+  anchorId?: string,
 ): LayoutResult {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const memo = new Map<string, number>();
@@ -90,23 +92,59 @@ export function computeFlowLayout(
 
   const out: LayoutNode[] = [];
   for (const depth of Array.from(layers.keys()).sort((a, b) => a - b)) {
-    const list = layers.get(depth)!;
+    const upstreamY = (node: PipelineNode): number | undefined => {
+      const parents = node.inputs.map((id) => out.find((p) => p.id === id)).filter((p): p is LayoutNode => Boolean(p));
+      return parents.length ? parents.reduce((sum, p) => sum + p.y + hOf(p.id) / 2, 0) / parents.length : undefined;
+    };
+    const list = [...layers.get(depth)!].sort((a, b) => (upstreamY(a) ?? 0) - (upstreamY(b) ?? 0));
     const layerHeight = list.reduce((s, n) => s + hOf(n.id), 0) + (list.length - 1) * GAP_Y;
     const offsetY = Math.max(0, (contentHeight - layerHeight) / 2);
+    let nextY = 0;
     list.forEach((node, row) => {
       // 同层纵向：累计前序节点的实际高度（配置内嵌后高度不再固定）
       const yOff = list.slice(0, row).reduce((s, m) => s + hOf(m.id), 0) + row * GAP_Y;
       const auto: FlowPos = {
         x: depth * (NODE_W + GAP_X),
-        y: offsetY + yOff,
+        y: Math.max(nextY, (upstreamY(node) ?? (offsetY + yOff + hOf(node.id) / 2)) - hOf(node.id) / 2),
       };
       const manual = overrides[node.id];
       const pos = manual && Number.isFinite(manual.x) && Number.isFinite(manual.y) ? manual : auto;
       out.push({ id: node.id, depth, row, x: pos.x, y: pos.y });
+      nextY = auto.y + hOf(node.id) + GAP_Y;
     });
   }
 
-  // 3) 边（悬空输入忽略）
+  // 3) 选中节点展开时临时避让：锚点保持原位，其他节点只做纵向位移。
+  // 位移只存在于本次布局结果中，不写入 flowPos；折叠/取消选择后自动回到用户原坐标。
+  const anchor = out.find((n) => n.id === anchorId);
+  if (anchor && hOf(anchor.id) > NODE_H + 16) {
+    const ordered = [anchor, ...out.filter((n) => n.id !== anchor.id).sort((a, b) => a.y - b.y || a.x - b.x)];
+    const placed: LayoutNode[] = [];
+    for (const node of ordered) {
+      const current = { ...node };
+      if (current.id !== anchor.id) {
+        let guard = 0;
+        while (guard++ < nodes.length * 4) {
+          const collision = placed.find((p) =>
+            current.x < p.x + NODE_W && current.x + NODE_W > p.x &&
+            current.y < p.y + hOf(p.id) + GAP_Y && current.y + hOf(current.id) + GAP_Y > p.y,
+          );
+          if (!collision) break;
+          const currentCenter = current.y + hOf(current.id) / 2;
+          const collisionCenter = collision.y + hOf(collision.id) / 2;
+          if (currentCenter >= collisionCenter) {
+            current.y = collision.y + hOf(collision.id) + GAP_Y;
+          } else {
+            current.y = Math.max(0, collision.y - hOf(current.id) - GAP_Y);
+          }
+        }
+      }
+      placed.push(current);
+    }
+    out.splice(0, out.length, ...placed.sort((a, b) => a.depth - b.depth || a.row - b.row));
+  }
+
+  // 4) 边（悬空输入忽略）
   const edges: LayoutEdge[] = [];
   for (const node of nodes) {
     for (const input of node.inputs) {
@@ -123,31 +161,57 @@ export function computeFlowLayout(
     maxY = Math.max(maxY, n.y + hOf(n.id));
   }
 
+  // Each source owns a distinct vertical lane within its layer gap.
+  for (const edge of edges) {
+    const sources = out.filter((n) => n.depth === byIdPos[edge.from].depth && edges.some((e) => e.from === n.id)).sort((a, b) => a.y - b.y || a.id.localeCompare(b.id));
+    edge.lane = 0.25 + 0.5 * (sources.findIndex((n) => n.id === edge.from) + 1) / (sources.length + 1);
+  }
   return { nodes: out, edges, byId: byIdPos, width: maxX, height: maxY };
 }
 
-/** 边的三次贝塞尔路径（左右连接，中段走水平切线）；高度传 DOM 实测值，默认兜底 NODE_H */
-export function edgePath(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH: number = NODE_H): string {
-  const x1 = from.x + NODE_W;
-  const y1 = from.y + Math.max(20, fromH) / 2;
-  const x2 = to.x;
-  const y2 = to.y + Math.max(20, toH) / 2;
-  const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
-  return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+/** Orthogonal routes keep a horizontal lead-in at each port. */
+function edgePoints(from: FlowPos, to: FlowPos, fromH: number, toH: number, lane: number): FlowPos[] {
+  const start = { x: from.x + NODE_W, y: from.y + Math.max(20, fromH) / 2 };
+  const end = { x: to.x - 7, y: to.y + Math.max(20, toH) / 2 };
+  const gap = end.x - start.x;
+  if (gap >= 48) {
+    const x = start.x + 20 + (gap - 40) * Math.max(0, Math.min(1, lane));
+    return [start, { x, y: start.y }, { x, y: end.y }, end];
+  }
+  // Reverse/close connections go around the top instead of turning through a node.
+  const top = Math.min(from.y, to.y) - 32 - lane * 24;
+  return [start, { x: start.x + 24, y: start.y }, { x: start.x + 24, y: top }, { x: end.x - 24, y: top }, { x: end.x - 24, y: end.y }, end];
 }
 
-/** 连线贝塞尔中点（t=0.5）：用于选中态的删除按钮锚点 */
-export function edgeMid(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH: number = NODE_H): FlowPos {
-  const x1 = from.x + NODE_W;
-  const y1 = from.y + Math.max(20, fromH) / 2;
-  const x2 = to.x;
-  const y2 = to.y + Math.max(20, toH) / 2;
-  const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
-  // 三次贝塞尔 t=0.5：(P0 + 3P1 + 3P2 + P3) / 8
-  return {
-    x: (x1 + 3 * (x1 + dx) + 3 * (x2 - dx) + x2) / 8,
-    y: (y1 + 3 * y1 + 3 * y2 + y2) / 8,
-  };
+export function edgePath(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH: number = NODE_H, lane = 0.5): string {
+  const points = edgePoints(from, to, fromH, toH, lane).filter((p, i, list) => !i || p.x !== list[i - 1].x || p.y !== list[i - 1].y);
+  let path = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1], p = points[i], next = points[i + 1];
+    const before = Math.hypot(p.x - prev.x, p.y - prev.y);
+    const after = Math.hypot(next.x - p.x, next.y - p.y);
+    const r = Math.min(8, before / 2, after / 2);
+    const a = { x: p.x + (prev.x - p.x) * r / before, y: p.y + (prev.y - p.y) * r / before };
+    const b = { x: p.x + (next.x - p.x) * r / after, y: p.y + (next.y - p.y) * r / after };
+    path += ` L ${a.x} ${a.y} Q ${p.x} ${p.y} ${b.x} ${b.y}`;
+  }
+  const end = points[points.length - 1];
+  return `${path} L ${end.x} ${end.y}`;
+}
+
+/** Halfway along the route, keeping the delete action on its connection. */
+export function edgeMid(from: FlowPos, to: FlowPos, fromH: number = NODE_H, toH: number = NODE_H, lane = 0.5): FlowPos {
+  const points = edgePoints(from, to, fromH, toH, lane);
+  const lengths = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y));
+  let remaining = lengths.reduce((sum, length) => sum + length, 0) / 2;
+  for (let i = 0; i < lengths.length; i++) {
+    if (remaining <= lengths[i] && lengths[i] > 0) {
+      const t = remaining / lengths[i];
+      return { x: points[i].x + (points[i + 1].x - points[i].x) * t, y: points[i].y + (points[i + 1].y - points[i].y) * t };
+    }
+    remaining -= lengths[i];
+  }
+  return points[0];
 }
 
 /** 矩形相交（框选用） */

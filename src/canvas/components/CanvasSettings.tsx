@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { Modal } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { downloadJsonFile, makeAllDataBackup, validateAllDataBackup } from '../template';
 import { loadTemplateLibrary, saveTemplateLibrary, type TemplateLibraryData } from '../templateLibrary';
@@ -11,7 +12,7 @@ import { useState } from 'react';
 const CANVAS_PERSIST_KEY = 'rankboard-canvas-v3';
 
 /** 画布级基础配置（PRD R4-10 / K9）：主题、宽度、字号、涨跌语义、模板存取 */
-export default function CanvasSettings() {
+export default function CanvasSettings({ section = 'canvas' }: { section?: 'canvas' | 'export' | 'storage' }) {
   const config = useCanvasStore((s) => s.config);
   const patch = useCanvasStore((s) => s.patchConfig);
   const [msg, setMsg] = useState('');
@@ -46,7 +47,7 @@ export default function CanvasSettings() {
   return (
     <div className="space-y-3">
 
-      <Section title="数据迁移">
+      {section === 'storage' && <Section title="数据迁移">
         <div className="flex flex-wrap gap-1">
           <Btn size="xs" onClick={exportAll}>
             导出全部数据
@@ -61,17 +62,17 @@ export default function CanvasSettings() {
             className="hidden"
             onChange={async (e) => {
               const f = e.target.files?.[0];
-              if (f) await importAll(f);
+              if (f) Modal.confirm({ zIndex: 2100, title: '替换当前工作区和模板库？', content: '导入后会立即刷新。建议先导出当前数据备份。', okText: '确认导入', cancelText: '取消', onOk: () => importAll(f) });
               e.target.value = '';
             }}
           />
         </div>
         <p className="text-[11.5px] text-ink-faint">
-          备份含工作区与整个模板库，用于浏览器 ↔ 桌面应用之间搬家；导入后立即刷新生效。
+          备份含工作区与整个模板库，用于浏览器 ↔ 桌面应用之间搬家；不含项目库全部项目及应用偏好。导入会替换当前工作区和模板库并刷新，请先导出备份。
         </p>
-      </Section>
+      </Section>}
 
-      <Section title="画布">
+      {section === 'canvas' && <Section title="画布">
         <Field label="标题（导出文件名用）">
           <TextInput value={config.title} onChange={(v) => patch({ title: v })} />
         </Field>
@@ -142,9 +143,9 @@ export default function CanvasSettings() {
             <ColorInput value={config.fallColor} onChange={(v) => patch({ fallColor: v })} />
           </Field>
         </div>
-      </Section>
+      </Section>}
 
-      <Section title="导出">
+      {section === 'export' && <Section title="导出">
         <Field label="倍率">
           <Select
             value={String(config.exportScale)}
@@ -157,7 +158,7 @@ export default function CanvasSettings() {
           />
         </Field>
         <p className="text-[11.5px] text-ink-faint">图表使用 SVG 渲染，4x 导出依然清晰；导出时编辑框会自动隐藏。</p>
-      </Section>
+      </Section>}
     </div>
   );
 }

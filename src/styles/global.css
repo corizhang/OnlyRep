@@ -5,7 +5,7 @@
 
 :root {
   /* 系统字体栈（铁律：不加载 web font，保证离线可用） */
-  --rb-font-system: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --rb-font-system: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 html,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { message, Segmented, Tooltip } from 'antd';
-import { DatabaseOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
@@ -12,11 +12,10 @@ import BlockLibrary from './BlockLibrary';
 import NodeLibrary from './NodeLibrary';
 import BlockInspector from './BlockInspector';
 import VariablePanel from './VariablePanel';
-import CanvasSettings from './CanvasSettings';
 import CanvasStage from './CanvasStage';
-import FlowSheet, { NodeInspector } from '../flow/FlowSheet';
+import FlowSheet from '../flow/FlowSheet';
 import TemplateLibraryModal from './TemplateLibraryModal';
-import SettingsModal from './SettingsModal';
+import SettingsModal, { type SettingsSection } from './SettingsModal';
 import ProjectLibraryModal from './ProjectLibraryModal';
 import SourceGuideModal from './SourceGuideModal';
 import { findPath } from '../blocks/rowTree';
@@ -39,8 +38,6 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   const canUndo = useCanvasStore((s) => s.history.past.length > 0);
   const canRedo = useCanvasStore((s) => s.history.future.length > 0);
   const storageError = useCanvasStore((s) => s.storageError);
-  const uiTheme = useCanvasStore((s) => s.uiTheme);
-  const toggleUiTheme = useCanvasStore((s) => s.toggleUiTheme);
   const externalUpdate = useCanvasStore((s) => s.externalUpdate);
   const activeTemplateId = useCanvasStore((s) => s.activeTemplateId);
   const templates = useCanvasStore((s) => s.templates);
@@ -48,7 +45,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   const [showPrjLib, setShowPrjLib] = useState(false);
   const activePrjName = useCanvasStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? null);
   const projectDirty = useCanvasStore((s) => s.projectDirty);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
   useEffect(() => {
@@ -82,12 +79,23 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const onSettingsKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+        e.preventDefault(); setSettingsSection('general');
+      }
+    };
+    window.addEventListener('keydown', onSettingsKey);
+    return () => window.removeEventListener('keydown', onSettingsKey);
+  }, []);
+
   // 全局撤销/重做：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y（输入控件内交给浏览器原生行为）
   useEffect(() => {
     const toast = (name: string | null, verb: string): void => {
       if (name) message.info({ content: `${verb}：${name}`, duration: 1.2 });
     };
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -117,6 +125,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   // Esc 逐级上钻：选中嵌套块→选父容器，顶层块→取消选中（Figma 惯例）
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
       if (e.key !== 'Escape') return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
@@ -135,7 +144,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
 
   return (
     <div className="flex h-screen flex-col bg-hover">
-      <header className="flex items-center justify-between border-b border-line bg-panel px-5 py-2">
+      <header className="flex items-center justify-between h-12 shrink-0 border-b border-line bg-panel px-3">
         <div className="flex items-center gap-4">
           <h1 className="text-[15px] font-semibold text-ink">RankBoard · 日报画布</h1>
           {/* 双视图切换：切换时左栏/画布/右栏三处联动 */}
@@ -153,7 +162,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
               <button
                 type="button"
                 onClick={onHome}
-                className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+                className="flex items-center rounded border border-transparent bg-transparent px-2 py-1 text-[12px] text-ink-dim hover:bg-hover hover:text-ink"
               >
                 ⌂
               </button>
@@ -170,7 +179,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
                   const name = st.projects.find((p) => p.id === id)?.name ?? '项目';
                   message.success({ content: `已保存到「${name}」`, duration: 1.5 });
                 }}
-                className="relative flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+                className="relative flex items-center rounded border border-transparent bg-transparent px-2 py-1 text-[12px] text-ink-dim hover:bg-hover hover:text-ink"
               >
                 💾
                 {projectDirty && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-warn" />}
@@ -182,7 +191,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
             <button
               type="button"
               onClick={() => setShowPrjLib(true)}
-              className="flex max-w-[180px] items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[11.5px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              className="flex max-w-[180px] items-center gap-1 rounded border border-transparent bg-transparent px-2 py-1 text-[11.5px] text-ink-dim hover:bg-hover hover:text-ink"
             >
               <DatabaseOutlined style={{ fontSize: 12 }} />
               <span className="truncate">{activePrjName ?? '项目库'}</span>
@@ -193,28 +202,19 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
             <button
               type="button"
               onClick={() => setShowTplLib(true)}
-              className="flex max-w-[180px] items-center gap-1 rounded-md border border-line bg-panel px-2 py-1 text-[11.5px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              className="flex max-w-[180px] items-center gap-1 rounded border border-transparent bg-transparent px-2 py-1 text-[11.5px] text-ink-dim hover:bg-hover hover:text-ink"
             >
               <FolderOpenOutlined style={{ fontSize: 12 }} />
               <span className="truncate">{activeTplName ?? '模板库'}</span>
             </button>
           </Tooltip>
-          <Tooltip title={uiTheme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}>
+          <Tooltip title="设置（Ctrl+,）">
             <button
               type="button"
-              onClick={toggleUiTheme}
-              className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              onClick={() => setSettingsSection('general')}
+              className="flex items-center rounded border border-transparent bg-transparent px-2 py-1 text-[12px] text-ink-dim hover:bg-hover hover:text-ink"
             >
-              {uiTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-            </button>
-          </Tooltip>
-          <Tooltip title="设置（导出路径等）">
-            <button
-              type="button"
-              onClick={() => setShowSettings(true)}
-              className="flex items-center rounded-md border border-line bg-panel px-2 py-1 text-[12px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
-            >
-              ⚙
+              <SettingOutlined />
             </button>
           </Tooltip>
           {/* 撤销/重做（config 级：节点/数据/区块/主题全部覆盖） */}
@@ -319,33 +319,29 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
 
         <VariablePanel />
 
-        <aside className={`shrink-0 overflow-y-auto border-l border-line bg-soft p-2.5 ${isCanvas ? 'w-[360px]' : 'w-[380px]'}`}>
-          {isCanvas ? (
-            <>
+        {isCanvas && (
+          <aside className="w-[360px] shrink-0 overflow-y-auto border-l border-line bg-soft p-2.5">
               {selected ? (
                 // Figma 式平面面板：不再套卡片，分区靠留白与细分隔线（ui.Section 已扁平化）
                 <BlockInspector block={selected} />
               ) : (
-                <CanvasSettings />
+                <div className="space-y-4 p-3"><h2 className="text-sm font-semibold text-ink">当前画布</h2><div className="rounded border border-line bg-panel p-3 text-xs leading-relaxed text-ink-dim"><div className="font-medium text-ink">{config.title || '未命名画布'}</div><div className="mt-2">{config.width}px · 基准字号 {config.baseFontSize}px · 导出 {config.exportScale}x</div></div><Btn onClick={() => setSettingsSection('canvas')}>画布设置</Btn><p className="text-xs leading-relaxed text-ink-faint">尺寸、主题和排版已集中到设置。选中组件后可在此编辑组件属性。</p></div>
               )}
               {selected && (
                 <div className="mt-2 text-center">
-                  <Btn size="xs" tone="ghost" onClick={() => useCanvasStore.getState().selectBlock(null)}>
+                  <Btn size="xs" tone="ghost" onClick={() => setSettingsSection('canvas')}>
                     返回画布设置
                   </Btn>
                 </div>
               )}
-            </>
-          ) : (
-            <NodeInspector />
-          )}
-        </aside>
+          </aside>
+        )}
       </main>
 
       {showFlow && <FlowSheet />}
 
       <TemplateLibraryModal open={showTplLib} onClose={() => setShowTplLib(false)} />
-      <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsModal open={settingsSection !== null} initialSection={settingsSection ?? 'general'} onClose={() => setSettingsSection(null)} />
       <ProjectLibraryModal open={showPrjLib} onClose={() => setShowPrjLib(false)} />
       <SourceGuideModal />
 
@@ -365,6 +361,7 @@ function ShortcutsHelp({ viewMode }: { viewMode: 'canvas' | 'node' }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
       if (e.key === 'Escape') setOpen(false);
     };
     window.addEventListener('keydown', onKey);
@@ -451,7 +448,7 @@ function ShortcutsHelp({ viewMode }: { viewMode: 'canvas' | 'node' }) {
               ))}
             </div>
             <div className="mt-3 border-t border-line pt-2 text-[10.5px] leading-relaxed text-ink-faint">
-              遇到问题：截图 + 画布设置「导出全部数据」→ 发给运营管理员
+              遇到问题：截图 + 设置 → 项目与存储 →「导出全部数据」→ 发给运营管理员
               <br />
               反馈时请附版本号：<span className="text-ink-dim">v{__APP_VERSION__} · {__BUILD_TIME__}</span>
             </div>
