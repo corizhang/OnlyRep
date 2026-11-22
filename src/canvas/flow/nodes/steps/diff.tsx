@@ -13,9 +13,10 @@ export const diffDef: NodeTypeDef = {
   desc: '较上日增加一列',
   hint: '逐行求与上一行的差值',
   needsTableInput: true,
-  defaultParams: () => ({ col: '', dateCol: '', groupCol: '', as: '' }),
+  defaultParams: () => ({ mode: 'difference', col: '', dateCol: '', groupCol: '', as: '' }),
   Config: ({ node, cols, setParam }) => (
     <>
+      <FieldRow label="计算方式"><NSelect value={String(node.params.mode ?? 'difference')} options={[{ value: 'difference', label: '差值（本期 − 上期）' }, { value: 'rate', label: '变化率（%）' }]} onChange={(v) => setParam({ mode: v })} /></FieldRow>
       <FieldRow label="数值列"><NSelect value={String(node.params.col ?? '')} placeholder="选择列（如累计值）" options={cols} onChange={(v) => setParam({ col: v })} /></FieldRow>
       <FieldRow label="日期列"><NSelect value={String(node.params.dateCol ?? '')} placeholder="按现有行顺序" options={cols} onChange={(v) => setParam({ dateCol: v })} /></FieldRow>
       <FieldRow label="分组列"><NSelect value={String(node.params.groupCol ?? '')} placeholder="不分组（全表逐行）" options={cols} onChange={(v) => setParam({ groupCol: v })} /></FieldRow>

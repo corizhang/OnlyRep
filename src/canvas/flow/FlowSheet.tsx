@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Dropdown } from 'antd';
-import { DeleteOutlined, MoonOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, PoweroffOutlined, SunOutlined } from '@ant-design/icons';
+import { DeleteOutlined, MoonOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, PoweroffOutlined, SearchOutlined, SunOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import type { NodeOutput, NodeType, PipelineNode , CanvasBlock } from '../types';
 import { computeFlowLayout, edgeMid, edgePath, NODE_H, NODE_W, rectsIntersect, type FlowPos } from './layout';
 import FlowNodeCard from './FlowNodeCard';
 import { nodeThemeVars, type NodeTheme } from './nodeTheme';
-import { stepDef } from './nodes';
+import { NODE_TYPE_META, stepDef } from './nodes';
 import EmptyGuide from '../components/EmptyGuide';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
@@ -35,6 +36,13 @@ interface DragState {
   moved: boolean;
   /** Ctrl/Shift+点击：抬起时切换选中而非拖动 */
   toggleOnUp?: string;
+}
+
+interface ScreenRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 export default function FlowSheet({ embedded = false }: { embedded?: boolean }) {
@@ -66,6 +74,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const [dropHover, setDropHover] = useState(false);
   const [heights, setHeights] = useState<Record<string, number>>({});
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [nodeDataOpen, setNodeDataOpen] = useState(true);
   /** 端口连线拖拽：from=源节点，start=输出端口坐标，cur=指针画布坐标，hover=命中的合法目标 */
   const [connect, setConnect] = useState<{ from: string; start: FlowPos; cur: FlowPos; hover: string | null } | null>(null);
   /** 框选（Shift+背景拖拽）：画布坐标起止点 */
@@ -80,15 +90,48 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   }, []);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const [canvasBounds, setCanvasBounds] = useState<ScreenRect | null>(null);
+  const initialFitDoneRef = useRef(false);
   const dragRef = useRef<DragState | null>(null);
   const panRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = (): void => {
+      const r = el.getBoundingClientRect();
+      const next = { left: r.left, top: r.top, width: r.width, height: r.height };
+      setCanvasBounds((prev) => prev && Math.abs(prev.left - next.left) < 1 && Math.abs(prev.top - next.top) < 1 && Math.abs(prev.width - next.width) < 1 && Math.abs(prev.height - next.height) < 1 ? prev : next);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
   const layout = useMemo(
-    () => computeFlowLayout(config.pipeline.nodes, config.flowPos ?? {}, heights),
-    [config.pipeline.nodes, config.flowPos, heights],
+    () => computeFlowLayout(config.pipeline.nodes, config.flowPos ?? {}, heights, flowSelectedIds.length === 1 ? flowSelectedIds[0] : undefined),
+    [config.pipeline.nodes, config.flowPos, heights, flowSelectedIds],
   );
+  const screenNodeRects = useMemo(() => {
+    if (!canvasBounds) return {} as Record<string, ScreenRect>;
+    return Object.fromEntries(layout.nodes.map((n) => {
+      const pos = withDelta(n, delta);
+      return [n.id, {
+        left: canvasBounds.left + pan.x + zoom * pos.x,
+        top: canvasBounds.top + pan.y + zoom * pos.y,
+        width: NODE_W * zoom,
+        height: (heights[n.id] ?? NODE_H) * zoom,
+      }];
+    }));
+  }, [layout.nodes, canvasBounds, pan, zoom, delta, heights]);
+  const miniScale = Math.min(160 / Math.max(1, layout.width), 92 / Math.max(1, layout.height));
 
   const nodeById = useMemo(() => new Map(config.pipeline.nodes.map((n) => [n.id, n])), [config.pipeline.nodes]);
   const selectedIds = flowSelectedIds;
@@ -99,6 +142,11 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   // 切换选中节点时收起「添加下游」浮层
   useEffect(() => {
     setAddMenuOpen(false);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (selectedId) setNodeDataOpen(true);
+    else setNodeDataOpen(false);
   }, [selectedId]);
 
   /** 批量启用/停用（ids 为空时无操作） */
@@ -158,9 +206,9 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   };
 
   /** 是否显示左侧输入端口（需要表格上游的步骤节点） */
-  const acceptsInput = (n: PipelineNode): boolean => stepDef(n.type)?.needsTableInput === true;
-  /** 是否显示右侧输出端口（取数/计算字段产出标量，不能作表格上游） */
-  const hasOutPort = (n: PipelineNode): boolean => n.type !== 'formula' && n.type !== 'scalarOut';
+  const acceptsInput = (n: PipelineNode): boolean => stepDef(n.type)?.needsTableInput === true || n.type === 'formula';
+  /** 公式节点无上游时产出标量；接入表格后产出逐行计算表 */
+  const hasOutPort = (n: PipelineNode): boolean => n.type !== 'scalarOut' && (n.type !== 'formula' || n.inputs.length > 0);
 
   /** 连线校验：返回 null 表示可连，否则为不可连原因 */
   const connectError = (from: string, to: string): string | null => {
@@ -188,6 +236,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   useEffect(() => {
     if (!connect) return;
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
       if (e.key === 'Escape') setConnect(null);
     };
     window.addEventListener('keydown', onKey);
@@ -197,6 +246,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   // 多选快捷键：Delete/Backspace 删除选中、Ctrl/Cmd+A 全选、Esc 清空选择（输入控件内不响应）
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, select, [contenteditable="true"]')) return;
       if (e.key === 'Escape' && !connect) {
@@ -285,24 +335,43 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     const w = el?.clientWidth ?? 1000;
     const h = el?.clientHeight ?? 700;
     const z = Math.min(1, (w - 56) / Math.max(1, layout.width), (h - 56) / Math.max(1, layout.height));
-    const nz = Math.max(0.35, Math.min(1.2, z));
+    const nz = Math.max(0.18, Math.min(1.2, z));
     setZoom(nz);
     setPan({ x: (w - layout.width * nz) / 2, y: Math.max(20, (h - layout.height * nz) / 2) });
   };
 
-  // 首次进入自动适应
+  useEffect(() => {
+    const onQuickAdd = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      e.preventDefault();
+      setQuickAddOpen(true);
+    };
+    window.addEventListener('keydown', onQuickAdd);
+    return () => window.removeEventListener('keydown', onQuickAdd);
+  }, []);
+
+  // 首次进入：等所有卡片报告真实高度后再适应视图，避免按占位尺寸缩放造成大片空白。
   useEffect(() => {
     const fxnode = new URLSearchParams(window.location.search).get('fxnode');
     if (fxnode) setFlowSelectedId(fxnode);
-    const t = setTimeout(fit, 30);
-    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (initialFitDoneRef.current || config.pipeline.nodes.length === 0 || Object.keys(heights).length < config.pipeline.nodes.length) return;
+    initialFitDoneRef.current = true;
+    requestAnimationFrame(fit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heights, config.pipeline.nodes.length]);
 
   // Esc 关闭（仅独立全屏模式；嵌入数据节点视图时无「关闭」概念）
   useEffect(() => {
     if (embedded) return;
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.target as HTMLElement | null)?.closest('[role="dialog"]')) return;
       if (e.key === 'Escape') setShowFlow(false);
     };
     window.addEventListener('keydown', onKey);
@@ -352,6 +421,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const onNodeDown = (e: React.PointerEvent, nodeId: string, node: FlowPos): void => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    setNodeDataOpen(true);
     setEdgeSel(null);
     containerRef.current?.setPointerCapture(e.pointerId);
     // Ctrl/Shift+点击：抬起时切换选中（不进入拖动）
@@ -517,7 +587,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     const type = nodeType as NodeType;
     const hitId = hitNodeAt(px, py);
     const hitOk = hitId && isTableOut(hitId) ? hitId : null;
-    const inputId = type === 'formula' ? null : hitOk ?? (flowSelectedId && isTableOut(flowSelectedId) ? flowSelectedId : null);
+    const inputId = type === 'formula' ? hitOk : hitOk ?? (flowSelectedId && isTableOut(flowSelectedId) ? flowSelectedId : null);
     if (type !== 'formula' && !inputId) {
       showHint('处理节点请拖到表格节点上（自动连为下游），或先点选一个表格节点');
       return;
@@ -534,7 +604,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
 
   return (
     <div
-      className={embedded ? 'flex h-full min-w-0 flex-1 flex-col bg-[#f7f9fc]' : 'fixed inset-0 z-50 flex flex-col bg-[#f7f9fc]'}
+      className={embedded ? 'flex h-full min-w-0 flex-1 flex-col bg-base' : 'fixed inset-0 z-50 flex flex-col bg-base'}
       style={nodeThemeVars(nodeTheme)}
     >
       {!embedded && (
@@ -552,6 +622,8 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 isTableOut={isTableOut}
                 onAddSource={addSourceOfKind}
                 onAddNode={addNodeOfType}
+                open={quickAddOpen}
+                onOpenChange={setQuickAddOpen}
               />
             )}
             <Btn size="xs" onClick={fit}>
@@ -574,10 +646,10 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
       {embedded && (
         <div className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
           <span className="text-[11.5px] text-ink-faint">
-            {config.pipeline.nodes.length} 个节点 · 从左侧节点库拖入 · 点选节点后在右侧修改配置 · 滚轮缩放
+            {config.pipeline.nodes.length} 个节点 · 选中节点可直接配置 · 滚轮缩放，拖动画布平移
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <AddNodeMenu selected={selected} isTableOut={isTableOut} onAddSource={addSourceOfKind} onAddNode={addNodeOfType} />
+            <AddNodeMenu selected={selected} isTableOut={isTableOut} onAddSource={addSourceOfKind} onAddNode={addNodeOfType} open={quickAddOpen} onOpenChange={setQuickAddOpen} />
             <Btn size="xs" onClick={fit}>
               适应视图
             </Btn>
@@ -588,12 +660,12 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         <div
           ref={containerRef}
           className="relative min-w-0 flex-1 cursor-default overflow-hidden"
           style={{
-            backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(var(--ui-grid-dot) 0.7px, transparent 0.7px)',
             backgroundSize: '22px 22px',
           }}
           onPointerDown={onBackgroundDown}
@@ -618,17 +690,17 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
           >
             <svg width={layout.width} height={layout.height} className="pointer-events-none absolute left-0 top-0 overflow-visible">
               <defs>
-                <marker id="nb-arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                  <path d="M0,0 L9,4.5 L0,9 z" style={{ fill: 'var(--nb-edge)' }} />
+                <marker id="nb-arrow" markerWidth="9" markerHeight="8" viewBox="0 0 9 8" refX="9" refY="4" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M0,0 L9,4 L0,8 z" style={{ fill: 'var(--nb-edge)' }} />
                 </marker>
-                <marker id="nb-arrow-bad" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                  <path d="M0,0 L9,4.5 L0,9 z" style={{ fill: 'var(--nb-edge-bad)' }} />
+                <marker id="nb-arrow-bad" markerWidth="9" markerHeight="8" viewBox="0 0 9 8" refX="9" refY="4" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M0,0 L9,4 L0,8 z" style={{ fill: 'var(--nb-edge-bad)' }} />
                 </marker>
-                <marker id="nb-arrow-active" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                  <path d="M0,0 L9,4.5 L0,9 z" fill="#2563eb" />
+                <marker id="nb-arrow-active" markerWidth="9" markerHeight="8" viewBox="0 0 9 8" refX="9" refY="4" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M0,0 L9,4 L0,8 z" fill="var(--ui-brand)" />
                 </marker>
-                <marker id="nb-arrow-del" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                  <path d="M0,0 L9,4.5 L0,9 z" fill="#dc2626" />
+                <marker id="nb-arrow-del" markerWidth="9" markerHeight="8" viewBox="0 0 9 8" refX="9" refY="4" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M0,0 L9,4 L0,8 z" fill="#dc2626" />
                 </marker>
               </defs>
               {layout.edges.map((e) => {
@@ -639,7 +711,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 // 选中（含多选）节点时高亮其上下游连线，其余淡出
                 const active = isSel(e.from) || isSel(e.to);
                 const selEdge = edgeSel !== null && edgeSel.from === e.from && edgeSel.to === e.to;
-                const d = edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H);
+                const d = edgePath(withDelta(from, delta), withDelta(to, delta), heights[e.from] ?? NODE_H, heights[e.to] ?? NODE_H, e.lane);
                 return (
                   <g key={`${e.from}->${e.to}`}>
                     {/* 加宽的隐形命中层：让细线易于点选 */}
@@ -660,9 +732,9 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                     <path
                       d={d}
                       fill="none"
-                      stroke={selEdge ? '#dc2626' : bad ? 'var(--nb-edge-bad)' : active ? '#2563eb' : 'var(--nb-edge)'}
-                      strokeWidth={selEdge ? 3 : active ? 2.5 : 2}
-                      opacity={selectedIds.length > 0 && !active && !selEdge ? 0.35 : 1}
+                      stroke={selEdge ? '#dc2626' : bad ? 'var(--nb-edge-bad)' : active ? 'var(--ui-brand)' : 'var(--nb-edge)'}
+                      strokeWidth={selEdge ? 2.5 : active ? 2 : 1.5}
+                      opacity={selectedIds.length > 0 && !active && !selEdge ? 0.22 : active || selEdge || bad ? 1 : 0.65}
                       markerEnd={selEdge ? 'url(#nb-arrow-del)' : bad ? 'url(#nb-arrow-bad)' : active ? 'url(#nb-arrow-active)' : 'url(#nb-arrow)'}
                     />
                   </g>
@@ -670,7 +742,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
               })}
               {/* 连线拖拽的 ghost 虚线 */}
               {connect && (
-                <path d={ghostPath(connect.start, connect.cur)} fill="none" stroke="#2563eb" strokeWidth={2} strokeDasharray="6 4" />
+                <path d={ghostPath(connect.start, connect.cur)} fill="none" stroke="var(--ui-brand)" strokeWidth={2} strokeDasharray="6 4" />
               )}
             </svg>
 
@@ -741,7 +813,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 const from = layout.byId[edgeSel.from];
                 const to = layout.byId[edgeSel.to];
                 if (!from || !to) return null;
-                const mid = edgeMid(withDelta(from, delta), withDelta(to, delta), heights[edgeSel.from] ?? NODE_H, heights[edgeSel.to] ?? NODE_H);
+                const mid = edgeMid(withDelta(from, delta), withDelta(to, delta), heights[edgeSel.from] ?? NODE_H, heights[edgeSel.to] ?? NODE_H, layout.edges.find((e) => e.from === edgeSel.from && e.to === edgeSel.to)?.lane);
                 return (
                   <button
                     type="button"
@@ -759,13 +831,19 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             {/* 选中节点浮动工具条：添加下游 / 启用停用 / 删除（随缩放反向缩放保持可点面积） */}
             {selected && layout.byId[selected.id] && (
               <SelectionToolbar
-                anchor={withDelta(layout.byId[selected.id], delta)}
-                zoom={zoom}
+                theme={nodeTheme}
+                screenAnchor={screenNodeRects[selected.id] ? { x: screenNodeRects[selected.id].left + screenNodeRects[selected.id].width / 2, y: screenNodeRects[selected.id].top } : null}
+                nodeRect={screenNodeRects[selected.id] ?? null}
+                occupiedRects={Object.values(screenNodeRects)}
+                viewportRect={canvasBounds}
                 node={selected}
                 outIsTable={selected.type === 'source' || outputs[selected.id]?.kind === 'table'}
                 addMenuOpen={addMenuOpen}
                 onToggleAddMenu={() => {
-                  if (selected.type === 'source' || outputs[selected.id]?.kind === 'table') setAddMenuOpen((v) => !v);
+                  if (selected.type === 'source' || outputs[selected.id]?.kind === 'table') {
+                    setNodeDataOpen(false);
+                    setAddMenuOpen((v) => !v);
+                  }
                   else showHint('该节点的输出不是表格，无法再接处理节点');
                 }}
                 onAddDownstream={addDownstream}
@@ -785,8 +863,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 return (
                   <MultiToolbar
                     count={selectedIds.length}
-                    anchor={anchor}
-                    zoom={zoom}
+                    screenAnchor={canvasBounds ? { x: canvasBounds.left + pan.x + zoom * (anchor.x + NODE_W / 2), y: canvasBounds.top + pan.y + zoom * anchor.y } : null}
                     onEnable={() => setEnabledBulk(selectedIds, true)}
                     onDisable={() => setEnabledBulk(selectedIds, false)}
                     onDelete={() => deleteNodes(selectedIds.slice())}
@@ -808,6 +885,32 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             )}
           </div>
 
+          {layout.nodes.length > 1 && (
+            <div
+              className="absolute bottom-3 right-3 z-10 rounded-lg border border-line bg-panel p-2 shadow-md backdrop-blur"
+              title="点击缩略图定位到流程区域"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                const rect = e.currentTarget.querySelector('[data-minimap]')?.getBoundingClientRect();
+                if (!rect) return;
+                const worldX = Math.max(0, Math.min(layout.width, (e.clientX - rect.left) / miniScale));
+                const worldY = Math.max(0, Math.min(layout.height, (e.clientY - rect.top) / miniScale));
+                const view = containerRef.current;
+                if (!view) return;
+                setPan({ x: view.clientWidth / 2 - worldX * zoom, y: view.clientHeight / 2 - worldY * zoom });
+              }}
+              role="button"
+              aria-label="流程小地图，点击定位"
+              tabIndex={0}
+            >
+              <div className="mb-1 text-[9.5px] font-medium text-ink-faint">流程概览 · {layout.nodes.length} 个节点</div>
+              <div data-minimap className="relative overflow-hidden rounded bg-soft" style={{ width: 164, height: 96 }}>
+                {layout.nodes.map((item) => (
+                  <span key={item.id} className={`absolute rounded-[1px] ${isSel(item.id) ? 'bg-brand' : nodeById.get(item.id)?.type === 'source' ? 'bg-blue-400' : 'bg-slate-400'}`} style={{ left: 2 + item.x * miniScale, top: 2 + item.y * miniScale, width: Math.max(3, NODE_W * miniScale), height: Math.max(2, (heights[item.id] ?? NODE_H) * miniScale) }} />
+                ))}
+              </div>
+            </div>
+          )}
           <Legend />
         </div>
 
@@ -821,127 +924,52 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
             onClose={() => setFlowSelectedId(null)}
           />
         )}
+        {embedded && selected && nodeDataOpen && <NodeDataDrawer node={selected} output={outputs[selected.id]} onClose={() => setNodeDataOpen(false)} />}
       </div>
     </div>
   );
 }
 
-/** 节点属性栏（数据节点视图右栏）：选中态来自 store，空态给引导文案 */
-export function NodeInspector() {
-  const config = useCanvasStore((s) => s.config);
+/** 选中节点的数据检查抽屉：参数留在节点内，输入和输出在此按需查看。 */
+function NodeDataDrawer({ node, output, onClose }: { node: PipelineNode; output: NodeOutput | undefined; onClose: () => void }) {
   const outputs = useCanvasStore((s) => s.outputs);
-  const flowSelectedId = useCanvasStore((s) => s.flowSelectedId);
-  const setFlowSelectedId = useCanvasStore((s) => s.setFlowSelectedId);
-  const flowSelectedIds = useCanvasStore((s) => s.flowSelectedIds);
-  const setFlowSelectedIds = useCanvasStore((s) => s.setFlowSelectedIds);
-  const addNodeToStore = useCanvasStore((s) => s.addNode);
-  const updateNodeInStore = useCanvasStore((s) => s.updateNode);
-  const removeNode = useCanvasStore((s) => s.removeNode);
-  const removeSource = useCanvasStore((s) => s.removeSource);
-
-  const node = flowSelectedId ? config.pipeline.nodes.find((n) => n.id === flowSelectedId) ?? null : null;
-
-  const isTableOut = (id: string): boolean => {
-    const n = config.pipeline.nodes.find((x) => x.id === id);
-    if (!n) return false;
-    if (n.type === 'source') return true;
-    return outputs[id]?.kind === 'table';
-  };
-
-  /** 多选批量删除（source 连同数据源；下游 inputs 引用由引擎侧清理） */
-  const deleteNodes = (ids: string[]): void => {
-    for (const id of ids) {
-      const n = config.pipeline.nodes.find((x) => x.id === id);
-      if (!n) continue;
-      if (n.type === 'source') {
-        const srcDef = config.dataSources.find((d) => d.id === String(n.params.sourceId ?? ''));
-        if (srcDef) removeSource(srcDef.id);
-        else removeNode(id);
-      } else {
-        removeNode(id);
-      }
-    }
-    setFlowSelectedIds([]);
-  };
-
-  const addDownstream = (type: NodeType): void => {
-    if (!node || (type !== 'formula' && !isTableOut(node.id))) return;
-    const label = type === 'formula' ? '计算字段' : STEP_TYPES.find((s) => s.type === type)?.label ?? '步骤';
-    const dup = config.pipeline.nodes.filter((n) => n.name === label || n.name.startsWith(`${label} `)).length;
-    const next: PipelineNode = {
-      id: newId('n'),
-      type,
-      name: dup > 0 ? `${label} ${dup + 1}` : label,
-      inputs: type === 'formula' ? [] : [node.id],
-      params: defaultParams(type),
-      enabled: true,
-    };
-    addNodeToStore(next);
-    setFlowSelectedId(next.id);
-  };
-
-  const upstreamCandidates = useMemo(() => {
-    if (!node) return [];
-    return config.pipeline.nodes.filter(
-      (n) => n.id !== node.id && isTableOut(n.id) && !dependsOn(config.pipeline.nodes, n.id, node.id),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.pipeline.nodes, outputs, node]);
-
-  // 多选面板：批量启用/停用/删除（放在所有 hooks 之后）
-  if (flowSelectedIds.length > 1) {
-    const ids = flowSelectedIds;
-    const names = ids.map((id) => config.pipeline.nodes.find((n) => n.id === id)?.name ?? id);
-    return (
-      <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
-        <div>
-          <div className="text-[13px] font-semibold text-ink">已选 {ids.length} 个节点</div>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">可整组拖动对齐位置，或批量启停、删除。按 Esc 取消选择。</p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {names.map((nm, i) => (
-            <span key={ids[i]} className="rounded-full border border-line bg-soft px-2 py-0.5 text-[11px] text-ink-dim">
-              {nm}
-            </span>
-          ))}
-        </div>
-        <div className="mt-1 flex flex-col gap-2">
-          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-[12px] text-ink hover:bg-hover" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: true }))}>
-            全部启用
-          </button>
-          <button type="button" className="rounded-md border border-line-strong px-3 py-1.5 text-[12px] text-ink hover:bg-hover" onClick={() => ids.forEach((id) => updateNodeInStore(id, { enabled: false }))}>
-            全部停用
-          </button>
-          <button type="button" className="rounded-md border border-danger/30 bg-danger-soft px-3 py-1.5 text-[12px] font-medium text-danger hover:bg-danger-soft" onClick={() => deleteNodes(ids.slice())}>
-            删除选中节点（Delete）
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!node) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <span className="text-[13px] font-medium text-ink-dim">未选中节点</span>
-        <p className="text-[12px] leading-relaxed text-ink-faint">
-          在中间流程图中点击一个节点，即可在这里查看实时结果、修改配置或添加下游节点。
-        </p>
-      </div>
-    );
-  }
+  const [tab, setTab] = useState<'input' | 'output'>('output');
+  const input = node.inputs[0] ? outputs[node.inputs[0]] : undefined;
+  const active = tab === 'input' ? input : output;
 
   return (
-    <div className="flex h-full w-full min-w-0">
-      <Drawer
-        node={node}
-        output={outputs[node.id]}
-        upstreamCandidates={node.inputs.length <= 1 && node.type !== 'source' && node.type !== 'formula' ? upstreamCandidates : []}
-        onAddDownstream={addDownstream}
-        onChangeUpstream={(upstreamId) => updateNodeInStore(node.id, { inputs: [upstreamId] })}
-        onClose={() => setFlowSelectedId(null)}
-      />
-    </div>
+    <aside className="absolute inset-y-0 right-0 z-30 flex w-[min(420px,48vw)] max-w-full flex-col border-l border-line bg-panel">
+      <header className="flex items-center gap-2 border-b border-line px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[10.5px] text-ink-faint">{NODE_TYPE_LABELS[node.type]}</div>
+          <div className="truncate text-[13px] font-semibold text-ink">{node.name}</div>
+        </div>
+        <button type="button" className="rounded p-1.5 text-ink-faint hover:bg-hover hover:text-ink" onClick={onClose} title="关闭数据检查" aria-label="关闭数据检查">✕</button>
+      </header>
+      <nav className="flex border-b border-line px-3" aria-label="节点数据视图">
+        {(['input', 'output'] as const).map((key) => (
+          <button key={key} type="button" onClick={() => setTab(key)} className={`border-b-2 px-3 py-2.5 text-[12px] ${tab === key ? 'border-brand font-medium text-brand' : 'border-transparent text-ink-dim hover:text-ink'}`}>
+            {key === 'input' ? '输入数据' : '输出结果'}
+          </button>
+        ))}
+      </nav>
+      <div className="min-h-0 flex-1 overflow-auto p-3">
+        {!active ? (
+          <div className="rounded-md border border-dashed border-line-strong bg-soft px-4 py-6 text-center text-[12px] leading-relaxed text-ink-faint">
+            {tab === 'input' ? '此节点没有已连接的上游输入。' : '节点尚未产生输出。'}
+          </div>
+        ) : active.kind === 'table' ? (
+          <DataPreview table={active.table} limit={50} />
+        ) : active.kind === 'scalar' ? (
+          <div className="rounded-md border border-line bg-soft p-4"><div className="text-[11px] text-ink-faint">计算结果</div><div className="mt-1 text-2xl font-semibold text-ok">{active.value === null ? '空值' : String(active.value)}</div></div>
+        ) : active.kind === 'scalars' ? (
+          <div className="divide-y divide-line rounded-md border border-line bg-panel">{Object.entries(active.values).map(([key, value]) => <div key={key} className="flex justify-between gap-4 px-3 py-2 text-[12px]"><span className="text-ink-dim">{key}</span><span className="font-medium text-ink">{String(value ?? '')}</span></div>)}</div>
+        ) : (
+          <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-[12px] leading-relaxed text-danger">{active.message}</div>
+        )}
+      </div>
+      <footer className="border-t border-line px-4 py-2 text-[10.5px] text-ink-faint">数据检查 · 配置项在画布节点中编辑</footer>
+    </aside>
   );
 }
 
@@ -951,12 +979,17 @@ function AddNodeMenu({
   isTableOut,
   onAddSource,
   onAddNode,
+  open,
+  onOpenChange,
 }: {
   selected: PipelineNode | null;
   isTableOut: (id: string) => boolean;
   onAddSource: (kind: DataSource['kind']) => void;
   onAddNode: (type: NodeType, inputId: string | null) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
+  const canAddSteps = Boolean(selected && isTableOut(selected.id));
   const items: MenuProps['items'] = [
     { key: 'g-src', type: 'group', label: '数据源（无上游，流程的起点）', children: (
       [
@@ -967,15 +1000,15 @@ function AddNodeMenu({
       ] as [DataSource['kind'], string, string][]
     ).map(([kind, label, hint]) => ({ key: `src-${kind}`, label: <span className="flex w-full items-center justify-between gap-3"><span>+ {label}</span><span className="text-[10.5px] text-ink-faint">{hint}</span></span> })) },
     { type: 'divider' },
-    { key: 'g-step', type: 'group', label: selected && isTableOut(selected.id) ? `处理节点：将接到「${selected.name}」之后` : '处理节点需先点选一个表格节点', children: (
-      STEP_TYPES.map((s) => ({ key: `step-${s.type}`, label: <span className="flex w-full items-center justify-between gap-3"><span>{s.label}</span><span className="text-[10.5px] text-ink-faint">{s.hint}</span></span> }))
+    { key: 'g-step', type: 'group', label: canAddSteps ? `处理节点：将接到「${selected?.name}」之后` : '处理节点（先选中表格节点）', children: (
+      STEP_TYPES.map((s) => ({ key: `step-${s.type}`, disabled: !canAddSteps, label: <span className="flex w-full items-center justify-between gap-3"><span>{s.label}</span><span className="text-[10.5px] text-ink-faint">{s.hint}</span></span> }))
     ) },
     { type: 'divider' },
-    { key: 'step-formula', label: <span className="flex w-full items-center justify-between gap-3"><span>计算字段</span><span className="text-[10.5px] text-ink-faint">公式产出新变量</span></span> },
+    { key: 'step-formula', label: <span className="flex w-full items-center justify-between gap-3"><span>计算字段</span><span className="text-[10.5px] text-ink-faint">标量公式 / 可接表格逐行计算</span></span> },
   ];
 
   const onMenuClick: MenuProps['onClick'] = ({ key }) => {
-    if (key === 'step-formula') return onAddNode('formula', null);
+    if (key === 'step-formula') return onAddNode('formula', selected && isTableOut(selected.id) ? selected.id : null);
     if (key.startsWith('src-')) return onAddSource(key.slice(4) as DataSource['kind']);
     if (key.startsWith('step-')) {
       const type = key.slice(5) as NodeType;
@@ -988,8 +1021,10 @@ function AddNodeMenu({
       menu={{ items, onClick: onMenuClick, style: { minWidth: 240 } }}
       trigger={['click']}
       placement="bottomRight"
+      open={open}
+      onOpenChange={onOpenChange}
     >
-      <Btn size="xs" tone="primary">添加节点 ▾</Btn>
+      <span title="添加节点（Ctrl+K）"><Btn size="xs" tone="primary">添加节点 · Ctrl+K</Btn></span>
     </Dropdown>
   );
 }
@@ -1002,33 +1037,41 @@ function withDelta(pos: FlowPos & { id?: string }, delta: { ids: string[]; dx: n
 /** 多选工具条：锚在选择集包围盒顶部居中，随缩放反向缩放 */
 function MultiToolbar({
   count,
-  anchor,
-  zoom,
+  screenAnchor,
   onEnable,
   onDisable,
   onDelete,
 }: {
   count: number;
-  anchor: FlowPos;
-  zoom: number;
+  screenAnchor: { x: number; y: number } | null;
   onEnable: () => void;
   onDisable: () => void;
   onDelete: () => void;
 }) {
-  const inv = 1 / Math.max(0.5, Math.min(1.8, zoom));
+  const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  useEffect(() => {
+    const resize = (): void => setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+  if (!screenAnchor) return null;
+  const width = 180;
+  const height = 42;
+  const left = Math.max(8, Math.min(viewport.width - width - 8, screenAnchor.x - width / 2));
+  const above = screenAnchor.y - height - 10;
+  const top = Math.max(8, Math.min(viewport.height - height - 8, above >= 8 ? above : screenAnchor.y + 8));
   return (
-    <div className="absolute" style={{ left: anchor.x + NODE_W / 2, top: anchor.y, width: 0, height: 0 }}>
+    <div className="fixed z-[1001]" style={{ left, top }}>
       <div
-        className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--nb-pop-border)] bg-[var(--nb-pop-surface)] px-2 py-1.5 shadow-lg backdrop-blur"
-        style={{ bottom: 10, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
+        className="flex items-center gap-1 whitespace-nowrap rounded-md bg-[var(--nb-pop-surface)] px-1.5 py-1 shadow-pop"
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <span className="px-1 text-[10.5px] font-medium text-[var(--nb-pop-text)]">{count} 个节点</span>
+        <span className="px-2 text-[11px] font-medium text-[var(--nb-pop-text)]">{count} 个节点</span>
         <button
           type="button"
           title="全部启用"
           onClick={onEnable}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-emerald-400 transition-colors hover:bg-emerald-500/20"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-emerald-500 transition-colors hover:bg-emerald-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
         >
           <PlayCircleOutlined style={{ fontSize: 13 }} />
         </button>
@@ -1036,7 +1079,7 @@ function MultiToolbar({
           type="button"
           title="全部停用"
           onClick={onDisable}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--nb-text-dim)] transition-colors hover:bg-slate-500/20"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--nb-text-dim)] transition-colors hover:bg-slate-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
         >
           <PauseCircleOutlined style={{ fontSize: 13 }} />
         </button>
@@ -1044,7 +1087,7 @@ function MultiToolbar({
           type="button"
           title="删除选中节点（Delete）"
           onClick={onDelete}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-red-400 transition-colors hover:bg-red-500/20"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
         >
           <DeleteOutlined style={{ fontSize: 13 }} />
         </button>
@@ -1059,10 +1102,13 @@ function ghostPath(from: FlowPos, to: FlowPos): string {
   return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
 }
 
-/** 选中节点的浮动工具条：锚在节点顶部居中上方，随缩放反向缩放 */
+/** 选中节点的浮动操作条与添加下游选择器：使用视口坐标，自动避让画布边缘。 */
 function SelectionToolbar({
-  anchor,
-  zoom,
+  theme,
+  screenAnchor,
+  nodeRect,
+  occupiedRects,
+  viewportRect,
   node,
   outIsTable,
   addMenuOpen,
@@ -1071,8 +1117,11 @@ function SelectionToolbar({
   onToggleEnabled,
   onDelete,
 }: {
-  anchor: FlowPos;
-  zoom: number;
+  theme: NodeTheme;
+  screenAnchor: { x: number; y: number } | null;
+  nodeRect: ScreenRect | null;
+  occupiedRects: ScreenRect[];
+  viewportRect: ScreenRect | null;
   node: PipelineNode;
   outIsTable: boolean;
   addMenuOpen: boolean;
@@ -1081,78 +1130,219 @@ function SelectionToolbar({
   onToggleEnabled: () => void;
   onDelete: () => void;
 }) {
-  const inv = 1 / Math.max(0.5, Math.min(1.8, zoom));
-  return (
-    <div className="absolute" style={{ left: anchor.x + NODE_W / 2, top: anchor.y, width: 0, height: 0 }}>
-      {/* 添加下游浮层：列出全部处理节点类型 */}
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [toolbarSize, setToolbarSize] = useState({ width: 174, height: 42 });
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('筛选与整理');
+
+  useLayoutEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setToolbarSize({ width: el.offsetWidth, height: el.offsetHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!addMenuOpen) {
+      setQuery('');
+      return;
+    }
+    searchRef.current?.focus();
+  }, [addMenuOpen]);
+
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target as Node;
+      if (!toolbarRef.current?.contains(target) && !menuRef.current?.contains(target)) onToggleAddMenu();
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onToggleAddMenu();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [addMenuOpen, onToggleAddMenu]);
+
+  const items = useMemo(() => {
+    const byType = new Map(STEP_TYPES.map((item) => [item.type, item]));
+    const list = [
+      { type: 'pickRows' as NodeType, category: '筛选与整理' },
+      { type: 'filter' as NodeType, category: '筛选与整理' },
+      { type: 'sortTopN' as NodeType, category: '筛选与整理' },
+      { type: 'derive' as NodeType, category: '计算与合并' },
+      { type: 'groupAgg' as NodeType, category: '计算与合并' },
+      { type: 'diff' as NodeType, category: '计算与合并' },
+      { type: 'union' as NodeType, category: '计算与合并' },
+      { type: 'scalarOut' as NodeType, category: '取数与公式' },
+      { type: 'formula' as NodeType, category: '取数与公式' },
+    ].map((entry) => {
+      const meta = NODE_TYPE_META.find((item) => item.type === entry.type);
+      const step = byType.get(entry.type);
+      return { ...entry, label: meta?.label ?? '计算字段', icon: meta?.icon ?? 'ƒ', hint: step?.hint ?? '公式产出新变量' };
+    });
+    const q = query.trim().toLocaleLowerCase();
+    return list.filter((item) => !q || `${item.label} ${item.hint} ${item.category}`.toLocaleLowerCase().includes(q));
+  }, [query]);
+  const categories = ['筛选与整理', '计算与合并', '取数与公式'];
+  const bounds = viewportRect ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+  const activeNodeRect = nodeRect ?? { left: (screenAnchor?.x ?? 0) - NODE_W / 2, top: screenAnchor?.y ?? 0, width: NODE_W, height: NODE_H };
+  const menuWidth = Math.max(160, Math.min(320, bounds.width - 16));
+  const menuMaxHeight = Math.max(120, Math.min(320, bounds.height - 24));
+  const effectiveMenuHeight = menuMaxHeight;
+  const clampX = (x: number, width: number): number => Math.max(bounds.left + 8, Math.min(bounds.left + bounds.width - width - 8, x));
+  const clampY = (y: number, height: number): number => Math.max(bounds.top + 8, Math.min(bounds.top + bounds.height - height - 8, y));
+  const left = screenAnchor ? clampX(screenAnchor.x - toolbarSize.width / 2, toolbarSize.width) : bounds.left + 8;
+  const toolbarAboveTop = screenAnchor ? activeNodeRect.top - toolbarSize.height - 10 : bounds.top + 8;
+  const toolbarBelowTop = screenAnchor ? activeNodeRect.top + activeNodeRect.height + 8 : bounds.top + 8;
+  const toolbarTop = screenAnchor
+    ? clampY(toolbarAboveTop >= bounds.top + 8 ? toolbarAboveTop : toolbarBelowTop, toolbarSize.height)
+    : bounds.top + 8;
+
+  const menuPosition = useMemo(() => {
+    if (!screenAnchor) return { left: bounds.left + 8, top: bounds.top + 8 };
+    const maxLeft = bounds.left + bounds.width - menuWidth - 8;
+    const maxTop = bounds.top + bounds.height - effectiveMenuHeight - 8;
+    const positions = new Map<string, { left: number; top: number }>();
+    const addPosition = (left: number, top: number): void => {
+      const x = Math.max(bounds.left + 8, Math.min(maxLeft, left));
+      const y = Math.max(bounds.top + 8, Math.min(maxTop, top));
+      positions.set(`${Math.round(x)}:${Math.round(y)}`, { left: x, top: y });
+    };
+    // Scan the canvas, with corner anchors and finer spacing so the chooser can
+    // fit into narrow empty areas without grazing a nearby node.
+    addPosition(bounds.left + 8, bounds.top + 8);
+    addPosition(maxLeft, bounds.top + 8);
+    addPosition(bounds.left + 8, maxTop);
+    addPosition(maxLeft, maxTop);
+    for (let y = bounds.top + 8; y <= maxTop; y += 16) {
+      for (let x = bounds.left + 8; x <= maxLeft; x += 16) addPosition(x, y);
+    }
+    for (const r of occupiedRects) {
+      addPosition(r.left, r.top - effectiveMenuHeight - 12);
+      addPosition(r.left, r.top + r.height + 12);
+      addPosition(r.left - menuWidth - 12, r.top);
+      addPosition(r.left + r.width + 12, r.top);
+    }
+    const area = (a: ScreenRect, b: ScreenRect): number => {
+      const gap = 12;
+      const w = Math.max(0, Math.min(a.left + a.width, b.left + b.width + gap) - Math.max(a.left, b.left - gap));
+      const h = Math.max(0, Math.min(a.top + a.height, b.top + b.height + gap) - Math.max(a.top, b.top - gap));
+      return w * h;
+    };
+    const scored = Array.from(positions.values()).map((pos) => {
+      const rect = { ...pos, width: menuWidth, height: effectiveMenuHeight };
+      const overlap = occupiedRects.reduce((sum, other) => sum + area(rect, other), 0);
+      const selectedOverlap = area(rect, activeNodeRect);
+      const toolbarOverlap = area(rect, { left, top: toolbarTop, width: toolbarSize.width, height: toolbarSize.height });
+      const distance = Math.hypot(rect.left + menuWidth / 2 - screenAnchor.x, rect.top + effectiveMenuHeight / 2 - activeNodeRect.top - activeNodeRect.height / 2);
+      return { left: rect.left, top: rect.top, score: (selectedOverlap + toolbarOverlap) * 1_000_000 + overlap * 100 + distance };
+    });
+    return scored.sort((a, b) => a.score - b.score)[0];
+  }, [screenAnchor, activeNodeRect, effectiveMenuHeight, bounds, occupiedRects, menuWidth, left, toolbarTop, toolbarSize]);
+
+  if (!screenAnchor) return null;
+  return createPortal(
+    <>
       {addMenuOpen && outIsTable && (
         <div
-          className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--nb-pop-border)] bg-[var(--nb-pop-surface)] px-2 py-1.5 shadow-lg backdrop-blur"
-          style={{ bottom: 44, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
+          ref={menuRef}
+          className="fixed z-[1000] flex flex-col overflow-hidden rounded-md bg-[var(--nb-pop-surface)] text-[var(--nb-pop-text)] shadow-pop"
+          style={{ ...nodeThemeVars(theme), background: theme === 'dark' ? '#292929' : '#ffffff', left: menuPosition.left, top: menuPosition.top, width: menuWidth, height: menuMaxHeight }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <span className="pr-0.5 text-[10px] text-[var(--nb-text-faint)]">添加下游</span>
-          {STEP_TYPES.map((s) => (
-            <button
-              key={s.type}
-              type="button"
-              title={s.hint}
-              onClick={() => onAddDownstream(s.type)}
-              className="rounded-full border border-[var(--nb-control-border)] bg-[var(--nb-control-bg)] px-2 py-[3px] text-[10.5px] text-[var(--nb-pop-text)] transition-colors hover:border-brand/70 hover:bg-[var(--nb-control-hover)] hover:text-brand"
-            >
-              {s.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            title="公式产出新变量"
-            onClick={() => onAddDownstream('formula')}
-            className="rounded-full border border-emerald-500/50 bg-emerald-500/15 px-2 py-[3px] text-[10.5px] text-emerald-300 transition-colors hover:bg-emerald-500/25"
-          >
-            ƒ 计算字段
-          </button>
+          <div className="flex items-center gap-2 border-b border-[var(--nb-pop-border)] px-3 py-2">
+            <SearchOutlined className="text-[var(--nb-text-faint)]" />
+            <input
+              ref={searchRef}
+              type="search"
+              role="searchbox"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索节点名称或用途"
+              aria-label="搜索下游节点"
+              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--nb-text-faint)]"
+            />
+            <kbd className="rounded border border-[var(--nb-pop-border)] px-1 py-0.5 text-[9px] text-[var(--nb-text-faint)]">Esc</kbd>
+          </div>
+          {!query.trim() && <div className="flex shrink-0 gap-1 border-b border-[var(--nb-pop-border)] px-2 py-2" role="tablist" aria-label="节点分类">
+            {categories.map((category) => <button key={category} type="button" role="tab" aria-selected={activeCategory === category} onClick={() => setActiveCategory(category)} className={`flex-1 rounded-md px-1 py-1.5 text-[11px] transition-colors ${activeCategory === category ? 'bg-brand/15 text-brand' : 'text-[var(--nb-text-dim)] hover:bg-[var(--nb-control-hover)]'}`}>{category}</button>)}
+          </div>}
+          <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+            {(query.trim() ? categories : [activeCategory]).map((category) => {
+              const group = items.filter((item) => item.category === category);
+              if (group.length === 0) return null;
+              return (
+                <section key={category} className="mb-1.5 last:mb-0">
+                  <h3 className="px-2 pb-0.5 text-[10px] font-semibold leading-3 tracking-wide text-[var(--nb-text-faint)]">{category}</h3>
+                  <div className="space-y-px">
+                    {group.map((item) => (
+                      <button
+                        key={item.type}
+                        type="button"
+                        title={item.hint}
+                        onClick={() => onAddDownstream(item.type)}
+                        className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-md border border-transparent px-2 py-1 text-left transition-colors hover:border-brand/25 hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                      >
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--nb-control-bg)] text-[12px] font-semibold text-brand">{item.icon}</span>
+                        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                          <span className="truncate text-[12px] font-medium">{item.label}</span>
+                          <span className="truncate text-[10px] text-[var(--nb-text-faint)]">{item.hint}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+            {items.length === 0 && <p className="px-2 py-6 text-center text-xs text-[var(--nb-text-faint)]">没有匹配的节点</p>}
+          </div>
+          <div className="shrink-0 truncate border-t border-[var(--nb-pop-border)] px-3 py-2 text-[10px] text-[var(--nb-text-dim)]" title={node.name}>添加后自动连接到「{node.name}」</div>
         </div>
       )}
 
       <div
-        className="absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--nb-pop-border)] bg-[var(--nb-pop-surface)] px-1.5 py-1 shadow-lg backdrop-blur"
-        style={{ bottom: 10, transform: `translateX(-50%) scale(${inv})`, transformOrigin: 'bottom center' }}
+        ref={toolbarRef}
+        className="fixed z-[1001] flex items-center gap-1 rounded-lg bg-[var(--nb-pop-surface)] px-1 py-0.5 shadow-md"
+        style={{ ...nodeThemeVars(theme), left, top: toolbarTop }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <button
           type="button"
+          aria-label={outIsTable ? '添加下游节点' : '该节点输出不是表格'}
           title={outIsTable ? '添加下游节点' : '该节点输出不是表格'}
           onClick={onToggleAddMenu}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-brand transition-colors hover:bg-brand/20"
+          disabled={!outIsTable}
+          className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${outIsTable ? 'text-brand hover:bg-brand/15' : 'cursor-not-allowed text-[var(--nb-text-faint)] opacity-45'}`}
         >
-          <PlusOutlined style={{ fontSize: 13 }} />
+          <PlusOutlined style={{ fontSize: 13 }} /> 添加
         </button>
-        <button
-          type="button"
-          title={node.enabled ? '停用该节点' : '启用该节点'}
-          onClick={onToggleEnabled}
-          className={`flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
-            node.enabled ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-ink-dim hover:bg-slate-500/20'
-          }`}
-        >
-          <PoweroffOutlined style={{ fontSize: 13 }} />
+        <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--nb-pop-border)]" />
+        <button type="button" aria-label={node.enabled ? '停用该节点' : '启用该节点'} title={node.enabled ? '停用该节点' : '启用该节点'} onClick={onToggleEnabled} className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${node.enabled ? 'text-emerald-500 hover:bg-emerald-500/15' : 'text-[var(--nb-text-dim)] hover:bg-slate-500/15'}`}>
+          <PoweroffOutlined style={{ fontSize: 14 }} />
         </button>
-        <button
-          type="button"
-          title="删除节点"
-          onClick={onDelete}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-red-400 transition-colors hover:bg-red-500/20"
-        >
-          <DeleteOutlined style={{ fontSize: 13 }} />
+        <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--nb-pop-border)]" />
+        <button type="button" aria-label="删除节点" title="删除节点（可撤销）" onClick={onDelete} className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50">
+          <DeleteOutlined style={{ fontSize: 14 }} />
         </button>
       </div>
-    </div>
+    </>,
+    document.body,
   );
 }
 
 function Legend() {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-panel/90 px-2.5 py-1.5 text-[10px] text-ink-dim shadow-sm">
+    <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-panel px-2.5 py-1.5 text-[10px] text-ink-dim shadow-sm">
       <span className="flex items-center gap-1">
         <i className="inline-block h-2 w-2 rounded-sm bg-brand" />
         数据源

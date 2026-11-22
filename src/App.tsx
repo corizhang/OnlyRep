@@ -19,8 +19,9 @@ const KEY = 'rankboard:entry-mode';
 /** antd 主题：对齐编辑器现有蓝灰基线与紧凑密度 */
 const antdTheme = {
   token: {
-    colorPrimary: '#2563eb',
-    borderRadius: 6,
+    colorPrimary: '#4b80ad',
+    borderRadius: 4,
+    fontFamily: '"Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
     fontSize: 13,
     controlHeight: 32,
     controlHeightSM: 26,
@@ -63,7 +64,21 @@ export default function App() {
   return (
     <ConfigProvider
       theme={{
-        token: antdTheme.token,
+        token: {
+          ...antdTheme.token,
+          colorPrimary: uiTheme === 'dark' ? '#77a7cc' : '#4b80ad',
+          colorBgContainer: uiTheme === 'dark' ? '#303030' : '#ffffff',
+          colorBgElevated: uiTheme === 'dark' ? '#292929' : '#ffffff',
+          colorBgLayout: uiTheme === 'dark' ? '#454545' : '#e2e3e5',
+          colorBorder: uiTheme === 'dark' ? '#555555' : '#bfc3c7',
+          colorText: uiTheme === 'dark' ? '#e0e0e0' : '#292d32',
+          colorTextSecondary: uiTheme === 'dark' ? '#b0b0b0' : '#626970',
+        },
+        components: {
+          Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
+          Segmented: { trackBg: uiTheme === 'dark' ? '#242424' : '#e9eaec' },
+          Table: { headerBg: uiTheme === 'dark' ? '#303030' : '#f2f2f2', cellPaddingBlockSM: 6 },
+        },
         algorithm: uiTheme === 'dark' ? antdAlgorithm.darkAlgorithm : antdAlgorithm.defaultAlgorithm,
       }}
     >

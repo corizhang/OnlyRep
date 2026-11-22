@@ -1,7 +1,7 @@
 import FormulaRow from '../FormulaRow';
 import type { NodeTypeDef } from '../types';
 
-/** 计算字段：公式产出新变量（无需表格上游） */
+/** 计算字段：无上游时计算标量；连接表格后按行计算并追加一列 */
 export const formulaDef: NodeTypeDef = {
   type: 'formula',
   label: '计算字段',
@@ -10,5 +10,10 @@ export const formulaDef: NodeTypeDef = {
   hint: '公式产出新变量',
   needsTableInput: false,
   defaultParams: () => ({ expr: '' }),
-  Config: ({ node, setParam }) => <FormulaRow node={node} label="公式" setParam={setParam} />,
+  Config: ({ node, rowColumns, rowSample, setParam }) => (
+    <>
+      <div className="text-[10px] text-[var(--nb-text-faint)]">{node.inputs.length ? `逐行计算 · 输出列名：${node.name}` : '标量公式 · 拖入表格上游后可引用列并逐行计算'}</div>
+      <FormulaRow node={node} label="公式" rowColumns={rowColumns} rowSample={rowSample} setParam={setParam} />
+    </>
+  ),
 };

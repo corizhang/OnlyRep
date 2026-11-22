@@ -85,7 +85,7 @@ export function runNode(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunCo
     case 'scalarOut':
       return runScalarOut(node, inputs);
     case 'formula':
-      return runFormula(node, ctx);
+      return inputs.length > 0 ? runFormulaRows(node, inputs, ctx) : runFormula(node, ctx);
     default:
       return { kind: 'error', message: `未知节点类型：${node.type}` };
   }
@@ -297,7 +297,8 @@ function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext):
   if (!col) return { kind: 'table', table: t };
   const dateCol = String(node.params.dateCol ?? '');
   const groupCol = String(node.params.groupCol ?? '');
-  const as = String(node.params.as ?? '').trim() || `${col}较上日`;
+  const mode = String(node.params.mode ?? 'difference');
+  const as = String(node.params.as ?? '').trim() || `${col}${mode === 'rate' ? '变化率(%)' : '较上日'}`;
 
   // 1) 每行的排序键：分组值 + 时间键（有日期列按日期升序，否则按现有行顺序）
   let bad = 0;
@@ -327,7 +328,9 @@ function runDiff(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext):
     }
     const v = getVal(t.rows[i], col);
     const num = typeof v === 'number' ? v : null;
-    diffs[i] = num !== null && prev !== null ? num - prev : null;
+    diffs[i] = num !== null && prev !== null
+      ? mode === 'rate' ? (prev === 0 ? null : ((num - prev) / Math.abs(prev)) * 100) : num - prev
+      : null;
     if (num !== null) prev = num;
   }
 
@@ -392,4 +395,27 @@ function runFormula(node: PipelineNode, ctx: NodeRunContext): NodeOutput {
   const res = evaluateFormula(expr, { vars: ctx.vars });
   if (!res.ok) return { kind: 'error', message: res.error };
   return { kind: 'scalar', value: res.value };
+}
+
+/** 计算字段接入表格时逐行执行公式，并以节点名作为输出列名。 */
+function runFormulaRows(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunContext): NodeOutput {
+  const t = firstTable(inputs);
+  if ('error' in t) return { kind: 'error', message: t.error };
+  const name = node.name.trim();
+  const expr = String(node.params.expr ?? '').trim();
+  if (!expr) return { kind: 'error', message: '公式为空' };
+  let failed = 0;
+  const rows: CleanRow[] = t.rows.map((r) => {
+    const row: NamedScalars = {};
+    for (const c of t.columns) row[c.key] = getVal(r, c.key) as ScalarValue;
+    const res = evaluateFormula(expr, { vars: ctx.vars, row });
+    const value = res.ok ? (typeof res.value === 'boolean' ? (res.value ? 1 : 0) : res.value) : null;
+    if (!res.ok) failed += 1;
+    return { ...r, [name]: value, [`${name}#raw`]: value === null ? '' : String(value) };
+  });
+  if (failed > 0) ctx.warn(`计算字段「${name}」有 ${failed} 行计算失败，已留空`);
+  const columns = t.columns.some((c) => c.key === name)
+    ? t.columns.map((c) => c.key === name ? { ...c, type: 'number' as const } : c)
+    : [...t.columns, makeColumn(name, name)];
+  return { kind: 'table', table: makeTable(rows, columns, t.excludedCount) };
 }

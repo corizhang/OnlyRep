@@ -1,97 +1,82 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Button, Modal, Select, Switch } from 'antd';
+import { SettingOutlined, LayoutOutlined, ExportOutlined, FolderOpenOutlined, InfoCircleOutlined, KeyOutlined } from '@ant-design/icons';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { isTauri, tauriPersistStorage } from '../../storage/tauriKv';
+import { appStorage } from '../../storage/safeStorage';
+import { useCanvasStore } from '../../store/useCanvasStore';
+import CanvasSettings from './CanvasSettings';
+import packageInfo from '../../../package.json';
 
-/**
- * 应用设置弹窗（头部 ⚙）：目前含「导出图片路径」。
- * 设置存桌面端 SQLite kv（键 rankboard-export-dir），Rust export_file 同键读取，天然同步。
- */
-export default function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [exportDir, setExportDir] = useState('');
+const SECTIONS = [
+  { id: 'general', label: '常规', icon: <SettingOutlined />, description: '应用外观与启动行为，仅影响本机。' },
+  { id: 'canvas', label: '当前画布', icon: <LayoutOutlined />, description: '标题、尺寸、主题和排版随当前项目保存，支持撤销。' },
+  { id: 'export', label: '导出', icon: <ExportOutlined />, description: '图片清晰度随当前项目保存；保存目录为本机偏好。' },
+  { id: 'storage', label: '项目与存储', icon: <FolderOpenOutlined />, description: '管理项目保存目录，以及工作区和模板库的数据迁移。' },
+  { id: 'shortcuts', label: '快捷键', icon: <KeyOutlined />, description: '在编辑区使用快捷键，提高常用操作效率。' },
+  { id: 'about', label: '关于', icon: <InfoCircleOutlined />, description: '应用版本与运行环境。' },
+] as const;
+export type SettingsSection = typeof SECTIONS[number]['id'];
+
+function Row({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line py-4"><div className="min-w-0 flex-1"><div className="text-[13px] font-medium text-ink">{title}</div>{description && <p className="mt-1 text-xs leading-relaxed text-ink-dim">{description}</p>}</div>{children}</div>;
+}
+
+function DirectorySetting({ storageKey, title, fallback, description }: { storageKey: string; title: string; fallback: string; description: string }) {
+  const [value, setValue] = useState('');
   const [loaded, setLoaded] = useState(false);
-  const [err, setErr] = useState('');
-
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (!open) return;
-    setLoaded(false);
-    if (isTauri()) {
-      tauriPersistStorage
-        .getItem('rankboard-export-dir')
-        .then((v) => {
-          setExportDir(v ?? '');
-          setLoaded(true);
-        })
-        .catch(() => setLoaded(true));
-    } else {
-      setLoaded(true);
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  const pickDir = async (): Promise<void> => {
-    setErr('');
+    let active = true;
+    setLoaded(false); setError('');
+    if (!isTauri()) return;
+    void tauriPersistStorage.getItem(storageKey).then(v => { if (active) { setValue(v ?? ''); setLoaded(true); } }).catch(e => { if (active) setError(`读取失败：${String(e)}`); });
+    return () => { active = false; };
+  }, [storageKey, attempt]);
+  const update = async (reset: boolean) => {
+    setBusy(true); setError('');
     try {
-      const dir = await openDialog({ directory: true, title: '选择导出图片的默认保存位置' });
-      if (typeof dir === 'string' && dir) {
-        setExportDir(dir);
-        await tauriPersistStorage.setItem('rankboard-export-dir', dir);
-      }
-    } catch (e) {
-      setErr(`打开文件夹选择器失败：${e instanceof Error ? e.message : String(e)}`);
-    }
+      const picked = reset ? '' : await openDialog({ directory: true, title: `选择${title}` });
+      if (typeof picked !== 'string') return;
+      if (reset) await tauriPersistStorage.removeItem(storageKey);
+      else if (picked) await tauriPersistStorage.setItem(storageKey, picked);
+      setValue(picked);
+    } catch (e) { setError(`保存失败：${String(e)}`); }
+    finally { setBusy(false); }
   };
+  return <div className="border-b border-line py-4"><h3 className="text-[13px] font-medium text-ink">{title}</h3><p className="mt-1 text-xs leading-relaxed text-ink-dim">{description}</p>{isTauri() ? <>
+    <div className="mt-3 break-all rounded border border-line bg-soft px-3 py-2 text-xs text-ink">{loaded ? value || fallback : '正在读取目录…'}</div>
+    <div className="mt-2 flex gap-2"><Button size="small" disabled={!loaded || busy} loading={busy} onClick={() => void update(false)}>更改目录</Button><Button size="small" disabled={!loaded || busy || !value} onClick={() => void update(true)}>恢复默认</Button>{error && <Button size="small" onClick={() => setAttempt(n => n + 1)}>重新读取</Button>}</div>
+    {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
+  </> : <p className="mt-3 rounded bg-soft px-3 py-2 text-xs leading-relaxed text-ink-dim">浏览器版使用浏览器下载目录，请在浏览器设置中调整。桌面应用支持自定义保存目录。</p>}</div>;
+}
 
-  const resetDir = async (): Promise<void> => {
-    setExportDir('');
-    await tauriPersistStorage.removeItem('rankboard-export-dir');
-  };
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/40" onClick={onClose}>
-      <div className="w-[440px] rounded-xl border border-line bg-panel p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-semibold text-ink">设置</h3>
-          <button type="button" className="text-ink-faint hover:text-ink-dim" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="mt-4">
-          <div className="text-[12px] font-medium text-ink-dim">导出图片保存位置</div>
-          {isTauri() ? (
-            <>
-              <div className="mt-1.5 rounded-md border border-line bg-soft px-2.5 py-2 text-[11.5px] text-ink-dim break-all">
-                {loaded ? (exportDir || '默认：系统「下载」文件夹下的 RankBoard 目录') : '读取中…'}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void pickDir()}
-                  className="rounded-md border border-line-strong bg-panel px-3 py-1.5 text-[12px] text-ink-dim hover:bg-hover"
-                >
-                  更改…
-                </button>
-                {exportDir && (
-                  <button
-                    type="button"
-                    onClick={() => void resetDir()}
-                    className="rounded-md border border-line px-3 py-1.5 text-[12px] text-ink-dim hover:bg-hover"
-                  >
-                    恢复默认
-                  </button>
-                )}
-              </div>
-              <p className="mt-2 text-[10.5px] leading-relaxed text-ink-faint">
-                自定义后所有导出图片都保存到该位置（同名自动追加序号）。仅桌面应用生效。
-              </p>
-              {err && <p className="mt-1.5 text-[11px] text-danger">{err}</p>}
-            </>
-          ) : (
-            <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">
-              浏览器版导出走浏览器下载目录（浏览器设置中调整）；桌面应用可在其设置中自定义路径。
-            </p>
-          )}
-        </div>
-      </div>
+export default function SettingsModal({ open, onClose, initialSection = 'general' }: { open: boolean; onClose: () => void; initialSection?: SettingsSection }) {
+  const [section, setSection] = useState<SettingsSection>(initialSection);
+  const [skipLauncher, setSkipLauncher] = useState(false);
+  const uiTheme = useCanvasStore(s => s.uiTheme);
+  const toggleUiTheme = useCanvasStore(s => s.toggleUiTheme);
+  useEffect(() => { if (open) { setSection(initialSection); setSkipLauncher(appStorage.getItem('rankboard-skip-launcher') === '1'); } }, [open, initialSection]);
+  const current = SECTIONS.find(s => s.id === section)!;
+  return <Modal open={open} onCancel={onClose} title={<div className="py-1"><div>设置</div><p className="mt-1 text-xs font-normal text-ink-dim">管理 RankBoard 的应用偏好与当前画布配置</p></div>} width={900} zIndex={2000} centered footer={null} styles={{ body: { padding: 0 } }} destroyOnHidden>
+    <div className="-mx-6 mt-3 flex h-[min(560px,65vh)] min-h-[260px] border-y border-line">
+      <nav aria-label="设置分类" className="w-40 shrink-0 space-y-1 overflow-y-auto border-r border-line bg-soft p-2 max-sm:w-28">{SECTIONS.map(s => <button type="button" key={s.id} aria-current={section === s.id ? 'page' : undefined} onClick={() => setSection(s.id)} className={`flex w-full items-center gap-2 rounded px-3 py-2.5 text-left text-xs transition-colors ${section === s.id ? 'bg-brand-soft text-brand' : 'text-ink-dim hover:bg-hover hover:text-ink'}`}>{s.icon}{s.label}</button>)}</nav>
+      <main key={section} aria-label={current.label} className="min-w-0 flex-1 overflow-y-auto px-6 py-5 max-sm:px-3"><h2 className="text-base font-semibold text-ink">{current.label}</h2><p className="mb-4 mt-1 text-xs leading-relaxed text-ink-dim">{current.description}</p>
+        {section === 'general' && <>
+          <Row title="界面主题" description="编辑器、节点和弹窗统一切换明暗外观。"><Select aria-label="界面主题" className="w-32" value={uiTheme} options={[{ value: 'light', label: '浅色' }, { value: 'dark', label: '深色 · 石墨灰' }]} onChange={v => { if (v !== uiTheme) toggleUiTheme(); }} /></Row>
+          <Row title="启动时直接进入工作区" description="开启后跳过项目启动页；仍可通过顶部主页按钮返回项目列表。"><Switch aria-label="启动时直接进入工作区" checked={skipLauncher} onChange={v => { appStorage.setItem('rankboard-skip-launcher', v ? '1' : ''); setSkipLauncher(v); }} /></Row>
+        </>}
+        {section === 'canvas' && <CanvasSettings section="canvas" />}
+        {section === 'export' && <><CanvasSettings section="export" /><DirectorySetting storageKey="rankboard-export-dir" title="导出图片保存位置" fallback="默认：系统下载目录下的 RankBoard 文件夹" description="仅桌面应用生效。同名文件会自动追加序号。" /></>}
+        {section === 'storage' && <><DirectorySetting storageKey="rankboard-project-dir" title="项目保存目录" fallback="默认：文档 / RankBoard / Projects" description="更改后用于后续项目保存，不会自动搬移已有项目文件。" /><div className="mt-5"><CanvasSettings section="storage" /></div></>}
+        {section === 'shortcuts' && <div className="divide-y divide-line">{[
+          ['Ctrl + ,', '打开设置'], ['Ctrl + S', '保存当前项目'], ['Ctrl + Z', '撤销'], ['Ctrl + Shift + Z / Ctrl + Y', '重做'], ['Ctrl + K', '添加节点（数据节点视图）'], ['Delete', '删除选中的节点或连线（数据节点视图）'], ['Shift + 拖动画布', '框选节点'], ['滚轮', '缩放节点画布'], ['拖动空白区域', '平移节点画布'], ['Esc', '关闭当前浮层'],
+        ].map(([key, label]) => <div key={key} className="flex flex-wrap justify-between gap-3 py-3 text-xs"><span className="text-ink-dim">{label}</span><kbd className="rounded border border-line bg-soft px-2 py-0.5 text-ink">{key}</kbd></div>)}</div>}
+        {section === 'about' && <div className="space-y-4 py-4"><div className="text-xl font-semibold text-ink">RankBoard <span className="text-sm font-normal text-ink-dim">v{packageInfo.version}</span></div><p className="text-sm text-ink-dim">数据处理与可视化日报工作台</p><p className="text-xs text-ink-dim">运行环境：{isTauri() ? 'Tauri 桌面应用' : '浏览器'}</p><p className="text-xs text-ink-dim">工作区在本机保存。重要项目建议另存项目文件，并定期备份工作区与模板库。</p></div>}
+      </main>
     </div>
-  );
+    <footer className="flex items-center justify-between gap-3 pt-4"><p className="text-xs text-ink-dim">设置即时生效；画布配置随当前项目保存。</p><Button onClick={onClose}>完成</Button></footer>
+  </Modal>;
 }

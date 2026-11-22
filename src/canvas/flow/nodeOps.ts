@@ -30,7 +30,7 @@ export function createStepNode(nodes: PipelineNode[], type: NodeType, inputId: s
     id: newId('n'),
     type,
     name: dup > 0 ? `${label} ${dup + 1}` : label,
-    inputs: type === 'formula' ? [] : [inputId as string],
+    inputs: type === 'formula' ? (inputId ? [inputId] : []) : [inputId as string],
     params: defaultParams(type),
     enabled: true,
   };

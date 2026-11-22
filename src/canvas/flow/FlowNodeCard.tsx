@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
-import { getVal } from '../../parser/clean';
 import { NODE_W } from './layout';
 import { NODE_TOKENS } from './nodeTheme';
 import { NoTableHint } from './nodes/controls';
@@ -33,30 +32,58 @@ interface FlowNodeCardProps {
 
 /** 类型徽标配色 */
 function accentOf(node: PipelineNode, bad: boolean): string {
-  if (bad) return 'bg-red-500/90 text-white';
-  if (node.type === 'source') return 'bg-brand/90 text-white';
-  if (node.type === 'scalarOut' || node.type === 'formula') return 'bg-emerald-500/90 text-white';
-  return 'bg-slate-500/70 text-[var(--nb-header-text)]';
+  if (bad) return 'bg-red-500/15 text-red-600 dark:text-red-300';
+  if (node.type === 'source') return 'bg-brand-soft text-brand';
+  if (node.type === 'scalarOut' || node.type === 'formula') return 'bg-[var(--nb-chip-bg)] text-[var(--nb-ok)]';
+  return 'bg-[var(--nb-chip-bg)] text-[var(--nb-header-dim)]';
+}
+
+function configSummary(node: PipelineNode): string {
+  const p = node.params;
+  const v = (key: string, fallback = '未设置'): string => String(p[key] ?? fallback);
+  switch (node.type) {
+    case 'source': return '数据输入';
+    case 'filter': return `${v('col', '选择列')} · ${v('op', '选择条件')} · ${v('value', '输入值')}`;
+    case 'pickRows': return `${v('mode', '取行方式')} · ${v('dateCol', '未指定日期列')}`;
+    case 'sortTopN': return `${v('col', '未指定排序列')} · ${p.dir === 'asc' ? '升序' : '降序'} · ${Number(p.n ?? 0) || '全部'} 行`;
+    case 'groupAgg': return `按 ${v('groupCol', '未指定分组列')} 分组 · ${(Array.isArray(p.aggs) ? p.aggs.length : 0)} 个聚合`;
+    case 'derive': return `新列：${v('name', '未命名')}`;
+    case 'diff': return `${p.mode === 'rate' ? '变化率' : '差值'} · ${v('col', '未指定数值列')} · ${v('dateCol', '按当前行顺序')}`;
+    case 'union': return `${node.inputs.length} 个输入`;
+    case 'scalarOut': return `${v('col', '未指定数值列')} · ${v('method', '求和')}`;
+    case 'formula': return '公式计算';
+    default: return '处理节点';
+  }
+}
+
+function OutputSummary({ output, srcRt }: { output: NodeOutput | undefined; srcRt?: SourceRuntime }) {
+  if (output?.kind === 'error') return <span className="truncate text-[11px] text-[var(--nb-err)]">运行失败 · {output.message}</span>;
+  if (output?.kind === 'table') return <span className="text-[11px] text-[var(--nb-text-dim)]">{output.table.rows.length.toLocaleString()} 行 · {output.table.columns.length} 列</span>;
+  if (output?.kind === 'scalar') return <span className="text-[12px] font-semibold text-[var(--nb-ok)]">结果 {output.value === null ? '空值' : output.value.toLocaleString('zh-CN')}</span>;
+  if (output?.kind === 'scalars') return <span className="text-[11px] text-[var(--nb-text-dim)]">{Object.keys(output.values).length} 个变量</span>;
+  if (srcRt?.status === 'error') return <span className="truncate text-[11px] text-[var(--nb-err)]">数据源错误 · {srcRt.message}</span>;
+  if (srcRt && srcRt.status !== 'ready') return <span className="text-[11px] text-[var(--nb-warn)]">等待数据</span>;
+  return <span className="text-[11px] text-[var(--nb-text-faint)]">尚无输出</span>;
 }
 
 /** 嵌套 ConfigProvider 的 antd 主题：dark→darkAlgorithm，light→默认算法；token 与 nodeTheme.ts 对齐 */
 function useNodeAntdTheme() {
-  const nodeTheme = useCanvasStore((s) => s.nodeTheme);
+  const nodeTheme = useCanvasStore((s) => s.uiTheme);
   return useMemo(() => {
     const t = NODE_TOKENS[nodeTheme];
     return {
       algorithm: nodeTheme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
       token: {
-        colorPrimary: '#2563eb',
+        colorPrimary: nodeTheme === 'dark' ? '#77a7cc' : '#4b80ad',
         colorBgContainer: t.controlBg,
-        colorBgElevated: nodeTheme === 'dark' ? '#2b3444' : '#ffffff',
+        colorBgElevated: nodeTheme === 'dark' ? '#303030' : '#ffffff',
         colorBorder: t.controlBorder,
         colorText: t.text,
         colorTextSecondary: t.textDim,
         colorTextPlaceholder: t.textFaint,
-        fontSize: 11,
+        fontSize: 12,
         controlHeight: 26,
-        controlHeightSM: 22,
+        controlHeightSM: 26,
         borderRadius: 4,
       },
     };
@@ -82,90 +109,6 @@ function StepConfig({ node }: { node: PipelineNode }) {
       <def.Config node={node} cols={cols} rowColumns={rowColumns} rowSample={rowSample} setParam={setParam} />
     </div>
   );
-}
-
-// ---- 结果预览（节点底部） ----
-
-function DarkPreview({ node, output, srcRt }: { node: PipelineNode; output: NodeOutput | undefined; srcRt?: SourceRuntime }) {
-  if (output?.kind === 'error') {
-    return <div className="text-[10.5px] leading-snug text-[var(--nb-err)]">{output.message}</div>;
-  }
-  if (output?.kind === 'table') {
-    const rows = output.table.rows.slice(0, 6);
-    const cols = output.table.columns;
-    return (
-      <div>
-        <div className="mb-1 text-[10px] text-[var(--nb-text-dim)]">
-          共 <b className="text-[var(--nb-text)]">{output.table.rows.length}</b> 行 × {cols.length} 列
-          {output.table.rows.length > 6 && '（预览前 6 行）'}
-        </div>
-        <div className="max-h-[150px] overflow-auto rounded border border-[var(--nb-preview-border)] bg-[var(--nb-preview-table)]">
-          <table className="w-full border-collapse text-[10.5px]">
-            <thead>
-              <tr>
-                {cols.map((c) => (
-                  <th key={c.key} className="whitespace-nowrap border-b border-[var(--nb-preview-head-line)] px-1.5 py-0.5 text-left font-medium text-[var(--nb-text)]">
-                    {c.rawName || c.key}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i}>
-                  {cols.map((c) => {
-                    const v = getVal(r, c.key);
-                    return (
-                      <td key={c.key} className="max-w-[150px] truncate whitespace-nowrap border-b border-[var(--nb-preview-row-line)] px-1.5 py-0.5 text-[var(--nb-text)]">
-                        {v === null ? '' : typeof v === 'number' ? v.toLocaleString('zh-CN') : String(v)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={Math.max(1, cols.length)} className="px-2 py-2 text-center text-[var(--nb-text-faint)]">
-                    没有数据行（可能是筛选条件过严）
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-  if (output?.kind === 'scalar') {
-    return (
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[10px] text-[var(--nb-text-dim)]">结果</span>
-        <span className="text-[16px] font-semibold text-[var(--nb-ok)]">{output.value === null ? '空值' : output.value.toLocaleString('zh-CN')}</span>
-      </div>
-    );
-  }
-  if (output?.kind === 'scalars') {
-    const list = Object.entries(output.values);
-    return (
-      <div className="space-y-0.5">
-        <div className="text-[10px] text-[var(--nb-text-dim)]">{list.length} 个参数</div>
-        {list.slice(0, 4).map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-2 text-[10.5px]">
-            <span className="truncate text-[var(--nb-text-dim)]">{k}</span>
-            <span className="font-medium text-[var(--nb-text)]">{String(v ?? '')}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-  // 未执行：数据源给导入状态提示
-  if (node.type === 'source' && srcRt?.status === 'error') {
-    return <div className="text-[10.5px] text-[var(--nb-err)]">{srcRt.message}</div>;
-  }
-  if (node.type === 'source' && srcRt?.status !== 'ready') {
-    return <div className="text-[10.5px] text-[var(--nb-warn)]">待选择文件</div>;
-  }
-  return <div className="text-[10.5px] text-[var(--nb-text-faint)]">未执行</div>;
 }
 
 /** 头部名称：点击进入行内编辑，Enter/失焦提交，Esc 取消 */
@@ -233,7 +176,7 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
   /** 表单控件区域不触发节点拖拽（antd 各控件容器与弹层类名一并排除：弹层经 React portal 冒泡） */
   const onShellDown = (e: React.PointerEvent): void => {
     const t = e.target as HTMLElement | null;
-    if (t?.closest('input, textarea, select, button, a, label, .ant-select, .ant-input, .ant-input-number, .ant-input-number-handler-wrap, .ant-btn, .ant-checkbox-wrapper, .ant-collapse, .ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .no-drag')) {
+    if (t?.closest('input, textarea, select, button, a, label, summary, details, .ant-select, .ant-input, .ant-input-number, .ant-input-number-handler-wrap, .ant-btn, .ant-checkbox-wrapper, .ant-collapse, .ant-select-dropdown, .ant-dropdown, .ant-picker-dropdown, .no-drag')) {
       e.stopPropagation();
       return;
     }
@@ -249,38 +192,41 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
         ref={ref}
         onPointerDown={onShellDown}
         style={{ left: x, top: y, width: NODE_W }}
-        className={`absolute cursor-grab select-none overflow-visible rounded-lg border bg-[var(--nb-surface)] shadow-md transition-shadow ${
-          selected ? 'border-brand ring-2 ring-brand/60' : 'border-[var(--nb-border)]'
+        className={`absolute cursor-grab select-none overflow-visible rounded-md border bg-[var(--nb-surface)] shadow-sm transition-shadow ${
+          selected ? 'border-brand ring-1 ring-brand/45 shadow-sm' : 'border-[var(--nb-border)] hover:border-brand-line'
         } ${bad && !selected ? 'border-red-500/70' : ''} ${dragging ? 'cursor-grabbing shadow-lg' : ''} ${node.enabled ? '' : 'opacity-60'}`}
       >
         {/* 头部：拖拽手柄 */}
-        <div className="flex items-center gap-1.5 rounded-t-lg border-b border-[var(--nb-header-line)] bg-[var(--nb-header)] px-2 py-1.5">
-          <span className={`rounded px-1 py-px text-[9px] leading-tight ${accentOf(node, bad)}`}>{NODE_TYPE_LABELS[node.type]}</span>
+        <div className="flex min-h-9 items-center gap-2 rounded-t-md border-b border-[var(--nb-header-line)] bg-[var(--nb-header)] px-2.5 py-1.5">
+          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight ${accentOf(node, bad)}`}>{NODE_TYPE_LABELS[node.type]}</span>
           <NodeName node={node} />
-          {node.inputs.length > 1 && <span className="text-[9px] text-[var(--nb-header-dim)]">{node.inputs.length} 入</span>}
-          {!node.enabled && <span className="text-[9px] text-[var(--nb-header-warn)]">已停用</span>}
+          {node.inputs.length > 1 && <span className="shrink-0 text-[10px] text-[var(--nb-header-dim)]">{node.inputs.length} 入</span>}
+          {!node.enabled && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-[var(--nb-header-warn)]">已停用</span>}
         </div>
 
-        {/* 主体：配置区（注册表渲染） */}
-        <div className="space-y-2 px-3 py-2.5">
-          {node.type === 'source' ? (
-            srcDef && SrcConfig ? (
-              <SrcConfig srcDef={srcDef} srcRt={srcRt} />
-            ) : null
-          ) : (
-            <StepConfig node={node} />
-          )}
-        </div>
-
-        {/* 底部：结果预览 */}
-        <div className="rounded-b-lg border-t border-[var(--nb-header-line)] bg-[var(--nb-preview-bg)] px-2.5 py-1.5">
-          <DarkPreview node={node} output={output} srcRt={srcRt} />
-          {(node.type === 'scalarOut' || node.type === 'formula') && (
-            <div className="mt-1 truncate text-[10px] text-[var(--nb-text-faint)]">
-              变量名 <code className="rounded bg-[var(--nb-chip-bg)] px-1 text-[var(--nb-text-dim)]">{node.name}</code>
+        {selected ? (
+          <div className="space-y-2.5 px-3 py-2.5">
+            {node.type === 'source' ? (
+              srcDef && SrcConfig ? (
+                srcDef.kind === 'manualTable' ? (
+                  <details className="rounded-md border border-[var(--nb-border)] bg-[var(--nb-preview-bg)] px-2.5 py-2">
+                    <summary className="cursor-pointer text-[11px] font-medium text-[var(--nb-text)]">编辑手填表（{srcDef.rows.length} 行 × {srcDef.columns.length} 列）</summary>
+                    <div className="mt-2"><SrcConfig srcDef={srcDef} srcRt={srcRt} /></div>
+                  </details>
+                ) : <SrcConfig srcDef={srcDef} srcRt={srcRt} />
+              ) : null
+            ) : <StepConfig node={node} />}
+            <div className="border-t border-[var(--nb-header-line)] pt-2">
+              <OutputSummary output={output} srcRt={srcRt} />
+              {(node.type === 'scalarOut' || node.type === 'formula') && <div className="mt-1 truncate text-[10.5px] text-[var(--nb-text-faint)]">变量名 <code className="rounded bg-[var(--nb-chip-bg)] px-1 text-[var(--nb-text-dim)]">{node.name}</code></div>}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex min-h-9 items-center justify-between gap-2 rounded-b-md px-2.5 py-1.5">
+            <span className="min-w-0 truncate text-[11px] text-[var(--nb-text-dim)]" title={configSummary(node)}>{configSummary(node)}</span>
+            <OutputSummary output={output} srcRt={srcRt} />
+          </div>
+        )}
       </div>
     </ConfigProvider>
   );

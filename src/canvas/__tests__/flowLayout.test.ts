@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PipelineNode } from '../types';
-import { computeFlowLayout, edgePath, NODE_H, NODE_W, type LayoutNode } from '../flow/layout';
+import { computeFlowLayout, edgePath, edgeMid, NODE_H, NODE_W, type LayoutNode } from '../flow/layout';
 
 function n(id: string, inputs: string[] = [], type: PipelineNode['type'] = 'filter'): PipelineNode {
   return { id, type, name: id, inputs, params: {}, enabled: true };
@@ -80,7 +80,31 @@ describe('edgePath 连线', () => {
   it('从右侧中点连到左侧中点', () => {
     const d = edgePath({ x: 0, y: 0 }, { x: 400, y: 100 });
     expect(d).toContain(`M ${NODE_W} ${NODE_H / 2}`);
-    expect(d).toContain('C');
-    expect(d.trim().endsWith(`400 ${100 + NODE_H / 2}`)).toBe(true);
+    expect(d).toContain('Q');
+    expect(d.trim().endsWith(`393 ${100 + NODE_H / 2}`)).toBe(true);
+  });
+});
+
+
+describe('rounded orthogonal routing', () => {
+  it('keeps the arrow lead-in horizontal and uses distinct source lanes', () => {
+    const from = { x: 0, y: 0 }, to = { x: 500, y: 400 };
+    const a = edgePath(from, to, NODE_H, NODE_H, 0.3);
+    const b = edgePath(from, to, NODE_H, NODE_H, 0.7);
+    expect(a).not.toBe(b);
+    expect(a).toMatch(/Q [\d.]+ 439 [\d.]+ 439 L 493 439$/);
+  });
+  it('handles same-height and reverse routes without invalid coordinates', () => {
+    for (const to of [{ x: 404, y: 0 }, { x: -400, y: 200 }, { x: 300, y: 0 }]) {
+      const from = { x: 0, y: 0 };
+      expect(edgePath(from, to)).not.toMatch(/NaN|Infinity/);
+      const mid = edgeMid(from, to);
+      expect(Number.isFinite(mid.x) && Number.isFinite(mid.y)).toBe(true);
+    }
+  });
+  it('orders children by their parents even when pipeline order is interleaved', () => {
+    const r = computeFlowLayout([n('s1', [], 'source'), n('s2', [], 'source'), n('b', ['s2']), n('a', ['s1'])]);
+    expect(r.byId.a.y).toBeLessThan(r.byId.b.y);
+    expect(r.edges.find(e => e.from === 's1')?.lane).not.toBe(r.edges.find(e => e.from === 's2')?.lane);
   });
 });

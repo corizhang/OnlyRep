@@ -185,7 +185,7 @@ export function runGraph(graph: PipelineGraph, ctx: EngineContext): RunResult {
       outputs[node.id] = { kind: 'error', message: '节点已停用' };
       continue;
     }
-    if (node.type === 'formula') {
+    if (node.type === 'formula' && node.inputs.length === 0) {
       formulaNodes.push(node);
       continue;
     }
