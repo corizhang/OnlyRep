@@ -841,7 +841,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 const mid = edgeMid(withDelta(from, delta), withDelta(to, delta), heights[edgeSel.from] ?? NODE_H, heights[edgeSel.to] ?? NODE_H, layout.edges.find((e) => e.from === edgeSel.from && e.to === edgeSel.to)?.lane);
                 return (
                   <div
-                    className="absolute z-30 flex items-center rounded-full border border-[var(--nb-border)] bg-[var(--nb-panel)] shadow-md"
+                    className="absolute z-30 flex items-center rounded-full bg-[var(--nb-pop-surface)] text-[var(--nb-pop-text)] shadow-pop"
                     style={{ left: mid.x, top: mid.y, transform: 'translate(-50%, -50%)' }}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
@@ -849,21 +849,22 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                       type="button"
                       title="在此连线上插入节点"
                       onClick={() => setEdgeInsertOpen((v) => !v)}
-                      className="flex h-6 items-center gap-0.5 rounded-l-full pl-2 pr-1.5 text-[11px] font-medium text-[var(--ui-brand)] hover:bg-brand/10"
+                      className="flex h-7 items-center gap-1 rounded-l-full pl-2.5 pr-2 text-[11px] font-medium text-[var(--ui-brand)] transition-colors hover:bg-brand/10"
                     >
-                      ⊕ 插入
+                      <PlusOutlined style={{ fontSize: 11 }} />
+                      插入
                     </button>
-                    <span aria-hidden className="h-4 w-px bg-[var(--nb-border)]" />
+                    <span aria-hidden className="h-4 w-px bg-[var(--nb-pop-border)]" />
                     <button
                       type="button"
                       title="删除此连线（或按 Delete）"
                       onClick={() => removeEdge(edgeSel.from, edgeSel.to)}
-                      className="flex h-6 items-center rounded-r-full pl-1.5 pr-2 text-[11px] font-medium text-red-500 hover:bg-red-500/10"
+                      className="flex h-7 items-center rounded-r-full px-2 text-[11px] font-medium text-red-500 transition-colors hover:bg-red-500/10"
                     >
-                      ✕
+                      <DeleteOutlined style={{ fontSize: 11 }} />
                     </button>
                     {edgeInsertOpen && (
-                      <div className="absolute left-1/2 top-7 z-40 flex max-h-[320px] w-[260px] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-[var(--nb-border)] bg-[var(--nb-panel)] shadow-xl">
+                      <div className="absolute left-1/2 top-8 z-40 flex h-[320px] w-[300px] -translate-x-1/2 flex-col overflow-hidden rounded-md bg-[var(--nb-pop-surface)] text-[var(--nb-pop-text)] shadow-pop">
                         <AddNodePanelContent onPick={insertNodeOnEdge} footerHint="插入后自动连接两端" autoFocus onEscape={() => setEdgeInsertOpen(false)} />
                       </div>
                     )}
