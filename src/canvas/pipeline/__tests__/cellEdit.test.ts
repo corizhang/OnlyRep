@@ -73,4 +73,40 @@ describe('修数节点', () => {
     const rows = out(node({ edits: [], pointEdits: [] }));
     expect(rows[0].score).toBe(80);
   });
+
+  it('修数后 #raw 同步：下游筛选「包含」能命中新值（用户真实场景回归）', () => {
+    // 模拟导入表（带 #raw 伴生值，与解析器产物一致）
+    const withRaw = (): CleanedTable => ({
+      columns: [
+        { key: '客群', type: 'text', rawName: '客群名称' },
+        { key: '渠道', type: 'text', rawName: '渠道' },
+      ],
+      rows: [
+        { __idx: 0, '客群': '短信-特邀推送', '客群#raw': '短信-特邀推送', '渠道': '短信', '渠道#raw': '短信' },
+        { __idx: 1, '客群': '公众号-快捷支付', '客群#raw': '公众号-快捷支付', '渠道': '公众号', '渠道#raw': '公众号' },
+      ],
+    } as unknown as CleanedTable);
+    const editNode: PipelineNode = { id: 'e', type: 'cellEdit', name: '修数', inputs: ['s'], params: { edits: [{ matchCol: '客群', matchOp: 'contains', matchVal: '短信', setCol: '客群', setVal: '公众号-{{客群}}' }] }, enabled: true };
+    const edited = runNode(editNode, [{ kind: 'table', table: withRaw() }], ctx);
+    if (edited.kind !== 'table') throw new Error('非表输出');
+    expect(edited.table.rows[0]['客群']).toBe('公众号-短信-特邀推送');
+    expect(edited.table.rows[0]['客群#raw']).toBe('公众号-短信-特邀推送');
+
+    // 下游筛选：客群 包含 公众号 → 应含修数改出来的行
+    const filterNode: PipelineNode = { id: 'f', type: 'filter', name: '筛选', inputs: ['e'], params: { col: '客群', op: 'contains', value: '公众号' }, enabled: true };
+    const filtered = runNode(filterNode, [edited], ctx);
+    if (filtered.kind !== 'table') throw new Error('非表输出');
+    expect(filtered.table.rows).toHaveLength(2); // 修复前只有 1 行（raw 残留旧值）
+  });
+
+  it('同节点规则按序：后规则基于前规则的改动匹配', () => {
+    const rows = out(node({
+      edits: [
+        { matchCol: 'name', matchOp: 'eq', matchVal: '张三', setCol: 'city', setVal: '北京' },
+        { matchCol: 'city', matchOp: 'eq', matchVal: '北京', setCol: 'score', setVal: '99' },
+      ],
+    }));
+    expect(rows[0].city).toBe('北京');
+    expect(rows[0].score).toBe(99); // 第二规则基于改后的 city 命中
+  });
 });

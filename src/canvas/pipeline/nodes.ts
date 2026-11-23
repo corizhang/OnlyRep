@@ -165,20 +165,26 @@ function runCellEdit(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {
   };
 
   const rows = t.rows.map((row) => {
-    const patch: Record<string, string | number | null> = {};
+    // 工作行：规则/定点按序应用，后面的匹配基于前面的改动（用户预期）
+    let cur = row;
+    let changed = false;
+    /** 写格：值与 #raw 伴生值同步更新（下游筛选/匹配优先读 #raw，不同步会拿到旧文本） */
+    const setCell = (col: string, v: string | number): void => {
+      cur = { ...cur, [col]: v, [`${col}#raw`]: String(v) };
+      changed = true;
+    };
     for (const r of edits) {
-      if (r.setCol && matchRow(row, r)) patch[r.setCol] = renderVal(r.setVal, row);
+      if (r.setCol && matchRow(cur, r)) setCell(r.setCol, renderVal(r.setVal, cur));
     }
     for (const pt of points) {
       if (!pt.keyCol || !pt.col) continue;
       // 优先原始文本，无 raw 元数据（程序生成的行）退回解析值
-      const rawV = getRawText(row, pt.keyCol);
-      const numV = getVal(row, pt.keyCol);
+      const rawV = getRawText(cur, pt.keyCol);
+      const numV = getVal(cur, pt.keyCol);
       const kv = rawV !== '' ? rawV : numV === null || numV === undefined ? '' : String(numV);
-      if (kv === pt.key) patch[pt.col] = renderVal(pt.value, row);
+      if (kv === pt.key) setCell(pt.col, renderVal(pt.value, cur));
     }
-    if (Object.keys(patch).length === 0) return row;
-    return { ...row, ...patch };
+    return changed ? cur : row;
   });
 
   return { kind: 'table', table: { ...t, rows } };
