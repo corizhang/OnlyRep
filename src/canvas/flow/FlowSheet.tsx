@@ -83,6 +83,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
   /** 选中的连线（点击选中后 Delete 或中点 ✕ 删除；与节点选择互斥） */
   const [edgeSel, setEdgeSel] = useState<{ from: string; to: string } | null>(null);
+  const [edgeInsertOpen, setEdgeInsertOpen] = useState(false);
   const selectedId = flowSelectedId;
 
   /** 节点高度上报（ResizeObserver 测量）：连线锚点与自动布局按实际高度计算 */
@@ -296,6 +297,27 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     });
     if (spot) reveal(spot);
     setFlowSelectedId(node.id);
+  };
+
+  /** 连线上插入新节点：新建节点接上 from，to 的输入重定向到新节点（单步撤销） */
+  const insertNodeOnEdge = (type: NodeType): void => {
+    if (!edgeSel) return;
+    const { from, to } = edgeSel;
+    const toNode = nodeById.get(to);
+    if (!toNode) return;
+    const node = createStepNode(config.pipeline.nodes, type, from);
+    const pf = layout.byId[from];
+    const pt = layout.byId[to];
+    const spot = pf && pt ? { x: (pf.x + pt.x) / 2 - NODE_W / 2, y: (pf.y + pt.y) / 2 } : null;
+    transact('insert-node', () => {
+      addNodeToStore(node);
+      if (spot) setFlowPos(node.id, spot);
+      // 重连：to 的输入 from → 新节点
+      updateNodeInStore(to, { inputs: toNode.inputs.map((i) => (i === from ? node.id : i)) });
+    });
+    setFlowSelectedId(node.id);
+    setEdgeSel(null);
+    setEdgeInsertOpen(false);
   };
 
   /** 落点在视口外时做「最小平移」：只补足缺口让新节点进入视野，不居中、尽量保住上游节点可见 */
@@ -769,6 +791,53 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
               );
             })}
 
+            {/* 选中连线：中点「⊕」插入新节点（A→X→B 一步完成） */}
+            {edgeSel && (() => {
+              const pf = layout.byId[edgeSel.from];
+              const pt = layout.byId[edgeSel.to];
+              if (!pf || !pt) return null;
+              const h1 = heights[edgeSel.from] ?? NODE_H;
+              const h2 = heights[edgeSel.to] ?? NODE_H;
+              const midX = (pf.x + NODE_W + pt.x) / 2;
+              const midY = (pf.y + h1 / 2 + pt.y + h2 / 2) / 2;
+              const types = NODE_TYPE_META.filter((m) => m.type !== 'scalarOut' && m.type !== 'formula');
+              return (
+                <div
+                  style={{ position: 'absolute', left: midX, top: midY, transform: 'translate(-50%, -50%)', zIndex: 30 }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    title="在此连线上插入节点"
+                    onClick={() => setEdgeInsertOpen((v) => !v)}
+                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--ui-brand)] bg-[var(--nb-panel)] text-[13px] font-bold text-[var(--ui-brand)] shadow-md hover:bg-[var(--ui-brand)] hover:text-white"
+                  >
+                    +
+                  </button>
+                  {edgeInsertOpen && (
+                    <div
+                      className="absolute left-1/2 top-7 z-40 w-[220px] -translate-x-1/2 rounded-lg border border-[var(--nb-border)] bg-[var(--nb-panel)] p-1.5 shadow-xl"
+                      style={{ maxHeight: 260, overflowY: 'auto' }}
+                    >
+                      <div className="grid grid-cols-2 gap-1">
+                        {types.map((m) => (
+                          <button
+                            key={m.type}
+                            type="button"
+                            onClick={() => insertNodeOnEdge(m.type)}
+                            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[11.5px] text-[var(--nb-text)] hover:bg-[var(--nb-hover)]"
+                          >
+                            <span className="text-[12px]">{m.icon}</span>
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* 连接端口：右侧输出点（可拖到下游建立连线）、左侧输入点（放置目标高亮） */}
             {layout.nodes.map((n) => {
               const node = nodeById.get(n.id);
@@ -1179,6 +1248,7 @@ function SelectionToolbar({
     const list = [
       { type: 'pickRows' as NodeType, category: '筛选与整理' },
       { type: 'filter' as NodeType, category: '筛选与整理' },
+      { type: 'cellEdit' as NodeType, category: '筛选与整理' },
       { type: 'sortTopN' as NodeType, category: '筛选与整理' },
       { type: 'derive' as NodeType, category: '计算与合并' },
       { type: 'groupAgg' as NodeType, category: '计算与合并' },
