@@ -11,6 +11,7 @@ const MODE_OPTIONS = [
 /** 取行：取最新日期 / 前 N 行 */
 export const pickRowsDef: NodeTypeDef = {
   type: 'pickRows',
+  category: '筛选与整理',
   label: '取行',
   icon: '⚙',
   desc: '取最新日期 / 前 N 行',

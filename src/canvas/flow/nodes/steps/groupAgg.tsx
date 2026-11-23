@@ -7,6 +7,7 @@ import type { AggMethod, PipelineNode } from '../../../types';
 /** 分组聚合：按维度汇总 */
 export const groupAggDef: NodeTypeDef = {
   type: 'groupAgg',
+  category: '计算与合并',
   label: '分组聚合',
   icon: '⚙',
   desc: '按维度汇总',

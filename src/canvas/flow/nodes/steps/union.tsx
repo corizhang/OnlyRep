@@ -7,6 +7,7 @@ import type { NodeTypeDef } from '../types';
  */
 export const unionDef: NodeTypeDef = {
   type: 'union',
+  category: '计算与合并',
   label: '合并',
   icon: '∪',
   desc: '两张表纵向拼接',

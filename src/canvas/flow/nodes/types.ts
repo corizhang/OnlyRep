@@ -35,8 +35,12 @@ export interface StepConfigProps {
   setParam: (patch: Record<string, unknown>) => void;
 }
 
+export type StepCategory = '筛选与整理' | '计算与合并' | '取数与公式';
+
 export interface NodeTypeDef {
   type: NodeType;
+  /** 添加面板分组（注册即自动归组，无需在面板里再维护清单） */
+  category: StepCategory;
   /** 库名称 / 头部徽标 / 创建节点时的初始名 */
   label: string;
   /** 节点库图标（单字符） */

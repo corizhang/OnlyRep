@@ -4,6 +4,7 @@ import type { NodeTypeDef } from '../types';
 /** 排序：升降序 / 取前 N */
 export const sortTopNDef: NodeTypeDef = {
   type: 'sortTopN',
+  category: '筛选与整理',
   label: '排序',
   icon: '⚙',
   desc: '升降序 / 取前 N',

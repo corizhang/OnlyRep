@@ -16,6 +16,7 @@ const OP_OPTIONS = [
 /** 筛选：按列值过滤行 */
 export const filterDef: NodeTypeDef = {
   type: 'filter',
+  category: '筛选与整理',
   label: '筛选',
   icon: '⚙',
   desc: '按列值过滤行',

@@ -8,6 +8,7 @@ import type { NodeTypeDef } from '../types';
  */
 export const diffDef: NodeTypeDef = {
   type: 'diff',
+  category: '计算与合并',
   label: '差分',
   icon: 'Δ',
   desc: '较上日增加一列',

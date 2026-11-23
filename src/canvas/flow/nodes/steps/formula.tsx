@@ -4,6 +4,7 @@ import type { NodeTypeDef } from '../types';
 /** 计算字段：无上游时计算标量；连接表格后按行计算并追加一列 */
 export const formulaDef: NodeTypeDef = {
   type: 'formula',
+  category: '取数与公式',
   label: '计算字段',
   icon: 'ƒ',
   desc: '公式产出新变量',

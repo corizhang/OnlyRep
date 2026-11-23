@@ -6,6 +6,7 @@ import type { AggMethod } from '../../../types';
 /** 取数：对列聚合出一个数值（写入变量环境） */
 export const scalarOutDef: NodeTypeDef = {
   type: 'scalarOut',
+  category: '取数与公式',
   label: '取数',
   icon: '⚙',
   desc: '对列聚合出一个数值',

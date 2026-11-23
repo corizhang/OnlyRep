@@ -5,6 +5,7 @@ import type { NodeTypeDef } from '../types';
 /** 派生列：行内公式新增一列 */
 export const deriveDef: NodeTypeDef = {
   type: 'derive',
+  category: '计算与合并',
   label: '派生列',
   icon: '⚙',
   desc: '行内公式新增一列',

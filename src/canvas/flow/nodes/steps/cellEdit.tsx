@@ -37,6 +37,7 @@ const newRule = (): Rule => ({ matchCol: '', matchOp: 'eq', matchVal: '', setCol
 
 export const cellEditDef: NodeTypeDef = {
   type: 'cellEdit',
+  category: '筛选与整理',
   label: '修数',
   icon: '✎',
   desc: '批量/定点修改单元格',

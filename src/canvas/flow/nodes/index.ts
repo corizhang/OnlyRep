@@ -24,7 +24,7 @@ import { manualSourceDef } from './sources/manual';
  * 引擎执行分支（engine.ts）与 NodeType 联合类型（types.ts）仍需各加一处（编译器会提示）。
  */
 
-const STEP_DEF_LIST: NodeTypeDef[] = [pickRowsDef, filterDef, cellEditDef, sortTopNDef, groupAggDef, deriveDef, diffDef, unionDef, scalarOutDef, formulaDef];
+export const STEP_DEF_LIST: NodeTypeDef[] = [pickRowsDef, filterDef, cellEditDef, sortTopNDef, groupAggDef, deriveDef, diffDef, unionDef, scalarOutDef, formulaDef];
 
 export const STEP_DEFS = Object.fromEntries(STEP_DEF_LIST.map((d) => [d.type, d])) as Record<string, NodeTypeDef>;
 

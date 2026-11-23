@@ -12,6 +12,7 @@ import { NODE_TYPE_META, stepDef } from './nodes';
 import EmptyGuide from '../components/EmptyGuide';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
+import AddNodePanelContent from './AddNodePanel';
 import { getVal } from '../../parser/clean';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
 import { createSourceOfKind, createStepNode, spotRightOf } from './nodeOps';
@@ -791,52 +792,6 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
               );
             })}
 
-            {/* 选中连线：中点「⊕」插入新节点（A→X→B 一步完成） */}
-            {edgeSel && (() => {
-              const pf = layout.byId[edgeSel.from];
-              const pt = layout.byId[edgeSel.to];
-              if (!pf || !pt) return null;
-              const h1 = heights[edgeSel.from] ?? NODE_H;
-              const h2 = heights[edgeSel.to] ?? NODE_H;
-              const midX = (pf.x + NODE_W + pt.x) / 2;
-              const midY = (pf.y + h1 / 2 + pt.y + h2 / 2) / 2;
-              const types = NODE_TYPE_META.filter((m) => m.type !== 'scalarOut' && m.type !== 'formula');
-              return (
-                <div
-                  style={{ position: 'absolute', left: midX, top: midY, transform: 'translate(-50%, -50%)', zIndex: 30 }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    title="在此连线上插入节点"
-                    onClick={() => setEdgeInsertOpen((v) => !v)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--ui-brand)] bg-[var(--nb-panel)] text-[13px] font-bold text-[var(--ui-brand)] shadow-md hover:bg-[var(--ui-brand)] hover:text-white"
-                  >
-                    +
-                  </button>
-                  {edgeInsertOpen && (
-                    <div
-                      className="absolute left-1/2 top-7 z-40 w-[220px] -translate-x-1/2 rounded-lg border border-[var(--nb-border)] bg-[var(--nb-panel)] p-1.5 shadow-xl"
-                      style={{ maxHeight: 260, overflowY: 'auto' }}
-                    >
-                      <div className="grid grid-cols-2 gap-1">
-                        {types.map((m) => (
-                          <button
-                            key={m.type}
-                            type="button"
-                            onClick={() => insertNodeOnEdge(m.type)}
-                            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[11.5px] text-[var(--nb-text)] hover:bg-[var(--nb-hover)]"
-                          >
-                            <span className="text-[12px]">{m.icon}</span>
-                            {m.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
 
             {/* 连接端口：右侧输出点（可拖到下游建立连线）、左侧输入点（放置目标高亮） */}
             {layout.nodes.map((n) => {
@@ -877,7 +832,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
               );
             })}
 
-            {/* 选中连线的中点删除按钮 */}
+            {/* 选中连线：中点控件胶囊（插入 | 删除 横排一体，避免两按钮漂移重叠） */}
             {edgeSel &&
               (() => {
                 const from = layout.byId[edgeSel.from];
@@ -885,16 +840,34 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 if (!from || !to) return null;
                 const mid = edgeMid(withDelta(from, delta), withDelta(to, delta), heights[edgeSel.from] ?? NODE_H, heights[edgeSel.to] ?? NODE_H, layout.edges.find((e) => e.from === edgeSel.from && e.to === edgeSel.to)?.lane);
                 return (
-                  <button
-                    type="button"
-                    title="删除此连线（或按 Delete）"
+                  <div
+                    className="absolute z-30 flex items-center rounded-full border border-[var(--nb-border)] bg-[var(--nb-panel)] shadow-md"
+                    style={{ left: mid.x, top: mid.y, transform: 'translate(-50%, -50%)' }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => removeEdge(edgeSel.from, edgeSel.to)}
-                    className="absolute flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-red-500 text-[10px] font-bold text-white shadow-md transition-transform hover:scale-110"
-                    style={{ left: mid.x - 10, top: mid.y - 10 }}
                   >
-                    ✕
-                  </button>
+                    <button
+                      type="button"
+                      title="在此连线上插入节点"
+                      onClick={() => setEdgeInsertOpen((v) => !v)}
+                      className="flex h-6 items-center gap-0.5 rounded-l-full pl-2 pr-1.5 text-[11px] font-medium text-[var(--ui-brand)] hover:bg-brand/10"
+                    >
+                      ⊕ 插入
+                    </button>
+                    <span aria-hidden className="h-4 w-px bg-[var(--nb-border)]" />
+                    <button
+                      type="button"
+                      title="删除此连线（或按 Delete）"
+                      onClick={() => removeEdge(edgeSel.from, edgeSel.to)}
+                      className="flex h-6 items-center rounded-r-full pl-1.5 pr-2 text-[11px] font-medium text-red-500 hover:bg-red-500/10"
+                    >
+                      ✕
+                    </button>
+                    {edgeInsertOpen && (
+                      <div className="absolute left-1/2 top-7 z-40 flex max-h-[320px] w-[260px] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-[var(--nb-border)] bg-[var(--nb-panel)] shadow-xl">
+                        <AddNodePanelContent onPick={insertNodeOnEdge} footerHint="插入后自动连接两端" autoFocus onEscape={() => setEdgeInsertOpen(false)} />
+                      </div>
+                    )}
+                  </div>
                 );
               })()}
 
@@ -1202,10 +1175,7 @@ function SelectionToolbar({
 }) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
   const [toolbarSize, setToolbarSize] = useState({ width: 174, height: 42 });
-  const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('筛选与整理');
 
   useLayoutEffect(() => {
     const el = toolbarRef.current;
@@ -1214,14 +1184,6 @@ function SelectionToolbar({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  useLayoutEffect(() => {
-    if (!addMenuOpen) {
-      setQuery('');
-      return;
-    }
-    searchRef.current?.focus();
-  }, [addMenuOpen]);
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -1243,28 +1205,6 @@ function SelectionToolbar({
     };
   }, [addMenuOpen, onToggleAddMenu]);
 
-  const items = useMemo(() => {
-    const byType = new Map(STEP_TYPES.map((item) => [item.type, item]));
-    const list = [
-      { type: 'pickRows' as NodeType, category: '筛选与整理' },
-      { type: 'filter' as NodeType, category: '筛选与整理' },
-      { type: 'cellEdit' as NodeType, category: '筛选与整理' },
-      { type: 'sortTopN' as NodeType, category: '筛选与整理' },
-      { type: 'derive' as NodeType, category: '计算与合并' },
-      { type: 'groupAgg' as NodeType, category: '计算与合并' },
-      { type: 'diff' as NodeType, category: '计算与合并' },
-      { type: 'union' as NodeType, category: '计算与合并' },
-      { type: 'scalarOut' as NodeType, category: '取数与公式' },
-      { type: 'formula' as NodeType, category: '取数与公式' },
-    ].map((entry) => {
-      const meta = NODE_TYPE_META.find((item) => item.type === entry.type);
-      const step = byType.get(entry.type);
-      return { ...entry, label: meta?.label ?? '计算字段', icon: meta?.icon ?? 'ƒ', hint: step?.hint ?? '公式产出新变量' };
-    });
-    const q = query.trim().toLocaleLowerCase();
-    return list.filter((item) => !q || `${item.label} ${item.hint} ${item.category}`.toLocaleLowerCase().includes(q));
-  }, [query]);
-  const categories = ['筛选与整理', '计算与合并', '取数与公式'];
   const bounds = viewportRect ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
   const activeNodeRect = nodeRect ?? { left: (screenAnchor?.x ?? 0) - NODE_W / 2, top: screenAnchor?.y ?? 0, width: NODE_W, height: NODE_H };
   const menuWidth = Math.max(160, Math.min(320, bounds.width - 16));
@@ -1331,53 +1271,7 @@ function SelectionToolbar({
           style={{ ...nodeThemeVars(theme), background: theme === 'dark' ? '#292929' : '#ffffff', left: menuPosition.left, top: menuPosition.top, width: menuWidth, height: menuMaxHeight }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-2 border-b border-[var(--nb-pop-border)] px-3 py-2">
-            <SearchOutlined className="text-[var(--nb-text-faint)]" />
-            <input
-              ref={searchRef}
-              type="search"
-              role="searchbox"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索节点名称或用途"
-              aria-label="搜索下游节点"
-              className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--nb-text-faint)]"
-            />
-            <kbd className="rounded border border-[var(--nb-pop-border)] px-1 py-0.5 text-[9px] text-[var(--nb-text-faint)]">Esc</kbd>
-          </div>
-          {!query.trim() && <div className="flex shrink-0 gap-1 border-b border-[var(--nb-pop-border)] px-2 py-2" role="tablist" aria-label="节点分类">
-            {categories.map((category) => <button key={category} type="button" role="tab" aria-selected={activeCategory === category} onClick={() => setActiveCategory(category)} className={`flex-1 rounded-md px-1 py-1.5 text-[11px] transition-colors ${activeCategory === category ? 'bg-brand/15 text-brand' : 'text-[var(--nb-text-dim)] hover:bg-[var(--nb-control-hover)]'}`}>{category}</button>)}
-          </div>}
-          <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
-            {(query.trim() ? categories : [activeCategory]).map((category) => {
-              const group = items.filter((item) => item.category === category);
-              if (group.length === 0) return null;
-              return (
-                <section key={category} className="mb-1.5 last:mb-0">
-                  <h3 className="px-2 pb-0.5 text-[10px] font-semibold leading-3 tracking-wide text-[var(--nb-text-faint)]">{category}</h3>
-                  <div className="space-y-px">
-                    {group.map((item) => (
-                      <button
-                        key={item.type}
-                        type="button"
-                        title={item.hint}
-                        onClick={() => onAddDownstream(item.type)}
-                        className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-md border border-transparent px-2 py-1 text-left transition-colors hover:border-brand/25 hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                      >
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--nb-control-bg)] text-[12px] font-semibold text-brand">{item.icon}</span>
-                        <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                          <span className="truncate text-[12px] font-medium">{item.label}</span>
-                          <span className="truncate text-[10px] text-[var(--nb-text-faint)]">{item.hint}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-            {items.length === 0 && <p className="px-2 py-6 text-center text-xs text-[var(--nb-text-faint)]">没有匹配的节点</p>}
-          </div>
-          <div className="shrink-0 truncate border-t border-[var(--nb-pop-border)] px-3 py-2 text-[10px] text-[var(--nb-text-dim)]" title={node.name}>添加后自动连接到「{node.name}」</div>
+          <AddNodePanelContent onPick={onAddDownstream} footerHint={`添加后自动连接到「${node.name}」`} autoFocus onEscape={onToggleAddMenu} />
         </div>
       )}
 
