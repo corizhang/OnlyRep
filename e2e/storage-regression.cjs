@@ -88,15 +88,22 @@ function watchErrors(page, bucket) {
     }
 
     // 主题切换会写入 appStorage（rankboard-ui-theme）；内存降级下也必须正常工作
+    // 键盘操作下拉（箭头+回车），规避无头环境弹层坐标偶发不响应
     let modeOk = false;
     try {
       await page.locator('header button:has(.anticon-setting)').first().click({ timeout: 5000 });
-      await page.getByRole('combobox', { name: '界面主题' }).click();
-      await page.getByText('深色 · 石墨灰', { exact: true }).last().click();
+      await page.getByRole('combobox', { name: '界面主题' }).click({ timeout: 5000 });
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(200);
+      await page.keyboard.press('Enter');
       await page.waitForTimeout(400);
       modeOk = (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark';
-    } catch {
+    } catch (e) {
       modeOk = false;
+      try {
+        console.log('    [debug] 主题切换断点:', String(e).split('\n')[0].slice(0, 120));
+        await page.screenshot({ path: '.shots/storage-theme-fail.png' });
+      } catch {}
     }
     record('降级后主题切换仍可用（写入内存生效）', modeOk);
     record('localStorage 不可用场景下无页面异常', errors.length === 0, errors.join('; ').slice(0, 200));

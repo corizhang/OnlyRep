@@ -12,6 +12,7 @@ import { NODE_TYPE_META, stepDef } from './nodes';
 import EmptyGuide from '../components/EmptyGuide';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
+import { getVal } from '../../parser/clean';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
 import { createSourceOfKind, createStepNode, spotRightOf } from './nodeOps';
 import { ImportEditor, FormEditor, ManualEditor } from '../components/DataSourcePanel';
@@ -1413,7 +1414,26 @@ function Drawer({
       <div className="mt-2 rounded-md border border-line bg-soft p-2">
         <div className="mb-1 text-[10px] font-medium text-ink-dim">实时结果</div>
         {output?.kind === 'table' ? (
-          <DataPreview table={output.table} />
+          <DataPreview
+            table={output.table}
+            onCellEdit={
+              node.type === 'cellEdit'
+                ? (rowIdx, colKey, current) => {
+                    // 定点编辑：主键列定位行（无主键列时按行号兜底），追加 pointEdit 并重算
+                    const tbl = output.kind === 'table' ? output.table : null;
+                    if (!tbl) return;
+                    const keyCol = String(node.params.keyCol ?? '');
+                    const row = tbl.rows.find((r) => r.__idx === rowIdx);
+                    if (!row) return;
+                    const key = keyCol ? String(getVal(row, keyCol) ?? '') : String(rowIdx);
+                    const next = window.prompt(`修改「${keyCol ? `${key} 的 ` : ''}${colKey}」`, current);
+                    if (next === null) return;
+                    const points = (Array.isArray(node.params.pointEdits) ? node.params.pointEdits : []) as { keyCol: string; key: string; col: string; value: string }[];
+                    updateNode(node.id, { params: { ...node.params, pointEdits: [...points, { keyCol: keyCol || '__idx', key, col: colKey, value: next }] } });
+                  }
+                : undefined
+            }
+          />
         ) : output?.kind === 'scalar' ? (
           <div className="text-lg font-semibold text-ok">{output.value === null ? '空值' : String(output.value)}</div>
         ) : output?.kind === 'scalars' ? (

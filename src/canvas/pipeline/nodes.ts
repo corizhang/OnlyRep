@@ -70,6 +70,8 @@ export function runNode(node: PipelineNode, inputs: NodeOutput[], ctx: NodeRunCo
   switch (node.type) {
     case 'filter':
       return runFilter(node, inputs);
+    case 'cellEdit':
+      return runCellEdit(node, inputs);
     case 'pickRows':
       return runPickRows(node, inputs, ctx);
     case 'derive':
@@ -98,6 +100,89 @@ function firstTable(inputs: NodeOutput[]): CleanedTable | { error: string } {
 }
 
 type FilterOp = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'notEmpty' | 'empty';
+
+/** 修数节点：批量规则（条件→设值，{{列名}} 引用同行原值）+ 定点编辑（主键列定位） */
+interface CellEditRule {
+  matchCol: string;
+  matchOp: 'eq' | 'ne' | 'contains' | 'empty' | 'notEmpty' | 'gt' | 'lt';
+  matchVal: string;
+  setCol: string;
+  setVal: string;
+}
+
+interface CellEditPoint {
+  keyCol: string;
+  key: string;
+  col: string;
+  value: string;
+}
+
+function runCellEdit(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {
+  const t = firstTable(inputs);
+  if ('error' in t) return { kind: 'error', message: t.error };
+  const edits = (Array.isArray(node.params.edits) ? node.params.edits : []) as CellEditRule[];
+  const points = (Array.isArray(node.params.pointEdits) ? node.params.pointEdits : []) as CellEditPoint[];
+  if (edits.length === 0 && points.length === 0) return { kind: 'table', table: t };
+
+  /** 新值插值：{{列名}} → 同行原值（原始文本）；整体为纯数字则转数值 */
+  const renderVal = (tpl: string, row: (typeof t.rows)[number]): string | number => {
+    const out = tpl.replace(/\{\{([^}]+)\}\}/g, (_, name: string) => {
+      const v = getVal(row, name.trim());
+      if (v === null || v === undefined) return '';
+      return String(v);
+    });
+    const trimmed = out.trim();
+    if (trimmed !== '' && !Number.isNaN(Number(trimmed.replace(/,/g, '')))) {
+      return Number(trimmed.replace(/,/g, ''));
+    }
+    return out;
+  };
+
+  const matchRow = (row: (typeof t.rows)[number], r: CellEditRule): boolean => {
+    if (!r.matchCol) return false;
+    const v = getVal(row, r.matchCol);
+    const text = getRawText(row, r.matchCol) || (v === null ? '' : String(v));
+    const numV = typeof v === 'number' ? v : Number(String(text).replace(/,/g, ''));
+    const numT = Number(r.matchVal.replace(/,/g, ''));
+    switch (r.matchOp) {
+      case 'empty':
+        return text.trim() === '';
+      case 'notEmpty':
+        return text.trim() !== '';
+      case 'contains':
+        return r.matchVal !== '' && text.includes(r.matchVal);
+      case 'ne':
+        return text.trim() !== r.matchVal.trim();
+      case 'gt':
+        return Number.isFinite(numV) && Number.isFinite(numT) && numV > numT;
+      case 'lt':
+        return Number.isFinite(numV) && Number.isFinite(numT) && numV < numT;
+      case 'eq':
+      default:
+        if (Number.isFinite(numV) && r.matchVal.trim() !== '' && Number.isFinite(numT)) return numV === numT;
+        return text.trim() === r.matchVal.trim();
+    }
+  };
+
+  const rows = t.rows.map((row) => {
+    const patch: Record<string, string | number | null> = {};
+    for (const r of edits) {
+      if (r.setCol && matchRow(row, r)) patch[r.setCol] = renderVal(r.setVal, row);
+    }
+    for (const pt of points) {
+      if (!pt.keyCol || !pt.col) continue;
+      // 优先原始文本，无 raw 元数据（程序生成的行）退回解析值
+      const rawV = getRawText(row, pt.keyCol);
+      const numV = getVal(row, pt.keyCol);
+      const kv = rawV !== '' ? rawV : numV === null || numV === undefined ? '' : String(numV);
+      if (kv === pt.key) patch[pt.col] = renderVal(pt.value, row);
+    }
+    if (Object.keys(patch).length === 0) return row;
+    return { ...row, ...patch };
+  });
+
+  return { kind: 'table', table: { ...t, rows } };
+}
 
 function runFilter(node: PipelineNode, inputs: NodeOutput[]): NodeOutput {
   const t = firstTable(inputs);

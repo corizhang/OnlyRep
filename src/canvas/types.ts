@@ -83,6 +83,7 @@ export const MANUAL_ROW_LIMIT = 200;
 export type NodeType =
   | 'source'
   | 'filter'
+  | 'cellEdit'
   | 'pickRows'
   | 'derive'
   | 'sortTopN'
