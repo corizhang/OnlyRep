@@ -42,7 +42,7 @@ function watchErrors(page, bucket) {
     await page.waitForTimeout(1800);
     const ok = await page.evaluate(() => {
       const r = document.getElementById('root');
-      return !!r && r.children.length > 0 && (r.textContent || '').includes('RankBoard');
+      return !!r && r.children.length > 0 && (r.textContent || '').includes('OnlyRep');
     });
     record('file:// 打开单文件产物不白屏', ok);
     record('file:// 下无页面异常', errors.length === 0, errors.join('; ').slice(0, 200));
@@ -66,7 +66,7 @@ function watchErrors(page, bucket) {
     await page.waitForTimeout(1200);
     const rendered = await page.evaluate(() => {
       const r = document.getElementById('root');
-      return !!r && r.children.length > 0 && (r.textContent || '').includes('RankBoard');
+      return !!r && r.children.length > 0 && (r.textContent || '').includes('OnlyRep');
     });
     record('localStorage 抛 SecurityError 不白屏', rendered);
 

@@ -62,7 +62,7 @@ fn export_file(app: tauri::AppHandle, state: State<DbState>, name: String, data_
     };
     let dir = match custom_dir.filter(|d| !d.trim().is_empty()) {
         Some(d) => std::path::PathBuf::from(d),
-        None => app.path().download_dir().map_err(|e| e.to_string())?.join("RankBoard"),
+        None => app.path().download_dir().map_err(|e| e.to_string())?.join("OnlyRep"),
     };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // 同名不覆盖：追加序号
@@ -112,7 +112,7 @@ fn save_project_file(app: tauri::AppHandle, state: State<DbState>, name: String,
             .path()
             .document_dir()
             .map_err(|e| e.to_string())?
-            .join("RankBoard")
+            .join("OnlyRep")
             .join("Projects"),
     };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

@@ -146,7 +146,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
     <div className="flex h-screen flex-col bg-hover">
       <header className="flex items-center justify-between h-12 shrink-0 border-b border-line bg-panel px-3">
         <div className="flex items-center gap-4">
-          <h1 className="text-[15px] font-semibold text-ink">RankBoard · 日报画布</h1>
+          <h1 className="text-[15px] font-semibold text-ink">OnlyRep · 日报画布</h1>
           {/* 双视图切换：切换时左栏/画布/右栏三处联动 */}
           <Segmented
             value={viewMode}

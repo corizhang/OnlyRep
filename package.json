@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.6.0",
   "type": "module",
-  "description": "RankBoard 排行榜生成工具（纯本地单文件 HTML）",
+  "description": "OnlyRep 数据可视化日报工作台（纯本地 + 桌面端）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

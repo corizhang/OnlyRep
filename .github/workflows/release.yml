@@ -70,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'RankBoard ${{ github.ref_name }}'
+          releaseName: 'OnlyRep ${{ github.ref_name }}'
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
@@ -81,7 +81,7 @@ jobs:
         shell: bash
         run: |
           cp src-tauri/target/release/rankboard.exe rankboard-standalone.exe
-          cp dist/index.html RankBoard-web-standalone.html
+          cp dist/index.html OnlyRep-web-standalone.html
 
       - name: 上传免安装 exe 与单文件网页版
         uses: softprops/action-gh-release@v2
@@ -89,4 +89,4 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             rankboard-standalone.exe
-            RankBoard-web-standalone.html
+            OnlyRep-web-standalone.html

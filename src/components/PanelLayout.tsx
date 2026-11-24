@@ -28,7 +28,7 @@ export default function PanelLayout() {
   return (
     <div className="flex h-screen flex-col bg-hover">
       <header className="flex items-center justify-between border-b border-line bg-panel px-6 py-3">
-        <h1 className="text-lg font-semibold text-ink">RankBoard 排行榜生成工具</h1>
+        <h1 className="text-lg font-semibold text-ink">OnlyRep 排行榜生成工具</h1>
         <span className="rounded-full bg-ok-soft px-3 py-1 text-xs text-ok">
           数据仅在本地处理，不会上传服务器
         </span>

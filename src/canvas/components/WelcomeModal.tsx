@@ -35,7 +35,7 @@ export default function WelcomeModal() {
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 backdrop-blur-[2px]">
       <div className="w-[440px] rounded-xl border border-line bg-panel p-7 shadow-2xl">
         <div className="text-[26px]">📊</div>
-        <h2 className="mt-2 text-[18px] font-semibold text-ink">欢迎使用 RankBoard 日报画布</h2>
+        <h2 className="mt-2 text-[18px] font-semibold text-ink">欢迎使用 OnlyRep 日报画布</h2>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-dim">
           把每天的 Excel 拖进来，节点自动算数，日报一键出图——一次搭好，换数据即用。
         </p>

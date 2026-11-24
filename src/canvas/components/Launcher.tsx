@@ -71,7 +71,7 @@ export default function Launcher({ onEnter }: { onEnter: () => void }) {
         {/* 品牌区 */}
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">RankBoard</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">OnlyRep</div>
             <h1 className="mt-1 text-[26px] font-bold text-ink">项目</h1>
             <p className="mt-1 text-[12.5px] text-ink-dim">数据可视化日报：一次搭好，换数即用。</p>
           </div>
@@ -114,7 +114,7 @@ export default function Launcher({ onEnter }: { onEnter: () => void }) {
               if (!f) return;
               const name = await importProjectFile(await f.text());
               if (name) onEnter();
-              else window.alert('文件不是有效的 RankBoard 项目（.rkb）');
+              else window.alert('文件不是有效的 OnlyRep 项目（.rkb）');
             }}
           />
           {isTauri() && <SaveDirRow />}
@@ -230,7 +230,7 @@ function SaveDirRow() {
     <div className="ml-auto flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-[11.5px] text-ink-dim">
       <FolderOpenOutlined className="text-ink-faint" style={{ fontSize: 12 }} />
       <span className="max-w-[260px] truncate" title={dir || undefined}>
-        {loaded ? (dir ? dir : '默认：文档\\RankBoard\\Projects') : '…'}
+        {loaded ? (dir ? dir : '默认：文档\\OnlyRep\\Projects') : '…'}
       </span>
       <button
         type="button"

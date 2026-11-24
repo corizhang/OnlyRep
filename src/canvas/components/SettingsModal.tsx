@@ -60,7 +60,7 @@ export default function SettingsModal({ open, onClose, initialSection = 'general
   const toggleUiTheme = useCanvasStore(s => s.toggleUiTheme);
   useEffect(() => { if (open) { setSection(initialSection); setSkipLauncher(appStorage.getItem('rankboard-skip-launcher') === '1'); } }, [open, initialSection]);
   const current = SECTIONS.find(s => s.id === section)!;
-  return <Modal open={open} onCancel={onClose} title={<div className="py-1"><div>设置</div><p className="mt-1 text-xs font-normal text-ink-dim">管理 RankBoard 的应用偏好与当前画布配置</p></div>} width={900} zIndex={2000} centered footer={null} styles={{ body: { padding: 0 } }} destroyOnHidden>
+  return <Modal open={open} onCancel={onClose} title={<div className="py-1"><div>设置</div><p className="mt-1 text-xs font-normal text-ink-dim">管理 OnlyRep 的应用偏好与当前画布配置</p></div>} width={900} zIndex={2000} centered footer={null} styles={{ body: { padding: 0 } }} destroyOnHidden>
     <div className="-mx-6 mt-3 flex h-[min(560px,65vh)] min-h-[260px] border-y border-line">
       <nav aria-label="设置分类" className="w-40 shrink-0 space-y-1 overflow-y-auto border-r border-line bg-soft p-2 max-sm:w-28">{SECTIONS.map(s => <button type="button" key={s.id} aria-current={section === s.id ? 'page' : undefined} onClick={() => setSection(s.id)} className={`flex w-full items-center gap-2 rounded px-3 py-2.5 text-left text-xs transition-colors ${section === s.id ? 'bg-brand-soft text-brand' : 'text-ink-dim hover:bg-hover hover:text-ink'}`}>{s.icon}{s.label}</button>)}</nav>
       <main key={section} aria-label={current.label} className="min-w-0 flex-1 overflow-y-auto px-6 py-5 max-sm:px-3"><h2 className="text-base font-semibold text-ink">{current.label}</h2><p className="mb-4 mt-1 text-xs leading-relaxed text-ink-dim">{current.description}</p>
@@ -69,12 +69,12 @@ export default function SettingsModal({ open, onClose, initialSection = 'general
           <Row title="启动时直接进入工作区" description="开启后跳过项目启动页；仍可通过顶部主页按钮返回项目列表。"><Switch aria-label="启动时直接进入工作区" checked={skipLauncher} onChange={v => { appStorage.setItem('rankboard-skip-launcher', v ? '1' : ''); setSkipLauncher(v); }} /></Row>
         </>}
         {section === 'canvas' && <CanvasSettings section="canvas" />}
-        {section === 'export' && <><CanvasSettings section="export" /><DirectorySetting storageKey="rankboard-export-dir" title="导出图片保存位置" fallback="默认：系统下载目录下的 RankBoard 文件夹" description="仅桌面应用生效。同名文件会自动追加序号。" /></>}
-        {section === 'storage' && <><DirectorySetting storageKey="rankboard-project-dir" title="项目保存目录" fallback="默认：文档 / RankBoard / Projects" description="更改后用于后续项目保存，不会自动搬移已有项目文件。" /><div className="mt-5"><CanvasSettings section="storage" /></div></>}
+        {section === 'export' && <><CanvasSettings section="export" /><DirectorySetting storageKey="rankboard-export-dir" title="导出图片保存位置" fallback="默认：系统下载目录下的 OnlyRep 文件夹" description="仅桌面应用生效。同名文件会自动追加序号。" /></>}
+        {section === 'storage' && <><DirectorySetting storageKey="rankboard-project-dir" title="项目保存目录" fallback="默认：文档 / OnlyRep / Projects" description="更改后用于后续项目保存，不会自动搬移已有项目文件。" /><div className="mt-5"><CanvasSettings section="storage" /></div></>}
         {section === 'shortcuts' && <div className="divide-y divide-line">{[
           ['Ctrl + ,', '打开设置'], ['Ctrl + S', '保存当前项目'], ['Ctrl + Z', '撤销'], ['Ctrl + Shift + Z / Ctrl + Y', '重做'], ['Ctrl + K', '添加节点（数据节点视图）'], ['Delete', '删除选中的节点或连线（数据节点视图）'], ['Shift + 拖动画布', '框选节点'], ['滚轮', '缩放节点画布'], ['拖动空白区域', '平移节点画布'], ['Esc', '关闭当前浮层'],
         ].map(([key, label]) => <div key={key} className="flex flex-wrap justify-between gap-3 py-3 text-xs"><span className="text-ink-dim">{label}</span><kbd className="rounded border border-line bg-soft px-2 py-0.5 text-ink">{key}</kbd></div>)}</div>}
-        {section === 'about' && <div className="space-y-4 py-4"><div className="text-xl font-semibold text-ink">RankBoard <span className="text-sm font-normal text-ink-dim">v{packageInfo.version}</span></div><p className="text-sm text-ink-dim">数据处理与可视化日报工作台</p><p className="text-xs text-ink-dim">运行环境：{isTauri() ? 'Tauri 桌面应用' : '浏览器'}</p><p className="text-xs text-ink-dim">工作区在本机保存。重要项目建议另存项目文件，并定期备份工作区与模板库。</p></div>}
+        {section === 'about' && <div className="space-y-4 py-4"><div className="text-xl font-semibold text-ink">OnlyRep <span className="text-sm font-normal text-ink-dim">v{packageInfo.version}</span></div><p className="text-sm text-ink-dim">数据处理与可视化日报工作台</p><p className="text-xs text-ink-dim">运行环境：{isTauri() ? 'Tauri 桌面应用' : '浏览器'}</p><p className="text-xs text-ink-dim">工作区在本机保存。重要项目建议另存项目文件，并定期备份工作区与模板库。</p></div>}
       </main>
     </div>
     <footer className="flex items-center justify-between gap-3 pt-4"><p className="text-xs text-ink-dim">设置即时生效；画布配置随当前项目保存。</p><Button onClick={onClose}>完成</Button></footer>

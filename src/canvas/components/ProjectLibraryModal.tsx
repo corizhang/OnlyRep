@@ -82,7 +82,7 @@ export default function ProjectLibraryModal({ open, onClose }: { open: boolean; 
               if (name) {
                 onClose();
               } else {
-                window.alert('文件不是有效的 RankBoard 项目（.rkb）');
+                window.alert('文件不是有效的 OnlyRep 项目（.rkb）');
               }
             }}
           />
