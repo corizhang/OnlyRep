@@ -97,8 +97,8 @@ function AiSettings() {
   const inputCls = 'w-64 rounded-md border border-line bg-panel px-2.5 py-1.5 text-[12.5px] text-ink outline-none focus:border-brand-line';
   return (
     <>
-      <Row title="服务端点" description="OpenAI 兼容服务地址（不含 /chat/completions），如 https://api.deepseek.com/v1 或公司内网网关。">
-        <input className={inputCls} value={cfg.endpoint} placeholder="https://…/v1" onChange={(e) => save({ endpoint: e.target.value })} />
+      <Row title="服务端点" description="OpenAI 兼容服务地址（不含 /chat/completions），如 DeepSeek / 通义 / 公司内网网关的 /v1 地址。">
+        <input className={inputCls} value={cfg.endpoint} placeholder="https://你的服务地址/v1" onChange={(e) => save({ endpoint: e.target.value })} />
       </Row>
       <Row title="API Key" description="仅存本机，不会上传到其他任何地方。">
         <input className={inputCls} type="password" value={cfg.apiKey} placeholder="sk-…" onChange={(e) => save({ apiKey: e.target.value })} />
