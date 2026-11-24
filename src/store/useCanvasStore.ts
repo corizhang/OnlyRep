@@ -20,6 +20,7 @@ import type {
   CanvasConfig,
   DataSource,
   ImportDataSource,
+  NodeType,
   NodeOutput,
   PipelineNode,
   RunResult,
@@ -130,6 +131,19 @@ export interface CanvasStore {
   /** 保存当前工作区：有当前模板则覆盖，否则以 name 新建（空则自动命名）；返回模板 id */
   /** 当前项目有未保存修改（mutateConfig 任一变更即置位；saveProject/loadProject 清除） */
   projectDirty: boolean;
+
+  /** 画布缩放（顶栏 Segmented 与画布共用） */
+  canvasZoom: number;
+  setCanvasZoom: (z: number) => void;
+  /** 节点画布注册的动作（顶栏按钮调用；FlowSheet 挂载注入、卸载清除） */
+  flowActions: { fit: () => void; autoArrange: () => void; addNode: (type: NodeType) => void; openAdd: () => void } | null;
+  setFlowActions: (a: { fit: () => void; autoArrange: () => void; addNode: (type: NodeType) => void; openAdd: () => void } | null) => void;
+  /** 导出结果提示（顶栏导出触发，轻横幅展示） */
+  exportToast: { msg: string; path: string } | null;
+  setExportToast: (t: { msg: string; path: string } | null) => void;
+  /** 导出进行中（画布据此隐藏编辑态） */
+  exportingCanvas: boolean;
+  setExportingCanvas: (v: boolean) => void;
 
   /** 模板新建项目后的数据源填充引导（有待填的 import 源时弹） */
   sourceGuideOpen: boolean;
@@ -349,6 +363,14 @@ export const useCanvasStore = create<CanvasStore>()(
         activeProjectId: null,
         sourceGuideOpen: false,
         projectDirty: false,
+        canvasZoom: 1,
+        setCanvasZoom: (z) => set({ canvasZoom: z }),
+        flowActions: null,
+        setFlowActions: (a) => set({ flowActions: a }),
+        exportToast: null,
+        setExportToast: (t) => set({ exportToast: t }),
+        exportingCanvas: false,
+        setExportingCanvas: (v) => set({ exportingCanvas: v }),
         setSourceGuideOpen: (v) => set({ sourceGuideOpen: v }),
         activeTemplateId: null,
         sources: {},

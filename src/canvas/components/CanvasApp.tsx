@@ -6,6 +6,7 @@ import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined 
 import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
 import { ensureAppInit } from '../appInit';
+import { exportCanvasNow } from '../exportCurrent';
 import { isTauri } from '../../storage/tauriKv';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
@@ -46,6 +47,12 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   const [showPrjLib, setShowPrjLib] = useState(false);
   const activePrjName = useCanvasStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? null);
   const projectDirty = useCanvasStore((s) => s.projectDirty);
+  const canvasZoom = useCanvasStore((s) => s.canvasZoom);
+  const setCanvasZoom = useCanvasStore((s) => s.setCanvasZoom);
+  const flowActions = useCanvasStore((s) => s.flowActions);
+  const exportingCanvas = useCanvasStore((s) => s.exportingCanvas);
+  const exportToast = useCanvasStore((s) => s.exportToast);
+  const canvasConfig = useCanvasStore((s) => s.config);
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const activeTplName = activeTemplateId ? templates.find((t) => t.id === activeTemplateId)?.name : undefined;
 
@@ -209,6 +216,57 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
               <span className="truncate">{activeTplName ?? '模板库'}</span>
             </button>
           </Tooltip>
+          <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+          {/* 视图相关控件：画布=缩放+导出；节点=添加/适应/排列 */}
+          {viewMode === 'canvas' && (
+            <>
+              <Segmented
+                size="small"
+                value={canvasZoom}
+                onChange={(v) => setCanvasZoom(Number(v))}
+                options={[
+                  { label: '50%', value: 0.5 },
+                  { label: '75%', value: 0.75 },
+                  { label: '100%', value: 1 },
+                  { label: '125%', value: 1.25 },
+                ]}
+              />
+              <button
+                type="button"
+                onClick={() => void exportCanvasNow()}
+                disabled={exportingCanvas}
+                className="rounded-md bg-brand px-3 py-1 text-[11.5px] font-medium text-white shadow-sm hover:bg-brand-hover disabled:opacity-60"
+              >
+                {exportingCanvas ? '导出中…' : `导出图片（${canvasConfig.exportScale}x）`}
+              </button>
+            </>
+          )}
+          {viewMode === 'node' && flowActions && (
+            <>
+              <button
+                type="button"
+                onClick={() => flowActions.openAdd()}
+                title="添加节点（Ctrl+K）"
+                className="rounded-md bg-brand px-2.5 py-1 text-[11.5px] font-medium text-white shadow-sm hover:bg-brand-hover"
+              >
+                ＋ 添加节点
+              </button>
+              <button
+                type="button"
+                onClick={() => flowActions.fit()}
+                className="rounded border border-line bg-panel px-2 py-1 text-[11.5px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              >
+                适应视图
+              </button>
+              <button
+                type="button"
+                onClick={() => flowActions.autoArrange()}
+                className="rounded border border-line bg-panel px-2 py-1 text-[11.5px] text-ink-dim shadow-sm hover:border-brand-line hover:text-brand"
+              >
+                自动排列
+              </button>
+            </>
+          )}
           <Tooltip title="设置（Ctrl+,）">
             <button
               type="button"
@@ -254,6 +312,13 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
           </span>
         </div>
       </header>
+
+      {exportToast && (
+        <div className="flex items-center gap-2 border-b border-brand-line bg-brand-soft px-5 py-1.5 text-[12px] text-brand">
+          <span className="min-w-0 flex-1 truncate" title={exportToast.path || undefined}>{exportToast.msg}</span>
+          <button type="button" className="shrink-0 text-ink-faint hover:text-ink" onClick={() => useCanvasStore.getState().setExportToast(null)}>✕</button>
+        </div>
+      )}
 
       {(errors.length > 0 || warnings.length > 0) && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-warn/30 bg-warn-soft px-5 py-1.5 text-[12px] text-warn">
@@ -326,7 +391,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
                 // Figma 式平面面板：不再套卡片，分区靠留白与细分隔线（ui.Section 已扁平化）
                 <BlockInspector block={selected} />
               ) : (
-                <div className="space-y-4 p-3"><h2 className="text-sm font-semibold text-ink">当前画布</h2><div className="rounded border border-line bg-panel p-3 text-xs leading-relaxed text-ink-dim"><div className="font-medium text-ink">{config.title || '未命名画布'}</div><div className="mt-2">{config.width}px · 基准字号 {config.baseFontSize}px · 导出 {config.exportScale}x</div></div><Btn onClick={() => setSettingsSection('canvas')}>画布设置</Btn><p className="text-xs leading-relaxed text-ink-faint">尺寸、主题和排版已集中到设置。选中组件后可在此编辑组件属性。</p></div>
+                <div className="space-y-4 p-3"><h2 className="text-sm font-semibold text-ink">当前画布</h2><div className="rounded border border-line bg-panel p-3 text-xs leading-relaxed text-ink-dim"><div className="font-medium text-ink">{config.title || '未命名画布'}</div><div className="mt-2">{config.width}px · 基准字号 {config.baseFontSize}px · 导出 {canvasConfig.exportScale}x</div></div><Btn onClick={() => setSettingsSection('canvas')}>画布设置</Btn><p className="text-xs leading-relaxed text-ink-faint">尺寸、主题和排版已集中到设置。选中组件后可在此编辑组件属性。</p></div>
               )}
               {selected && (
                 <div className="mt-2 text-center">

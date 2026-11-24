@@ -85,6 +85,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
   /** 选中的连线（点击选中后 Delete 或中点 ✕ 删除；与节点选择互斥） */
   const [edgeSel, setEdgeSel] = useState<{ from: string; to: string } | null>(null);
   const [edgeInsertOpen, setEdgeInsertOpen] = useState(false);
+
   const selectedId = flowSelectedId;
 
   /** 节点高度上报（ResizeObserver 测量）：连线锚点与自动布局按实际高度计算 */
@@ -626,6 +627,19 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
     setFlowSelectedId(node.id);
   };
 
+  // 顶栏动作注册（添加/适应视图/自动排列由顶栏按钮触发）
+  const setFlowActions = useCanvasStore((st) => st.setFlowActions);
+  useEffect(() => {
+    setFlowActions({
+      fit,
+      autoArrange: () => { resetFlowPos(); setDelta(null); setTimeout(fit, 20); },
+      addNode: (type) => addNodeOfType(type, selectedId),
+      openAdd: () => setQuickAddOpen(true),
+    });
+    return () => setFlowActions(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, config.pipeline.nodes.length]);
+
   return (
     <div
       className={embedded ? 'flex h-full min-w-0 flex-1 flex-col bg-base' : 'fixed inset-0 z-50 flex flex-col bg-base'}
@@ -667,22 +681,6 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
         <div className="border-b border-warn/30 bg-warn-soft px-5 py-1.5 text-[11px] text-warn">{hint}</div>
       )}
 
-      {embedded && (
-        <div className="flex items-center gap-2 border-b border-line bg-panel px-3 py-2">
-          <span className="text-[11.5px] text-ink-faint">
-            {config.pipeline.nodes.length} 个节点 · 选中节点可直接配置 · 滚轮缩放，拖动画布平移
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <AddNodeMenu selected={selected} isTableOut={isTableOut} onAddSource={addSourceOfKind} onAddNode={addNodeOfType} open={quickAddOpen} onOpenChange={setQuickAddOpen} />
-            <Btn size="xs" onClick={fit}>
-              适应视图
-            </Btn>
-            <Btn size="xs" onClick={() => { resetFlowPos(); setDelta(null); setTimeout(fit, 20); }}>
-              自动排列
-            </Btn>
-          </div>
-        </div>
-      )}
 
       <div className="relative flex min-h-0 flex-1">
         <div
@@ -955,7 +953,7 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
               </div>
             </div>
           )}
-          <Legend />
+          <Legend count={config.pipeline.nodes.length} />
         </div>
 
         {!embedded && selected && (
@@ -1306,9 +1304,10 @@ function SelectionToolbar({
   );
 }
 
-function Legend() {
+function Legend({ count }: { count?: number }) {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-3 rounded-md bg-panel px-2.5 py-1.5 text-[10px] text-ink-dim shadow-sm">
+    <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap items-center gap-3 rounded-md bg-panel px-2.5 py-1.5 text-[10px] text-ink-dim shadow-sm">
+      {count !== undefined && <span className="font-medium text-ink">{count} 个节点</span>}
       <span className="flex items-center gap-1">
         <i className="inline-block h-2 w-2 rounded-sm bg-brand" />
         数据源

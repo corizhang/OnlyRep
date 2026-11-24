@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { Segmented } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { THEMES } from '../../themes/themes';
 import type { CanvasBlock } from '../types';
 import CanvasRenderer from '../blocks/CanvasRenderer';
 import type { RenderCtx } from '../blocks/context';
-import { exportPng } from '../../utils/exportImage';
 import { invoke } from '@tauri-apps/api/core';
 import EmptyGuide from './EmptyGuide';
 import { createBlock } from '../defaults';
@@ -24,11 +22,10 @@ export default function CanvasStage() {
   const insertBlockAt = useCanvasStore((s) => s.insertBlockAt);
   const addBlockToRow = useCanvasStore((s) => s.addBlockToRow);
 
-  const [exporting, setExporting] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [toast, setToast] = useState('');
+  const zoom = useCanvasStore((s) => s.canvasZoom);
+  const exporting = useCanvasStore((s) => s.exportingCanvas);
+  const setZoom = useCanvasStore((s) => s.setCanvasZoom);
   /** 最近一次导出的落盘路径（桌面端）：toast 显示「打开文件夹」按钮 */
-  const [lastExportPath, setLastExportPath] = useState('');
   const [dropHint, setDropHint] = useState(false);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
 
@@ -90,69 +87,9 @@ export default function CanvasStage() {
     return idx;
   };
 
-  const doExport = async (): Promise<void> => {
-    const node = document.getElementById('canvas-export-node');
-    if (!node) return;
-    setExporting(true);
-    setToast('正在生成图片…');
-    // 等两帧，确保编辑框已卸载、图表 SVG 已完成布局
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
-    try {
-      const d = new Date();
-      const name = `${config.title}_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-      const res = await exportPng(node, { scale: config.exportScale, fileName: name });
-      setLastExportPath(res.savedPath ?? '');
-      setToast(
-        res.savedPath
-          ? `已导出：${res.savedPath}`
-          : `已导出 ${res.scale}x${res.downgraded ? '（受尺寸限制已自动降倍率）' : ''}${res.segmented ? ' · 分段拼接' : ''}`,
-      );
-    } catch (err) {
-      setToast(err instanceof Error ? err.message : '导出失败');
-    } finally {
-      setExporting(false);
-      setTimeout(() => setToast(''), 8000);
-    }
-  };
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-2">
-        <span className="text-[12px] text-ink-dim">
-          {config.width}px · {countBlocks(config.blocks)} 个区块
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <Segmented
-            value={zoom}
-            onChange={(v) => setZoom(Number(v))}
-            options={[
-              { label: '50%', value: 0.5 },
-              { label: '75%', value: 0.75 },
-              { label: '100%', value: 1 },
-              { label: '125%', value: 1.25 },
-            ]}
-          />
-          <Btn tone="primary" onClick={() => void doExport()} disabled={exporting}>
-            {exporting ? '导出中…' : `导出图片（${config.exportScale}x）`}
-          </Btn>
-        </div>
-      </div>
-
-      {toast && (
-        <div className="flex items-center gap-2 border-b border-brand-line bg-brand-soft px-4 py-1.5 text-[11px] text-brand">
-          <span className="min-w-0 flex-1 truncate" title={lastExportPath || undefined}>{toast}</span>
-          {lastExportPath && (
-            <button
-              type="button"
-              className="shrink-0 rounded border border-brand-line bg-panel px-2 py-0.5 text-[10.5px] font-medium text-brand hover:bg-brand-line"
-              onClick={() => invoke('open_export_folder', { path: lastExportPath }).catch(() => undefined)}
-            >
-              📂 打开文件夹
-            </button>
-          )}
-        </div>
-      )}
-
       <div
         className="relative flex-1 overflow-auto bg-base p-6"
         onDragOver={(e) => {
