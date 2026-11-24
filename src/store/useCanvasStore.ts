@@ -144,6 +144,8 @@ export interface CanvasStore {
   /** 导出进行中（画布据此隐藏编辑态） */
   exportingCanvas: boolean;
   setExportingCanvas: (v: boolean) => void;
+  /** 应用 AI 生成的画布配置（压历史可撤销） */
+  applyAiConfig: (config: CanvasConfig) => void;
 
   /** 模板新建项目后的数据源填充引导（有待填的 import 源时弹） */
   sourceGuideOpen: boolean;
@@ -503,6 +505,15 @@ export const useCanvasStore = create<CanvasStore>()(
           void clearSourceSnapshots();
           const config = createDefaultCanvasConfig();
           set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null });
+        },
+
+        /** 应用 AI 生成的配置：压入历史（采用后可 Ctrl+Z 撤销），然后正常重算 */
+        applyAiConfig: (config) => {
+          pushHistory('ai:generate');
+          engineCache.clear();
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], activeTemplateId: null });
+          recomputeWith(config, {});
+          void restoreImportCaches(recomputeWith, () => null);
         },
 
         loadTemplate: (config) => {
