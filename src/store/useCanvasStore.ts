@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { K } from '../storage/keys';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { appStorage, onStorageError } from '../storage/safeStorage';
 import { isTauri, tauriPersistStorage } from '../storage/tauriKv';
@@ -377,10 +378,10 @@ export const useCanvasStore = create<CanvasStore>()(
         setLibCollapsed: (v) => set({ libCollapsed: v }),
         nodeTheme: 'dark',
         setNodeTheme: (v) => set({ nodeTheme: v }),
-        uiTheme: (appStorage.getItem('rankboard-ui-theme') === 'dark' ? 'dark' : 'light') as 'light' | 'dark',
+        uiTheme: (appStorage.getItem(K.uiTheme) === 'dark' ? 'dark' : 'light') as 'light' | 'dark',
         toggleUiTheme: () => {
           const next = get().uiTheme === 'dark' ? 'light' : 'dark';
-          appStorage.setItem('rankboard-ui-theme', next);
+          appStorage.setItem(K.uiTheme, next);
           document.documentElement.dataset.theme = next;
           set({ uiTheme: next });
         },
@@ -1271,7 +1272,7 @@ export const useCanvasStore = create<CanvasStore>()(
       };
     },
     {
-      name: 'rankboard-canvas-v3',
+      name: K.canvasPersist,
       version: 4,
       // Tauri 桌面壳：config 落 SQLite（无 5MB 配额）；浏览器：safeStorage（探测+内存降级）
       storage: createJSONStorage(() => (isTauri() ? tauriPersistStorage : appStorage)),
@@ -1284,7 +1285,7 @@ export const useCanvasStore = create<CanvasStore>()(
       migrate: (persisted, version) => {
         try {
           if (persisted && typeof persisted === 'object') {
-            appStorage.setItem(`rankboard-canvas-backup-v${version}`, JSON.stringify(persisted));
+            appStorage.setItem(`${K.canvasBackupPrefix}${version}`, JSON.stringify(persisted));
           }
           const p = persisted as { config?: Partial<CanvasConfig> } | undefined;
           const config = { ...createDefaultCanvasConfig(), ...(p?.config ?? {}) };

@@ -52,7 +52,7 @@ fn export_file(app: tauri::AppHandle, state: State<DbState>, name: String, data_
     let custom_dir = {
         let conn = state.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT value FROM kv WHERE key = 'rankboard-export-dir'")
+            .prepare("SELECT value FROM kv WHERE key IN ('onlyrep-export-dir', 'rankboard-export-dir') ORDER BY CASE key WHEN 'onlyrep-export-dir' THEN 0 ELSE 1 END LIMIT 1")
             .map_err(|e| e.to_string())?;
         let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
         match rows.next().map_err(|e| e.to_string())? {
@@ -98,7 +98,7 @@ fn save_project_file(app: tauri::AppHandle, state: State<DbState>, name: String,
     let custom_dir = {
         let conn = state.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT value FROM kv WHERE key = 'rankboard-project-dir'")
+            .prepare("SELECT value FROM kv WHERE key IN ('onlyrep-project-dir', 'rankboard-project-dir') ORDER BY CASE key WHEN 'onlyrep-project-dir' THEN 0 ELSE 1 END LIMIT 1")
             .map_err(|e| e.to_string())?;
         let mut rows = stmt.query([]).map_err(|e| e.to_string())?;
         match rows.next().map_err(|e| e.to_string())? {
@@ -146,11 +146,29 @@ fn main() {
         .setup(|app| {
             let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
             std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-            let conn = Connection::open(dir.join("rankboard.db")).map_err(|e| e.to_string())?;
+            // 更名迁移（rankboard→onlyrep）：新库不存在且旧数据目录有库 → 整体拷贝过来
+            let db_path = dir.join("onlyrep.db");
+            if !db_path.exists() {
+                if let Ok(appdata) = std::env::var("APPDATA") {
+                    let legacy_db = std::path::PathBuf::from(appdata).join("com.rankboard.app").join("rankboard.db");
+                    if legacy_db.exists() {
+                        let _ = std::fs::create_dir_all(&dir);
+                        if let Err(e) = std::fs::copy(&legacy_db, &db_path) {
+                            eprintln!("[migrate] 旧数据库拷贝失败: {e}");
+                        }
+                    }
+                }
+            }
+            let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
             conn.execute_batch(
                 "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); PRAGMA journal_mode = WAL;",
             )
             .map_err(|e| e.to_string())?;
+            // kv 键更名迁移（幂等：新键不存在才拷贝，旧行保留可回滚）
+            let _ = conn.execute_batch(
+                "INSERT OR IGNORE INTO kv (key, value) SELECT 'onlyrep-export-dir', value FROM kv WHERE key = 'rankboard-export-dir';
+                 INSERT OR IGNORE INTO kv (key, value) SELECT 'onlyrep-project-dir', value FROM kv WHERE key = 'rankboard-project-dir';"
+            );
             app.manage(DbState(Mutex::new(conn)));
             Ok(())
         })

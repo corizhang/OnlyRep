@@ -77,7 +77,7 @@ function launchOptions(extra = {}) {
 async function prepareLegacyMode(page) {
   await page.addInitScript(() => {
     try {
-      window.localStorage.setItem('rankboard:entry-mode', 'rank');
+      window.localStorage.setItem('onlyrep:entry-mode', 'rank');
     } catch {
       // 存储不可用时忽略，交给应用自身降级
     }

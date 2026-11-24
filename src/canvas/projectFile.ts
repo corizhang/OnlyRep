@@ -12,7 +12,7 @@ const EMPTY_TABLE = { columns: [], rows: [] } as unknown as CleanedTable;
  */
 
 export interface RkbFile {
-  kind: 'rankboard-project';
+  kind: 'onlyrep-project';
   version: 1;
   name: string;
   exportedAt: number;
@@ -32,7 +32,7 @@ export async function buildProjectFile(name: string, config: CanvasConfig): Prom
     }
   }
   return {
-    kind: 'rankboard-project',
+    kind: 'onlyrep-project',
     version: 1,
     name,
     exportedAt: Date.now(),
@@ -45,7 +45,7 @@ export async function buildProjectFile(name: string, config: CanvasConfig): Prom
 export function parseProjectFile(text: string): RkbFile | null {
   try {
     const data = JSON.parse(text) as RkbFile;
-    if (data?.kind !== 'rankboard-project' || !data.config) return null;
+    if (!data || !['onlyrep-project', 'rankboard-project'].includes(data.kind as string) || !data.config) return null;
     return data;
   } catch {
     return null;

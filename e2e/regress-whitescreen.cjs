@@ -59,7 +59,7 @@ const BASE = 'http://localhost:4173';
       ],
       floats: [],
     };
-    localStorage.setItem('rankboard:config:v1', JSON.stringify({ state: { config: oldConfig }, version: 2 }));
+    localStorage.setItem('onlyrep:config:v1', JSON.stringify({ state: { config: oldConfig }, version: 2 }));
   });
   await page.reload({ waitUntil: 'networkidle' });
   await page.locator('text=拖入 Excel/CSV').waitFor({ timeout: 10000 });

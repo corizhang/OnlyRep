@@ -28,7 +28,7 @@ describe('项目文件 .rkb', () => {
     });
 
     const rkb = await buildProjectFile('测试项目', config);
-    expect(rkb.kind).toBe('rankboard-project');
+    expect(rkb.kind).toBe('onlyrep-project');
     expect(rkb.files).toHaveLength(1);
     expect(rkb.files[0].fileBytes).toBe(csvBytes);
 

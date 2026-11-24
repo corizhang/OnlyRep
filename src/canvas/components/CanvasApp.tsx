@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { K } from '../../storage/keys';
 import { message, Segmented, Tooltip } from 'antd';
 import { DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { FolderOpenOutlined, QuestionCircleOutlined, RedoOutlined, UndoOutlined } from '@ant-design/icons';
@@ -63,7 +64,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
     // 多窗口/标签页互踩检测：storage 事件只在「其他窗口」写入时触发（本窗口写不触发），
     // 且 Tauri 单窗口无此事件——只在浏览器多开时提示，防止旧内存态覆写新数据
     const onStorage = (e: StorageEvent): void => {
-      if (e.key !== 'rankboard-canvas-v3' || e.newValue == null) return;
+      if (e.key !== K.canvasPersist || e.newValue == null) return;
       try {
         const incoming = (JSON.parse(e.newValue) as { state?: { config?: unknown } }).state?.config;
         if (incoming && JSON.stringify(incoming) !== JSON.stringify(useCanvasStore.getState().config)) {

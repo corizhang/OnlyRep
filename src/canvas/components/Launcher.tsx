@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { K } from '../../storage/keys';
 import { Popconfirm, Tooltip } from 'antd';
 import {
   DeleteOutlined,
@@ -19,7 +20,7 @@ import NewProjectModal from './NewProjectModal';
  * 每次启动默认展示；「继续上次工作区」一键回到 persist 的当前工作区。
  */
 
-const SKIP_KEY = 'rankboard-skip-launcher';
+const SKIP_KEY = K.skipLauncher;
 
 export function shouldShowLauncher(): boolean {
   try {
@@ -41,7 +42,7 @@ export default function Launcher({ onEnter }: { onEnter: () => void }) {
   const [showNew, setShowNew] = useState(false);
   const [pins, setPins] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('rankboard-project-pins') ?? '[]') as string[];
+      return JSON.parse(localStorage.getItem(K.projectPins) ?? '[]') as string[];
     } catch {
       return [];
     }
@@ -52,7 +53,7 @@ export default function Launcher({ onEnter }: { onEnter: () => void }) {
     const next = pins.includes(id) ? pins.filter((x) => x !== id) : [id, ...pins];
     setPins(next);
     try {
-      localStorage.setItem('rankboard-project-pins', JSON.stringify(next));
+      localStorage.setItem(K.projectPins, JSON.stringify(next));
     } catch {
       /* 降级不打扰 */
     }
@@ -222,7 +223,7 @@ function SaveDirRow() {
   useEffect(() => {
     void (async () => {
       const { tauriPersistStorage } = await import('../../storage/tauriKv');
-      setDir((await tauriPersistStorage.getItem('rankboard-project-dir')) ?? '');
+      setDir((await tauriPersistStorage.getItem(K.projectDir)) ?? '');
       setLoaded(true);
     })();
   }, []);
@@ -241,7 +242,7 @@ function SaveDirRow() {
           const picked = await open({ directory: true, title: '选择项目保存目录' });
           if (typeof picked === 'string' && picked) {
             setDir(picked);
-            await tauriPersistStorage.setItem('rankboard-project-dir', picked);
+            await tauriPersistStorage.setItem(K.projectDir, picked);
           }
         }}
       >

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { K } from '../../storage/keys';
 import { appStorage } from '../../storage/safeStorage';
 import { useCanvasStore } from '../../store/useCanvasStore';
 
@@ -8,8 +9,8 @@ import { useCanvasStore } from '../../store/useCanvasStore';
  * 「载入示例」一键进入带数据的完整效果；「从空白开始」直接进编辑器。
  */
 
-const ONBOARD_KEY = 'rankboard-onboarded-v1';
-const CANVAS_KEY = 'rankboard-canvas-v3';
+const ONBOARD_KEY = K.onboarded;
+const CANVAS_KEY = K.canvasPersist;
 
 export default function WelcomeModal() {
   const applyPreset = useCanvasStore((s) => s.applyPreset);

@@ -56,7 +56,7 @@
 ### 4. 导出
 
 - 画布导出高清 PNG（缩放/留白可调，桌面端可选保存位置、导后一键打开文件夹）
-- 网页单文件产物：`RankBoard-web-standalone.html`，双击即用、可内网分发
+- 网页单文件产物：`OnlyRep-web-standalone.html`，双击即用、可内网分发
 
 ### 5. 数据安全
 
@@ -68,10 +68,10 @@
 
 | 形态 | 文件 | 说明 |
 |---|---|---|
-| Windows 安装包 | `RankBoard_x.x.x_x64-setup.exe` | 推荐，开始菜单/卸载齐全 |
-| MSI | `RankBoard_x.x.x_x64_en-US.msi` | 备选安装包 |
-| 免安装单文件 | `rankboard-standalone.exe` | 双击即用 |
-| 单文件网页 | `RankBoard-web-standalone.html` | 浏览器打开，数据存浏览器 |
+| Windows 安装包 | `OnlyRep_x.x.x_x64-setup.exe` | 推荐，开始菜单/卸载齐全 |
+| MSI | `OnlyRep_x.x.x_x64_en-US.msi` | 备选安装包 |
+| 免安装单文件 | `onlyrep-standalone.exe` | 双击即用 |
+| 单文件网页 | `OnlyRep-web-standalone.html` | 浏览器打开，数据存浏览器 |
 
 > 首次运行如弹 Windows SmartScreen：「更多信息」→「仍要运行」。
 

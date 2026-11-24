@@ -80,7 +80,7 @@ jobs:
       - name: 准备补充资产
         shell: bash
         run: |
-          cp src-tauri/target/release/rankboard.exe rankboard-standalone.exe
+          cp src-tauri/target/release/onlyrep.exe onlyrep-standalone.exe
           cp dist/index.html OnlyRep-web-standalone.html
 
       - name: 上传免安装 exe 与单文件网页版
@@ -88,5 +88,5 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            rankboard-standalone.exe
+            onlyrep-standalone.exe
             OnlyRep-web-standalone.html

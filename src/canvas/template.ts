@@ -1,3 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
+import { K } from '../storage/keys';
+import { isTauri } from '../storage/tauriKv';
 import type { CanvasBlock, CanvasConfig, CanvasBlockType } from './types';
 import { createBlock, createDefaultCanvasConfig, newBlockId } from './defaults';
 import type { RankConfig, TextBlockConfig } from '../types';
@@ -7,7 +10,7 @@ import type { RankConfig, TextBlockConfig } from '../types';
  * 模板只存配置（含手填数据），不含导入数据与 File 引用（R10-04）。
  */
 
-export const CANVAS_TEMPLATE_KIND = 'rankboard-canvas';
+export const CANVAS_TEMPLATE_KIND = 'onlyrep-canvas'; // 旧值 rankboard-canvas 由 validate 兼容
 export const CANVAS_TEMPLATE_VERSION = 3;
 
 export interface CanvasTemplateFile {
@@ -243,7 +246,7 @@ export function downloadCanvasTemplate(config: CanvasConfig): void {
 // ---------- 全量数据迁移（工作区 + 模板库）：跨环境搬家（浏览器 ↔ 桌面 exe） ----------
 
 export interface AllDataBackup {
-  kind: 'rankboard-all-data';
+  kind: string;
   version: 1;
   exportedAt: string;
   /** zustand persist 原文（含工作区 config） */
@@ -252,13 +255,13 @@ export interface AllDataBackup {
   templates: unknown;
 }
 
-const CANVAS_KEY = 'rankboard-canvas-v3';
-const TEMPLATES_KEY = 'rankboard-canvas-templates-v1';
+const CANVAS_KEY = K.canvasPersist;
+const TEMPLATES_KEY = K.templates;
 
 /** 由持久层原文组装备份（调用方负责取数：浏览器读 localStorage，桌面端读镜像/状态） */
 export function makeAllDataBackup(canvasPersist: unknown, templates: unknown): AllDataBackup {
   return {
-    kind: 'rankboard-all-data',
+    kind: 'onlyrep-all-data',
     version: 1,
     exportedAt: new Date().toISOString(),
     canvas: canvasPersist,
@@ -268,13 +271,20 @@ export function makeAllDataBackup(canvasPersist: unknown, templates: unknown): A
 
 export function validateAllDataBackup(json: unknown): AllDataBackup {
   const b = json as AllDataBackup;
-  if (!b || b.kind !== 'rankboard-all-data' || b.version !== 1) throw new Error('不是有效的全量数据备份文件');
+  if (!b || !['onlyrep-all-data', 'rankboard-all-data'].includes(b.kind) || b.version !== 1) throw new Error('不是有效的全量数据备份文件');
   if (!b.canvas || typeof b.canvas !== 'object') throw new Error('备份文件缺少工作区数据');
   return b;
 }
 
 export function downloadJsonFile(filename: string, data: unknown): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const text = JSON.stringify(data, null, 2);
+  // Tauri WebView 不支持 a[download] 触发保存 → 走 Rust 落盘（导出目录）
+  if (isTauri()) {
+    void invoke('export_file', { fileName: filename, dataBase64: btoa(unescape(encodeURIComponent(text))) })
+      .catch((e) => console.error('[downloadJsonFile] 桌面导出失败', e));
+    return;
+  }
+  const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

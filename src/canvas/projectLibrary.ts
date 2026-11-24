@@ -1,4 +1,5 @@
 import { appStorage } from '../storage/safeStorage';
+import { K } from '../storage/keys';
 import { initTauriMirror, isTauri, mirrorGet, mirrorSet } from '../storage/tauriKv';
 import { newId } from '../canvas/datasource/registry';
 import type { CanvasConfig } from '../canvas/types';
@@ -24,7 +25,7 @@ export interface ProjectLibraryData {
   items: SavedProject[];
 }
 
-const KEY = 'rankboard-projects-v1';
+const KEY = K.projects;
 
 /** Tauri 环境启动时调用一次：把项目库从 SQLite 载入内存镜像 */
 export async function initProjectLibraryStorage(): Promise<void> {

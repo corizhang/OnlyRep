@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { K } from './storage/keys';
 import { ConfigProvider, theme as antdAlgorithm } from 'antd';
 import PanelLayout from './components/PanelLayout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -14,7 +15,7 @@ import { appStorage } from './storage/safeStorage';
  */
 type Mode = 'canvas' | 'rank';
 
-const KEY = 'rankboard:entry-mode';
+const KEY = K.entryMode;
 
 /** antd 主题：对齐编辑器现有蓝灰基线与紧凑密度 */
 const antdTheme = {

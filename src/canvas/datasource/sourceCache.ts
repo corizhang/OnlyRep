@@ -53,7 +53,7 @@ export function sameFingerprint(a: FileFingerprint | null | undefined, b: FileFi
 
 // ========== IndexedDB 底层 ==========
 
-const DB_NAME = 'rankboard-cache';
+const DB_NAME = 'onlyrep-cache'; // 更名后重建缓存（快照可从原始文件重新解析，不迁移）
 const DB_VERSION = 1;
 const SNAPSHOT_STORE = 'snapshots';
 const HANDLE_STORE = 'handles';

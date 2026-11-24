@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { K } from '../../storage/keys';
 import { Modal } from 'antd';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { downloadJsonFile, makeAllDataBackup, validateAllDataBackup } from '../template';
@@ -9,7 +10,7 @@ import { THEME_LIST } from '../../themes/themes';
 import { Btn, ColorInput, Field, NumberInput, Section, Select, TextInput } from './ui';
 import { useState } from 'react';
 
-const CANVAS_PERSIST_KEY = 'rankboard-canvas-v3';
+const CANVAS_PERSIST_KEY = K.canvasPersist;
 
 /** 画布级基础配置（PRD R4-10 / K9）：主题、宽度、字号、涨跌语义、模板存取 */
 export default function CanvasSettings({ section = 'canvas' }: { section?: 'canvas' | 'export' | 'storage' }) {
@@ -24,7 +25,7 @@ export default function CanvasSettings({ section = 'canvas' }: { section?: 'canv
       { state: { config: useCanvasStore.getState().config }, version: 3 },
       loadTemplateLibrary(),
     );
-    downloadJsonFile(`rankboard-全量备份_${new Date().toISOString().slice(0, 10)}.json`, backup);
+    downloadJsonFile(`onlyrep-全量备份_${new Date().toISOString().slice(0, 10)}.json`, backup);
     setMsg('全量备份已导出（含工作区与模板库）');
   };
 

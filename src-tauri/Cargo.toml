@@ -1,5 +1,5 @@
 [package]
-name = "rankboard"
+name = "onlyrep"
 version = "0.5.0"
 description = "OnlyRep 日报画布（桌面壳 + SQLite 持久化）"
 edition = "2021"

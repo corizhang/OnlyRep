@@ -1,4 +1,5 @@
 import { appStorage } from '../storage/safeStorage';
+import { K } from '../storage/keys';
 import { initTauriMirror, isTauri, mirrorGet, mirrorSet } from '../storage/tauriKv';
 import { newId } from '../canvas/datasource/registry';
 import type { CanvasConfig } from '../canvas/types';
@@ -21,7 +22,7 @@ export interface TemplateLibraryData {
   items: SavedTemplate[];
 }
 
-const KEY = 'rankboard-canvas-templates-v1';
+const KEY = K.templates;
 
 /** Tauri 环境启动时调用一次：把模板库从 SQLite 载入内存镜像（此后同步读写与普通路径一致） */
 export async function initTemplateLibraryStorage(): Promise<void> {

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { K } from '../../storage/keys';
 import { Button, Modal, Select, Switch } from 'antd';
 import { SettingOutlined, LayoutOutlined, ExportOutlined, FolderOpenOutlined, InfoCircleOutlined, KeyOutlined } from '@ant-design/icons';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
@@ -58,7 +59,7 @@ export default function SettingsModal({ open, onClose, initialSection = 'general
   const [skipLauncher, setSkipLauncher] = useState(false);
   const uiTheme = useCanvasStore(s => s.uiTheme);
   const toggleUiTheme = useCanvasStore(s => s.toggleUiTheme);
-  useEffect(() => { if (open) { setSection(initialSection); setSkipLauncher(appStorage.getItem('rankboard-skip-launcher') === '1'); } }, [open, initialSection]);
+  useEffect(() => { if (open) { setSection(initialSection); setSkipLauncher(appStorage.getItem(K.skipLauncher) === '1'); } }, [open, initialSection]);
   const current = SECTIONS.find(s => s.id === section)!;
   return <Modal open={open} onCancel={onClose} title={<div className="py-1"><div>设置</div><p className="mt-1 text-xs font-normal text-ink-dim">管理 OnlyRep 的应用偏好与当前画布配置</p></div>} width={900} zIndex={2000} centered footer={null} styles={{ body: { padding: 0 } }} destroyOnHidden>
     <div className="-mx-6 mt-3 flex h-[min(560px,65vh)] min-h-[260px] border-y border-line">
@@ -66,11 +67,11 @@ export default function SettingsModal({ open, onClose, initialSection = 'general
       <main key={section} aria-label={current.label} className="min-w-0 flex-1 overflow-y-auto px-6 py-5 max-sm:px-3"><h2 className="text-base font-semibold text-ink">{current.label}</h2><p className="mb-4 mt-1 text-xs leading-relaxed text-ink-dim">{current.description}</p>
         {section === 'general' && <>
           <Row title="界面主题" description="编辑器、节点和弹窗统一切换明暗外观。"><Select aria-label="界面主题" className="w-32" value={uiTheme} options={[{ value: 'light', label: '浅色' }, { value: 'dark', label: '深色 · 石墨灰' }]} onChange={v => { if (v !== uiTheme) toggleUiTheme(); }} /></Row>
-          <Row title="启动时直接进入工作区" description="开启后跳过项目启动页；仍可通过顶部主页按钮返回项目列表。"><Switch aria-label="启动时直接进入工作区" checked={skipLauncher} onChange={v => { appStorage.setItem('rankboard-skip-launcher', v ? '1' : ''); setSkipLauncher(v); }} /></Row>
+          <Row title="启动时直接进入工作区" description="开启后跳过项目启动页；仍可通过顶部主页按钮返回项目列表。"><Switch aria-label="启动时直接进入工作区" checked={skipLauncher} onChange={v => { appStorage.setItem(K.skipLauncher, v ? '1' : ''); setSkipLauncher(v); }} /></Row>
         </>}
         {section === 'canvas' && <CanvasSettings section="canvas" />}
-        {section === 'export' && <><CanvasSettings section="export" /><DirectorySetting storageKey="rankboard-export-dir" title="导出图片保存位置" fallback="默认：系统下载目录下的 OnlyRep 文件夹" description="仅桌面应用生效。同名文件会自动追加序号。" /></>}
-        {section === 'storage' && <><DirectorySetting storageKey="rankboard-project-dir" title="项目保存目录" fallback="默认：文档 / OnlyRep / Projects" description="更改后用于后续项目保存，不会自动搬移已有项目文件。" /><div className="mt-5"><CanvasSettings section="storage" /></div></>}
+        {section === 'export' && <><CanvasSettings section="export" /><DirectorySetting storageKey={K.exportDir} title="导出图片保存位置" fallback="默认：系统下载目录下的 OnlyRep 文件夹" description="仅桌面应用生效。同名文件会自动追加序号。" /></>}
+        {section === 'storage' && <><DirectorySetting storageKey={K.projectDir} title="项目保存目录" fallback="默认：文档 / OnlyRep / Projects" description="更改后用于后续项目保存，不会自动搬移已有项目文件。" /><div className="mt-5"><CanvasSettings section="storage" /></div></>}
         {section === 'shortcuts' && <div className="divide-y divide-line">{[
           ['Ctrl + ,', '打开设置'], ['Ctrl + S', '保存当前项目'], ['Ctrl + Z', '撤销'], ['Ctrl + Shift + Z / Ctrl + Y', '重做'], ['Ctrl + K', '添加节点（数据节点视图）'], ['Delete', '删除选中的节点或连线（数据节点视图）'], ['Shift + 拖动画布', '框选节点'], ['滚轮', '缩放节点画布'], ['拖动空白区域', '平移节点画布'], ['Esc', '关闭当前浮层'],
         ].map(([key, label]) => <div key={key} className="flex flex-wrap justify-between gap-3 py-3 text-xs"><span className="text-ink-dim">{label}</span><kbd className="rounded border border-line bg-soft px-2 py-0.5 text-ink">{key}</kbd></div>)}</div>}

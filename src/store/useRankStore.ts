@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { K } from '../storage/keys';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { appStorage } from '../storage/safeStorage';
 import type { StoreApi } from 'zustand';
@@ -229,7 +230,7 @@ export const useRankStore = create<RankStore>()(
       // migrate 做 v1→v2 结构迁移 + v2 旧持久化补 P0 样式字段默认值。
       // 注意：zustand persist 仅在存储版本 ≠ 此处 version 时调用 migrate，
       // 因此每新增配置字段必须同步升版本号，否则旧持久化会绕过补默认值（白屏事故根因）。
-      name: 'rankboard:config:v1',
+      name: K.rankConfig,
       version: 3,
       storage: createJSONStorage(() => appStorage),
       // 白名单只含 config；且背景图 dataURL 绝不落盘（铁律 / R9）

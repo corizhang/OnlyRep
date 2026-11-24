@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OnlyRep",
   "version": "0.6.0",
-  "identifier": "com.rankboard.app",
+  "identifier": "com.onlyrep.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",

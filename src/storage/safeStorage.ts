@@ -66,7 +66,7 @@ function classifyError(err: unknown): StorageErrorKind {
 function detectNative(): Storage | null {
   try {
     const s = globalThis.localStorage;
-    const probe = '__rankboard_storage_probe__';
+    const probe = '__onlyrep_storage_probe__';
     s.setItem(probe, '1');
     s.removeItem(probe);
     return s;
