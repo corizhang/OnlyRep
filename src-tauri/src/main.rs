@@ -164,11 +164,27 @@ fn main() {
                 "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL); PRAGMA journal_mode = WAL;",
             )
             .map_err(|e| e.to_string())?;
-            // kv 键更名迁移（幂等：新键不存在才拷贝，旧行保留可回滚）
-            let _ = conn.execute_batch(
-                "INSERT OR IGNORE INTO kv (key, value) SELECT 'onlyrep-export-dir', value FROM kv WHERE key = 'rankboard-export-dir';
-                 INSERT OR IGNORE INTO kv (key, value) SELECT 'onlyrep-project-dir', value FROM kv WHERE key = 'rankboard-project-dir';"
-            );
+            // kv 键更名迁移（带一次性标记：老值覆盖新值；旧行保留可回滚）
+            let migrated: bool = conn
+                .query_row("SELECT COUNT(*) FROM kv WHERE key = 'onlyrep-migrated-v1'", [], |r| r.get::<_, i64>(0))
+                .map(|n| n > 0)
+                .unwrap_or(false);
+            if !migrated {
+                let _ = conn.execute_batch(
+                    "INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep:entry-mode', value FROM kv WHERE key = 'rankboard:entry-mode';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-canvas-v3', value FROM kv WHERE key = 'rankboard-canvas-v3';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-canvas-templates-v1', value FROM kv WHERE key = 'rankboard-canvas-templates-v1';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-projects-v1', value FROM kv WHERE key = 'rankboard-projects-v1';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-skip-launcher', value FROM kv WHERE key = 'rankboard-skip-launcher';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-project-pins', value FROM kv WHERE key = 'rankboard-project-pins';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-project-dir', value FROM kv WHERE key = 'rankboard-project-dir';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-export-dir', value FROM kv WHERE key = 'rankboard-export-dir';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-onboarded-v1', value FROM kv WHERE key = 'rankboard-onboarded-v1';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep-ui-theme', value FROM kv WHERE key = 'rankboard-ui-theme';
+                     INSERT OR REPLACE INTO kv (key, value) SELECT 'onlyrep:config:v1', value FROM kv WHERE key = 'rankboard:config:v1';
+                     INSERT OR REPLACE INTO kv (key, value) VALUES ('onlyrep-migrated-v1', '1');"
+                );
+            }
             app.manage(DbState(Mutex::new(conn)));
             Ok(())
         })

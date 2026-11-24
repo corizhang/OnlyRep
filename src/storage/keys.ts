@@ -24,24 +24,26 @@ export const KEY_MIGRATIONS: Record<string, string> = {
 /** 带序号前缀的键（自动备份 rankboard-canvas-backup-v1..3） */
 const PREFIX_MIGRATIONS: [string, string][] = [['rankboard-canvas-backup-v', 'onlyrep-canvas-backup-v']];
 
-/** 启动时迁移：老键有值且新键为空 → 拷贝（旧键保留，出问题可人工回滚） */
+/**
+ * 启动时迁移（一次性标记 onlyrep-migrated-v1）：
+ * 标记不存在时，老键值覆盖拷入新键（旧键保留可回滚）；跑过一次后不再触碰。
+ * 覆盖语义的理由：老键只可能由更名前的版本写入，迁移时老数据理应获胜。
+ */
 export function migrateLegacyKeys(): void {
   try {
+    if (appStorage.getItem('onlyrep-migrated-v1') != null) return;
     for (const [oldKey, newKey] of Object.entries(KEY_MIGRATIONS)) {
       const oldVal = appStorage.getItem(oldKey);
-      if (oldVal != null && appStorage.getItem(newKey) == null) {
-        appStorage.setItem(newKey, oldVal);
-      }
+      if (oldVal != null) appStorage.setItem(newKey, oldVal);
     }
     // 自动备份键迁移（序号固定 1..3，显式枚举——不依赖 localStorage 枚举能力，降级环境兼容）
     for (const [oldPrefix, newPrefix] of PREFIX_MIGRATIONS) {
       for (let v = 1; v <= 3; v += 1) {
-        const oldKey = `${oldPrefix}${v}`;
-        const newKey = `${newPrefix}${v}`;
-        const oldVal = appStorage.getItem(oldKey);
-        if (oldVal != null && appStorage.getItem(newKey) == null) appStorage.setItem(newKey, oldVal);
+        const oldVal = appStorage.getItem(`${oldPrefix}${v}`);
+        if (oldVal != null) appStorage.setItem(`${newPrefix}${v}`, oldVal);
       }
     }
+    appStorage.setItem('onlyrep-migrated-v1', '1');
   } catch {
     // 存储降级环境：跳过迁移（内存态本就会重建）
   }
