@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ClearOutlined, CloseOutlined, PaperClipOutlined, SendOutlined } from '@ant-design/icons';
 import { useAiChat } from './chat';
 import { adoptAction, attachFile, discardAction, sendChatMessage } from './chatActions';
+import { renderMarkdown } from './markdown';
+import { humanizeReply } from './humanize';
+import { useCanvasStore } from '../../store/useCanvasStore';
 import type { ChatMsg } from './chat';
 
 /**
@@ -118,6 +121,7 @@ function MessageList({ messages, generating }: { messages: ChatMsg[]; generating
 
 function Bubble({ msg }: { msg: ChatMsg }) {
   const isUser = msg.role === 'user';
+  const canvasConfig = useCanvasStore((s) => s.config);
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -126,7 +130,7 @@ function Bubble({ msg }: { msg: ChatMsg }) {
         }`}
       >
         {msg.attachment && <div className="mb-1 rounded bg-black/10 px-1.5 py-0.5 text-[10.5px]">📎 {msg.attachment}</div>}
-        <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+        <div className="break-words">{isUser ? <div className="whitespace-pre-wrap">{msg.content}</div> : renderMarkdown(humanizeReply(msg.content, canvasConfig))}</div>
         {msg.action && (
           <div className="mt-2 rounded-md border border-brand-line bg-panel p-2">
             <div className="text-[10px] font-medium text-brand">{msg.action.kind === 'patch' ? '增量修改' : '完整画布'}</div>
