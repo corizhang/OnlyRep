@@ -7,7 +7,8 @@ import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
 import { ensureAppInit } from '../appInit';
 import { exportCanvasNow } from '../exportCurrent';
-import AiGenerateModal from '../ai/AiGenerateModal';
+import AiAssistantPanel from '../ai/AiAssistantPanel';
+import { useAiChat } from '../ai/chat';
 import { isTauri } from '../../storage/tauriKv';
 import DataSourcePanel from './DataSourcePanel';
 import StepChainPanel from './StepChainPanel';
@@ -46,7 +47,6 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
   const templates = useCanvasStore((s) => s.templates);
   const [showTplLib, setShowTplLib] = useState(false);
   const [showPrjLib, setShowPrjLib] = useState(false);
-  const [showAi, setShowAi] = useState(false);
   const activePrjName = useCanvasStore((s) => s.projects.find((p) => p.id === s.activeProjectId)?.name ?? null);
   const projectDirty = useCanvasStore((s) => s.projectDirty);
   const canvasZoom = useCanvasStore((s) => s.canvasZoom);
@@ -221,7 +221,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
           <Tooltip title="AI 生成日报（自然语言描述，AI 直接搭画布与管道）">
             <button
               type="button"
-              onClick={() => setShowAi(true)}
+              onClick={() => useAiChat.getState().setPanelOpen(true)}
               className="rounded-md border border-brand-line bg-brand-soft px-2.5 py-1 text-[11.5px] font-medium text-brand shadow-sm hover:bg-brand-line"
             >
               ✨ AI 生成
@@ -421,7 +421,7 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
       <SettingsModal open={settingsSection !== null} initialSection={settingsSection ?? 'general'} onClose={() => setSettingsSection(null)} />
       <ProjectLibraryModal open={showPrjLib} onClose={() => setShowPrjLib(false)} />
       <SourceGuideModal />
-      <AiGenerateModal open={showAi} onClose={() => setShowAi(false)} />
+      <AiAssistantPanel />
 
       {/* 首屏欢迎页（仅首次使用出现一次） */}
       <WelcomeModal />

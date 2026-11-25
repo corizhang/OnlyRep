@@ -15,6 +15,51 @@ export interface AiResult {
   raw?: string;
 }
 
+export interface AiRawResult {
+  content?: string;
+  error?: string;
+}
+
+/** 原始调用：不做 JSON 约束（聊天模式：回答或动作卡由上层分流） */
+export async function callModel(cfg: AiConfig, system: string, user: string, signal?: AbortSignal): Promise<AiRawResult> {
+  const base = cfg.endpoint.trim().replace(/\/+$/, '');
+  const url = `${base}/chat/completions`;
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey.trim()}` },
+      body: JSON.stringify({
+        model: cfg.model.trim(),
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.4,
+        max_tokens: 8000,
+      }),
+      signal,
+    });
+  } catch (e) {
+    return { error: `网络请求失败：${e instanceof Error ? e.message : String(e)}（端点无法连通或跨域受限）` };
+  }
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    if (resp.status === 401 || resp.status === 403) return { error: '鉴权失败：请检查 API Key 是否正确、是否过期' };
+    if (resp.status === 404) return { error: `端点 404：请确认端点地址（当前 ${url}），通常应为 https://域名/v1` };
+    if (resp.status === 429) return { error: '请求频率超限（429）：稍后重试' };
+    return { error: `服务返回 ${resp.status}：${body.slice(0, 200)}` };
+  }
+  try {
+    const data = (await resp.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content ?? '';
+    if (!content.trim()) return { error: '模型返回了空内容' };
+    return { content };
+  } catch {
+    return { error: '响应不是有效 JSON（端点可能不兼容 OpenAI 格式）' };
+  }
+}
+
 /** 从模型输出里容错抽取 JSON 本体（剥围栏/前后废话） */
 export function extractJson(text: string): string | null {
   let t = text.trim();

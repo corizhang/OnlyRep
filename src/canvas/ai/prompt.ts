@@ -9,7 +9,7 @@ import type { SourceRuntime } from '../types';
  * - 强令只输出 JSON（生成侧另有容错抽取）
  */
 
-const SCHEMA_DOC = `
+export const SCHEMA_DOC = `
 你将为「OnlyRep 数据可视化日报工作台」生成一份画布配置 JSON（CanvasConfig）。只输出 JSON，不要任何解释。
 
 ## 顶层结构
@@ -130,4 +130,35 @@ export function buildAiMessages(
     system: SCHEMA_DOC,
     user: `【数据上下文】\n${ctx}\n\n【完整配置示例】\n${EXAMPLE}\n\n【用户需求】\n${description}\n\n请生成 CanvasConfig JSON（只输出 JSON 本体，不要 markdown 代码围栏，不要任何解释）。`,
   };
+}
+
+
+/** 聊天助手的节点体系知识（问答用，浓缩自节点指南） */
+const NODE_KNOWLEDGE = `
+节点体系速查（回答"怎么配节点"类问题时使用）：
+- 数据源：文件导入（xlsx/csv 多表）、手填表（manualTable，columns/rows 直接挂源上）、表单（日期/参数进公式变量）、常量
+- 筛选与整理：取行 pickRows（前N/区间）、筛选 filter（条件过滤）、修数 cellEdit（批量规则改值+双击定点改）、排序 sortTopN
+- 计算与合并：计算字段 derive（公式加列）、分组汇总 groupAgg、行差异 diff（环比/同比）、合并 union
+- 取数与公式：取数 scalarOut（列聚合成变量）、公式 formula（标量或逐行，变量名=节点 name）
+- 连线中点可一键插入节点；多输入节点（union）按追加连线
+常见套路：
+- 环比：diff 节点，params { col, prev }
+- TopN 排行榜：sortTopN → 排行榜块绑定
+- 渠道对比：groupAgg 按渠道汇总 → 图表块绑定
+`.trim();
+
+/** 聊天模式系统提示词 = 配置规范 + 节点知识 + 输出协议 */
+export function buildChatSystem(sendSampleRows: boolean, dataSources: DataSource[], sources: Record<string, SourceRuntime>): string {
+  const ctx = dataContext(dataSources, sources, sendSampleRows);
+  return `${SCHEMA_DOC}
+
+${NODE_KNOWLEDGE}
+
+【数据上下文】
+${ctx}
+
+## 你是 OnlyRep 的内置助手，两种输出方式择一：
+A. **回答问题**：用户问怎么配节点/怎么用功能/分析思路时，直接用中文简洁回答（可给步骤清单），不要输出 JSON。
+B. **生成画布**：用户要你搭画布/改版面时，输出且只输出 CanvasConfig JSON 本体（不要 markdown 围栏，不要解释）。画布会自动做结构校验，不合法会被拒。
+判断标准：用户意图是"动手做"→ B；是"问怎么做/问概念"→ A。`;
 }
