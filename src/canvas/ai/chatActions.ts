@@ -4,7 +4,7 @@ import { newId } from '../datasource/registry';
 import type { DataSource } from '../types';
 import { aiConfigured, loadAiConfig } from './aiConfig';
 import { buildChatSystem } from './prompt';
-import { callModel, extractJson } from './generate';
+import { callModelStream, extractJson } from './generate';
 import { sanitizeCanvasConfig } from '../template';
 import { applyPatchOps, parsePatch, type PatchRequest } from './patch';
 import { useAiChat, windowedHistory } from './chat';
@@ -17,7 +17,13 @@ import { cleanTable } from '../../parser/clean';
  */
 
 /** 从 AI 输出里分辨：增量 patch / 全量画布 / 纯回答 */
-function parseReply(content: string): { kind: 'patch'; req: PatchRequest; newConfig: ReturnType<typeof sanitizeCanvasConfig> } | { kind: 'canvas'; config: ReturnType<typeof sanitizeCanvasConfig> } | { kind: 'text'; text: string } {
+type ParsedReply =
+  | { kind: 'patch'; req: PatchRequest; newConfig: ReturnType<typeof sanitizeCanvasConfig> }
+  | { kind: 'canvas'; config: ReturnType<typeof sanitizeCanvasConfig> }
+  | { kind: 'invalid'; reason: string }
+  | { kind: 'text'; text: string };
+
+function parseReply(content: string): ParsedReply {
   const jsonText = extractJson(content);
   if (jsonText) {
     const req = parsePatch(jsonText);
@@ -26,16 +32,20 @@ function parseReply(content: string): { kind: 'patch'; req: PatchRequest; newCon
         const current = useCanvasStore.getState().config;
         return { kind: 'patch', req, newConfig: applyPatchOps(current, req.ops) };
       } catch (e) {
-        return { kind: 'text', text: `增量修改未通过校验：${e instanceof Error ? e.message : String(e)}（未改动画布）` };
+        return { kind: 'invalid', reason: `patch 校验失败：${e instanceof Error ? e.message : String(e)}` };
       }
     }
     try {
       const parsed = JSON.parse(jsonText) as { blocks?: unknown };
       if (parsed && Array.isArray(parsed.blocks)) {
-        return { kind: 'canvas', config: sanitizeCanvasConfig(parsed) };
+        try {
+          return { kind: 'canvas', config: sanitizeCanvasConfig(parsed) };
+        } catch (e) {
+          return { kind: 'invalid', reason: `画布校验失败：${e instanceof Error ? e.message : String(e)}` };
+        }
       }
     } catch {
-      /* 不是合法画布 → 当文本 */
+      /* 不是合法 JSON → 当文本 */
     }
   }
   return { kind: 'text', text: content.trim() };
@@ -56,31 +66,59 @@ export async function sendChatMessage(text: string): Promise<void> {
   chat.setGenerating(true);
   const thinking = chat.push({ role: 'assistant', content: '思考中…' });
 
+  const present = (reply: ParsedReply): boolean => {
+    const c = useAiChat.getState();
+    if (reply.kind === 'canvas') {
+      c.update(thinking.id, {
+        content: `已生成「${reply.config.title}」：${reply.config.blocks.length} 个区块 · ${reply.config.pipeline.nodes.length} 个节点`,
+        action: { kind: 'canvas', config: reply.config, summary: `${reply.config.blocks.length} 区块 / ${reply.config.pipeline.nodes.length} 节点 / ${reply.config.dataSources.length} 数据源` },
+      });
+      return true;
+    }
+    if (reply.kind === 'patch') {
+      c.update(thinking.id, {
+        content: `增量修改：${reply.req.summary}（${reply.req.ops.length} 处变更）`,
+        action: { kind: 'patch', summary: reply.req.summary, ops: reply.req.ops, newConfig: reply.newConfig },
+      });
+      return true;
+    }
+    if (reply.kind === 'text') {
+      c.update(thinking.id, { content: reply.text || '（空回复）' });
+      return true;
+    }
+    return false; // invalid
+  };
+
   try {
     const { config, sources } = useCanvasStore.getState();
     const system = buildChatSystem(aiCfg.sendSampleRows, config.dataSources, sources, config);
     // 多轮：system + 窗口内历史（刚 push 的用户消息与"思考中"占位不入历史，单独作为当前输入）
     const history = windowedHistory(useAiChat.getState().messages.filter((m) => m.id !== thinking.id).slice(0, -1));
-    const userText = [...history, { role: 'user' as const, content: trimmed }].map((m) => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`).join('\n\n');
-    const res = await callModel(aiCfg, system, userText);
+    let userText = [...history, { role: 'user' as const, content: trimmed }].map((m) => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`).join('\n\n');
 
-    if (res.error) {
-      chat.update(thinking.id, { content: res.error, failed: true });
-    } else {
-      const reply = parseReply(res.content ?? '');
-      if (reply.kind === 'canvas') {
-        chat.update(thinking.id, {
-          content: `已生成「${reply.config.title}」：${reply.config.blocks.length} 个区块 · ${reply.config.pipeline.nodes.length} 个节点`,
-          action: { kind: 'canvas', config: reply.config, summary: `${reply.config.blocks.length} 区块 / ${reply.config.pipeline.nodes.length} 节点 / ${reply.config.dataSources.length} 数据源` },
-        });
-      } else if (reply.kind === 'patch') {
-        chat.update(thinking.id, {
-          content: `增量修改：${reply.req.summary}（${reply.req.ops.length} 处变更）`,
-          action: { kind: 'patch', summary: reply.req.summary, ops: reply.req.ops, newConfig: reply.newConfig },
-        });
-      } else {
-        chat.update(thinking.id, { content: reply.text || '（空回复）' });
+    // 最多两次尝试：第一次失败后把校验错误回喂，让 AI 自修一次
+    let done = false;
+    for (let attempt = 0; attempt < 2 && !done; attempt += 1) {
+      if (attempt > 0) chat.update(thinking.id, { content: '输出未通过校验，正在让 AI 自修…' });
+      const res = await callModelStream(aiCfg, system, userText, (full) => {
+        // 流式：实时把正在生成的内容投到气泡（截断防爆长度）
+        useAiChat.getState().update(thinking.id, { content: full.length > 4000 ? `${full.slice(0, 4000)}…` : full });
+      });
+      if (res.error) {
+        chat.update(thinking.id, { content: res.error, failed: res.error !== '已取消' });
+        break;
       }
+      const reply = parseReply(res.content ?? '');
+      if (reply.kind === 'invalid' && attempt === 0) {
+        // 自愈：错误回喂重试
+        userText = `用户：${trimmed}\n\n助手上次输出未通过系统校验：${reply.reason}。请修正后重新输出（保持用户意图不变，只修不合法的部分）。`;
+        continue;
+      }
+      if (reply.kind === 'invalid') {
+        chat.update(thinking.id, { content: `${reply.reason}（重试后仍未通过，请换个说法或稍后重试）`, failed: true });
+        break;
+      }
+      done = present(reply);
     }
   } catch (e) {
     chat.update(thinking.id, { content: `请求异常：${e instanceof Error ? e.message : String(e)}`, failed: true });

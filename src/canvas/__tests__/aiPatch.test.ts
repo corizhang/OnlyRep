@@ -57,3 +57,38 @@ describe('AI 增量 patch', () => {
     expect(s).toContain('id=');
   });
 });
+
+describe('管道节点 patch', () => {
+  const withNodes = () => {
+    const c = createDefaultCanvasConfig();
+    c.pipeline.nodes = [
+      { id: 'n_src', type: 'source', name: '数据', inputs: [], params: { sourceId: 'ds1' }, enabled: true },
+      { id: 'n_filter', type: 'filter', name: '筛选', inputs: ['n_src'], params: { col: '渠道', op: 'contains', value: '公众号' }, enabled: true },
+    ];
+    return c;
+  };
+
+  it('updateNode 合并参数与改名', () => {
+    const c = applyPatchOps(withNodes(), [{ op: 'updateNode', id: 'n_filter', params: { value: '短信' }, name: '只看短信' }]);
+    const n = c.pipeline.nodes.find((x) => x.id === 'n_filter')!;
+    expect(n.params.value).toBe('短信');
+    expect(n.params.col).toBe('渠道'); // 未动字段保留
+    expect(n.name).toBe('只看短信');
+  });
+
+  it('addNode afterId 插入并重接下游', () => {
+    const c = applyPatchOps(withNodes(), [
+      { op: 'addNode', node: { id: 'n_edit', type: 'cellEdit', name: '修数', inputs: [], params: { edits: [] }, enabled: true }, afterId: 'n_src' },
+    ]);
+    const edit = c.pipeline.nodes.find((x) => x.id === 'n_edit')!;
+    const filter = c.pipeline.nodes.find((x) => x.id === 'n_filter')!;
+    expect(edit.inputs).toEqual(['n_src']);
+    expect(filter.inputs).toEqual(['n_edit']); // 原下游重接到新节点
+  });
+
+  it('removeNode 有依赖时拒绝', () => {
+    expect(() => applyPatchOps(withNodes(), [{ op: 'removeNode', id: 'n_src' }])).toThrow('依赖');
+    const c = applyPatchOps(withNodes(), [{ op: 'removeNode', id: 'n_filter' }]);
+    expect(c.pipeline.nodes).toHaveLength(1);
+  });
+});

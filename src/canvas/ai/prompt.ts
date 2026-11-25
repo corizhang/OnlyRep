@@ -175,7 +175,11 @@ ops 支持：
 - { "op": "addBlock", "block": { 块定义同画布规范 }, "afterId": "插到某块后（可选）" }
 - { "op": "updateBlock", "id": "目标块id", "config": { 要合并的字段 } }
 - { "op": "removeBlock", "id": "目标块id" }
-块 id 从「当前画布摘要」里取；不要输出 markdown 围栏和解释。
+管道节点（改数据逻辑时用）：
+- { "op": "updateNode", "id": "目标节点id", "name": "改名（可选）", "params": { 要合并的参数字段 } }
+- { "op": "addNode", "node": { 节点定义同管道规范 }, "afterId": "插到某节点下游（可选，自动重接原下游）" }
+- { "op": "removeNode", "id": "目标节点id" }（有被依赖的节点删不了，先处理下游）
+块/节点 id 从「当前画布摘要」里取；不要输出 markdown 围栏和解释。
 判断标准：问概念→A；从零搭→B；改现有→C。
 
 ## 回答风格（A 类回答必须遵守）

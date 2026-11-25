@@ -1,4 +1,4 @@
-import type { CanvasBlock, CanvasConfig } from '../types';
+import type { CanvasBlock, CanvasConfig, PipelineNode } from '../types';
 import { sanitizeCanvasConfig } from '../template';
 
 /**
@@ -13,7 +13,10 @@ export type PatchOp =
   | { op: 'updateCanvas'; patch: { width?: number; baseFontSize?: number; exportScale?: 1 | 2 | 4; padding?: number; gap?: number } }
   | { op: 'addBlock'; block: CanvasBlock; afterId?: string }
   | { op: 'updateBlock'; id: string; config: Record<string, unknown> }
-  | { op: 'removeBlock'; id: string };
+  | { op: 'removeBlock'; id: string }
+  | { op: 'updateNode'; id: string; name?: string; params?: Record<string, unknown> }
+  | { op: 'addNode'; node: PipelineNode; afterId?: string }
+  | { op: 'removeNode'; id: string };
 
 export interface PatchRequest {
   action: 'patch';
@@ -112,6 +115,37 @@ export function applyPatchOps(config: CanvasConfig, ops: PatchOp[]): CanvasConfi
           }),
         };
         if (!found) throw new Error(`${where}（removeBlock）：找不到块 ${op.id}`);
+        break;
+      }
+      case 'updateNode': {
+        const idx = next.pipeline.nodes.findIndex((n) => n.id === op.id);
+        if (idx < 0) throw new Error(`${where}（updateNode）：找不到节点 ${op.id}`);
+        const nodes = [...next.pipeline.nodes];
+        const cur = nodes[idx];
+        nodes[idx] = { ...cur, ...(op.name ? { name: op.name } : {}), params: { ...cur.params, ...(op.params ?? {}) } };
+        next = { ...next, pipeline: { nodes } };
+        break;
+      }
+      case 'addNode': {
+        if (!op.node?.id || !op.node?.type) throw new Error(`${where}（addNode）：节点定义不完整（缺 id/type）`);
+        if (next.pipeline.nodes.some((n) => n.id === op.node.id)) throw new Error(`${where}（addNode）：节点 id 重复 ${op.node.id}`);
+        // afterId：把该节点插到 afterId 下游（inputs=[afterId]；afterId 原下游重接到新节点）
+        let node: PipelineNode = { ...op.node, inputs: Array.isArray(op.node.inputs) ? [...op.node.inputs] : [], enabled: op.node.enabled !== false };
+        let nodes = [...next.pipeline.nodes];
+        if (op.afterId) {
+          if (!next.pipeline.nodes.some((n) => n.id === op.afterId)) throw new Error(`${where}（addNode）：找不到上游节点 ${op.afterId}`);
+          node = { ...node, inputs: [op.afterId] };
+          nodes = nodes.map((n) => (n.inputs.includes(op.afterId!) ? { ...n, inputs: n.inputs.map((i) => (i === op.afterId ? node.id : i)) } : n));
+        }
+        next = { ...next, pipeline: { nodes: [...nodes, node] } };
+        break;
+      }
+      case 'removeNode': {
+        const target = next.pipeline.nodes.find((n) => n.id === op.id);
+        if (!target) throw new Error(`${where}（removeNode）：找不到节点 ${op.id}`);
+        const dependents = next.pipeline.nodes.filter((n) => n.inputs.includes(op.id));
+        if (dependents.length > 0) throw new Error(`${where}（removeNode）：节点 ${op.id} 被 ${dependents.map((d) => d.name || d.id).join('、')} 依赖，先处理下游`);
+        next = { ...next, pipeline: { nodes: next.pipeline.nodes.filter((n) => n.id !== op.id) } };
         break;
       }
       default:
