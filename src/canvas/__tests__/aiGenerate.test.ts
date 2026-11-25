@@ -59,4 +59,21 @@ describe('AI 生成', () => {
     expect(cfg.blocks).toHaveLength(1);
     expect(cfg.pipeline.nodes).toHaveLength(1);
   });
+
+  it('sanitize 自愈：manualTable 嵌套 table 形状拍平（AI 旧提示词产物回归）', () => {
+    const broken = {
+      version: 2,
+      title: 'x',
+      dataSources: [
+        { id: 'ds1', name: '表', kind: 'manualTable', table: { columns: ['渠道', '新增'], rows: [['公众号', 1]] } },
+      ],
+      pipeline: { nodes: [] },
+      blocks: [],
+    };
+    const cfg = sanitizeCanvasConfig(broken as never);
+    const ds = cfg.dataSources[0] as unknown as { columns: string[]; rows: unknown[][]; table?: unknown };
+    expect(ds.columns).toEqual(['渠道', '新增']);
+    expect(ds.rows).toEqual([['公众号', 1]]);
+    expect(ds.table).toBeUndefined();
+  });
 });

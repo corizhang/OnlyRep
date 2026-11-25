@@ -128,9 +128,18 @@ export function sanitizeCanvasConfig(raw: unknown): CanvasConfig {
     pageBg: typeof raw.pageBg === 'string' ? raw.pageBg : '',
     headerBg: typeof raw.headerBg === 'string' ? raw.headerBg : '',
     headerHeight: raw.headerHeight === undefined ? undefined : clamp(Number(raw.headerHeight), 0, 400, 110),
-    dataSources: dataSources.map((d) =>
-      d.kind === 'import' ? { ...d, fileName: '', sheetName: d.sheetName ?? '' } : d,
-    ),
+    dataSources: dataSources.map((d) => {
+      if (d.kind === 'import') return { ...d, fileName: '', sheetName: d.sheetName ?? '' };
+      // 自愈：AI 早期输出把 columns/rows 套在 table 里——拍平回正确形状
+      if (d.kind === 'manualTable' && !Array.isArray((d as unknown as { rows?: unknown }).rows)) {
+        const t = (d as unknown as { table?: { columns?: string[]; rows?: unknown } }).table;
+        if (t && Array.isArray(t.columns) && Array.isArray(t.rows)) {
+          const { table: _omit, ...rest } = d as unknown as { table?: unknown } & Record<string, unknown>;
+          return { ...rest, columns: t.columns, rows: t.rows } as typeof d;
+        }
+      }
+      return d;
+    }),
     pipeline: { nodes: nodes.map((n) => ({ ...n, inputs: Array.isArray(n.inputs) ? n.inputs : [], enabled: n.enabled !== false })) },
     blocks,
     exportScale: raw.exportScale === 1 || raw.exportScale === 4 ? raw.exportScale : 2,

@@ -26,7 +26,7 @@ const SCHEMA_DOC = `
 
 ## 数据源 dataSources[]
 - 手填表（数据直接写在配置里，AI 造数用这个）：
-  { "id": "ds1", "name": "渠道数据", "kind": "manualTable", "table": { "columns": ["渠道","新增"], "rows": [["公众号", 120], ["短信", 85]] } }
+  { "id": "ds1", "name": "渠道数据", "kind": "manualTable", "columns": ["渠道","新增"], "rows": [["公众号", 120], ["短信", 85]] }  // 注意：columns/rows 直接挂在源上，不要套 table 字段
 - 常量：{ "id": "c1", "name": "全年目标", "kind": "constant", "value": 10000 }
 （若用户已导入数据，优先用「用户已有数据源」的 id 直接引用，不要重复创建）
 
@@ -65,7 +65,7 @@ const EXAMPLE = JSON.stringify(
     fontSize: 'medium',
     theme: { accent: '#2563eb', bg: '#f6f7f9' },
     dataSources: [
-      { id: 'ds_ch', name: '渠道数据', kind: 'manualTable', table: { columns: ['渠道', '新增'], rows: [['公众号', 120], ['短信', 85], ['企微', 60]] } },
+      { id: 'ds_ch', name: '渠道数据', kind: 'manualTable', columns: ['渠道', '新增'], rows: [['公众号', 120], ['短信', 85], ['企微', 60]] },
       { id: 'c_goal', name: '全年目标', kind: 'constant', value: 10000 },
     ],
     pipeline: {

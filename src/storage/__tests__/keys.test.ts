@@ -42,3 +42,31 @@ describe('存储键迁移', () => {
     expect(appStorage.getItem(K.projects)).toBe('{"items":[]}');
   });
 });
+
+// 配置自愈：持久层 manualTable 嵌套 table 形状拍平（AI 旧提示词事故回归）
+describe('配置自愈迁移', () => {
+  it('canvasPersist 里的嵌套 table 形状被拍平', async () => {
+    const { fixPersistedShape } = await import('../keysMigrate');
+    const { appStorage: store } = await import('../safeStorage');
+    const persisted = {
+      state: {
+        config: {
+          dataSources: [
+            { id: 'ds1', name: '表', kind: 'manualTable', table: { columns: ['渠道'], rows: [['公众号']] } },
+            { id: 'ds2', name: '正常', kind: 'manualTable', columns: ['x'], rows: [[1]] },
+          ],
+        },
+      },
+      version: 0,
+    };
+    store.setItem(K.canvasPersist, JSON.stringify(persisted));
+    fixPersistedShape(K.canvasPersist);
+    const fixed = JSON.parse(store.getItem(K.canvasPersist)!) as typeof persisted;
+    const [bad, good] = fixed.state.config.dataSources as unknown as { columns: string[]; rows: unknown[][]; table?: unknown }[];
+    expect(bad.columns).toEqual(['渠道']);
+    expect(bad.rows).toEqual([['公众号']]);
+    expect(bad.table).toBeUndefined();
+    expect(good.columns).toEqual(['x']); // 正常形状不动
+    store.removeItem(K.canvasPersist);
+  });
+});

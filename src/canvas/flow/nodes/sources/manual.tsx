@@ -12,7 +12,7 @@ export const manualSourceDef: SourceKindDef = {
     const def = srcDef as ManualTableDataSource;
     return (
       <div className="no-drag rounded bg-[var(--nb-manual-bg,#ffffff)] p-1.5">
-        <ManualEditor sourceId={def.id} columns={def.columns} rows={def.rows} />
+        <ManualEditor sourceId={def.id} columns={def.columns ?? []} rows={def.rows ?? []} />
       </div>
     );
   },

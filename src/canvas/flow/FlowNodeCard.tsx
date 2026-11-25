@@ -210,7 +210,7 @@ export default function FlowNodeCard({ node, output, srcDef, srcRt, x, y, select
               srcDef && SrcConfig ? (
                 srcDef.kind === 'manualTable' ? (
                   <details className="rounded-md border border-[var(--nb-border)] bg-[var(--nb-preview-bg)] px-2.5 py-2">
-                    <summary className="cursor-pointer text-[11px] font-medium text-[var(--nb-text)]">编辑手填表（{srcDef.rows.length} 行 × {srcDef.columns.length} 列）</summary>
+                    <summary className="cursor-pointer text-[11px] font-medium text-[var(--nb-text)]">编辑手填表（{(srcDef.rows ?? []).length} 行 × {(srcDef.columns ?? []).length} 列）</summary>
                     <div className="mt-2"><SrcConfig srcDef={srcDef} srcRt={srcRt} /></div>
                   </details>
                 ) : <SrcConfig srcDef={srcDef} srcRt={srcRt} />
