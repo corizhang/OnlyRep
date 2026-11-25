@@ -496,7 +496,7 @@ export const useCanvasStore = create<CanvasStore>()(
           const config = preset.create();
           engineCache.clear();
           void clearSourceSnapshots();
-          set({ config, sources: {}, selectedId: null, errors: [], history: { past: [], future: [] }, activeTemplateId: null });
+          set({ config, sources: {}, selectedId: null, errors: [], history: { past: [], future: [] }, activeTemplateId: null, activeProjectId: null });
           recomputeWith(config, {});
         },
 
@@ -504,7 +504,7 @@ export const useCanvasStore = create<CanvasStore>()(
           engineCache.clear();
           void clearSourceSnapshots();
           const config = createDefaultCanvasConfig();
-          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null });
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null, activeProjectId: null });
         },
 
         /** 应用 AI 生成的配置：压入历史（采用后可 Ctrl+Z 撤销），然后正常重算 */
@@ -519,7 +519,7 @@ export const useCanvasStore = create<CanvasStore>()(
         loadTemplate: (config) => {
           engineCache.clear();
           // 数据快照按源 id 保留（不再清空）：模板/项目切换后自动恢复，切回不丢数据
-          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null });
+          set({ config, sources: {}, selectedId: null, errors: [], warnings: [], history: { past: [], future: [] }, activeTemplateId: null, activeProjectId: null });
           recomputeWith(config, {});
           void restoreImportCaches(recomputeWith, (store) => {
             const pending = store.config.dataSources.filter((d) => d.kind === 'import' && !store.sources[d.id]?.table).length;
