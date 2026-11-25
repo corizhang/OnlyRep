@@ -7,6 +7,7 @@ import { useCanvasStore, findBlock } from '../../store/useCanvasStore';
 import { downloadCanvasTemplate } from '../template';
 import { ensureAppInit } from '../appInit';
 import { exportCanvasNow } from '../exportCurrent';
+import { invoke } from '@tauri-apps/api/core';
 import AiAssistantPanel from '../ai/AiAssistantPanel';
 import { useAiChat } from '../ai/chat';
 import { isTauri } from '../../storage/tauriKv';
@@ -327,6 +328,15 @@ export default function CanvasApp({ onHome }: { onHome?: () => void }) {
       {exportToast && (
         <div className="flex items-center gap-2 border-b border-brand-line bg-brand-soft px-5 py-1.5 text-[12px] text-brand">
           <span className="min-w-0 flex-1 truncate" title={exportToast.path || undefined}>{exportToast.msg}</span>
+          {exportToast.path && isTauri() && (
+            <button
+              type="button"
+              className="shrink-0 rounded border border-brand-line bg-panel px-2 py-0.5 text-[11px] text-brand hover:bg-brand-soft"
+              onClick={() => void invoke('open_export_folder', { path: exportToast.path }).catch(() => undefined)}
+            >
+              打开文件夹
+            </button>
+          )}
           <button type="button" className="shrink-0 text-ink-faint hover:text-ink" onClick={() => useCanvasStore.getState().setExportToast(null)}>✕</button>
         </div>
       )}
