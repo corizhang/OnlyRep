@@ -1,4 +1,5 @@
 import type { CanvasConfig, DataSource } from '../types';
+import { canvasSummary } from './patch';
 import type { SourceRuntime } from '../types';
 
 /**
@@ -14,11 +15,13 @@ export const SCHEMA_DOC = `
 
 ## 顶层结构
 {
-  "version": 2,
+  "version": 3,
   "title": "日报标题",
   "width": 750,
-  "fontSize": "medium",          // small|medium|large
-  "theme": { "accent": "#2563eb", "bg": "#f6f7f9" },  // accent 主题色，bg 页面底色
+  "themeId": "businessBlue",     // businessBlue|festiveRed|darkGold|cleanWhite
+  "accentColor": "",             // "" = 跟随主题主色；可填 #2563eb
+  "pageBg": "",                  // "" = 跟随主题底色
+  "baseFontSize": 15,            // 10~28
   "dataSources": [ ... ],
   "pipeline": { "nodes": [ ... ] },
   "blocks": [ ... ]
@@ -59,11 +62,13 @@ export const SCHEMA_DOC = `
 /** few-shot 完整例子（精简但结构完整） */
 const EXAMPLE = JSON.stringify(
   {
-    version: 2,
+    version: 3,
     title: '渠道新增日报',
     width: 750,
-    fontSize: 'medium',
-    theme: { accent: '#2563eb', bg: '#f6f7f9' },
+    themeId: 'businessBlue',
+    accentColor: '',
+    pageBg: '',
+    baseFontSize: 15,
     dataSources: [
       { id: 'ds_ch', name: '渠道数据', kind: 'manualTable', columns: ['渠道', '新增'], rows: [['公众号', 120], ['短信', 85], ['企微', 60]] },
       { id: 'c_goal', name: '全年目标', kind: 'constant', value: 10000 },
@@ -148,8 +153,9 @@ const NODE_KNOWLEDGE = `
 `.trim();
 
 /** 聊天模式系统提示词 = 配置规范 + 节点知识 + 输出协议 */
-export function buildChatSystem(sendSampleRows: boolean, dataSources: DataSource[], sources: Record<string, SourceRuntime>): string {
+export function buildChatSystem(sendSampleRows: boolean, dataSources: DataSource[], sources: Record<string, SourceRuntime>, canvas?: import('../types').CanvasConfig): string {
   const ctx = dataContext(dataSources, sources, sendSampleRows);
+  const summary = canvas ? canvasSummary(canvas) : '';
   return `${SCHEMA_DOC}
 
 ${NODE_KNOWLEDGE}
@@ -157,8 +163,18 @@ ${NODE_KNOWLEDGE}
 【数据上下文】
 ${ctx}
 
-## 你是 OnlyRep 的内置助手，两种输出方式择一：
+${summary ? `【当前画布摘要】\n${summary}\n\n` : ''}## 你是 OnlyRep 的内置助手，三种输出方式择一：
 A. **回答问题**：用户问怎么配节点/怎么用功能/分析思路时，直接用中文简洁回答（可给步骤清单），不要输出 JSON。
-B. **生成画布**：用户要你搭画布/改版面时，输出且只输出 CanvasConfig JSON 本体（不要 markdown 围栏，不要解释）。画布会自动做结构校验，不合法会被拒。
-判断标准：用户意图是"动手做"→ B；是"问怎么做/问概念"→ A。`;
+B. **新建画布**：用户要从零搭一份日报时，输出且只输出 CanvasConfig JSON 本体。
+C. **增量修改**：用户要调整当前画布（改标题/改主题色/加一块/改某块/删某块）时，输出且只输出 patch JSON：
+{ "action": "patch", "summary": "一句话说明改了什么", "ops": [ ... ] }
+ops 支持：
+- { "op": "setTitle", "title": "新标题" }
+- { "op": "setTheme", "themeId": "businessBlue|festiveRed|darkGold|cleanWhite", "accentColor": "#hex", "pageBg": "#hex" }（字段任选）
+- { "op": "updateCanvas", "patch": { "width": 750, "baseFontSize": 15, "exportScale": 2, "padding": 32, "gap": 14 } }（字段任选）
+- { "op": "addBlock", "block": { 块定义同画布规范 }, "afterId": "插到某块后（可选）" }
+- { "op": "updateBlock", "id": "目标块id", "config": { 要合并的字段 } }
+- { "op": "removeBlock", "id": "目标块id" }
+块 id 从「当前画布摘要」里取；不要输出 markdown 围栏和解释。
+判断标准：问概念→A；从零搭→B；改现有→C。`;
 }

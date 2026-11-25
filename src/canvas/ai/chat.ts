@@ -6,11 +6,9 @@ import type { CanvasConfig } from '../types';
  * 会话级内存（不落盘）；多轮 = 历史消息原样进请求，超出窗口截断。
  */
 
-export interface ChatAction {
-  /** 可采用的画布配置（已通过 sanitize 校验） */
-  config: CanvasConfig;
-  summary: string;
-}
+export type ChatAction =
+  | { kind: 'canvas'; config: CanvasConfig; summary: string }
+  | { kind: 'patch'; summary: string; ops: import('./patch').PatchOp[]; newConfig: CanvasConfig };
 
 export interface ChatMsg {
   id: string;
@@ -30,6 +28,8 @@ interface AiChatState {
   messages: ChatMsg[];
   generating: boolean;
   panelOpen: boolean;
+  width: number;
+  setWidth: (w: number) => void;
   setPanelOpen: (v: boolean) => void;
   push: (m: Omit<ChatMsg, 'id' | 'ts'>) => ChatMsg;
   update: (id: string, patch: Partial<ChatMsg>) => void;
@@ -40,10 +40,44 @@ interface AiChatState {
 let seq = 0;
 const newId = (): string => `m${Date.now().toString(36)}_${(seq += 1)}`;
 
+const PERSIST_KEY = 'onlyrep-ai-chat';
+const PERSIST_CAP = 50;
+
+/** 落盘：剥掉动作卡的重负载（config/newConfig 只存内存），留可读简述 */
+function persist(state: Pick<AiChatState, 'messages' | 'width'>): void {
+  try {
+    const lite = state.messages.slice(-PERSIST_CAP).map((m) => ({
+      ...m,
+      action: m.action ? undefined : undefined, // 动作卡不恢复（采用/放弃必须在当次会话内完成）
+      content: m.action ? `${m.content}（历史动作卡，配置未保留）` : m.content,
+    }));
+    localStorage.setItem(PERSIST_KEY, JSON.stringify({ messages: lite, width: state.width }));
+  } catch {
+    /* 降级环境忽略 */
+  }
+}
+
+function loadPersisted(): { messages: ChatMsg[]; width: number } {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (raw) {
+      const d = JSON.parse(raw) as { messages?: ChatMsg[]; width?: number };
+      return { messages: Array.isArray(d.messages) ? d.messages : [], width: typeof d.width === 'number' ? d.width : 380 };
+    }
+  } catch {
+    /* 忽略 */
+  }
+  return { messages: [], width: 380 };
+}
+
+const persisted = loadPersisted();
+
 export const useAiChat = create<AiChatState>()((set) => ({
-  messages: [],
+  messages: persisted.messages,
   generating: false,
   panelOpen: false,
+  width: persisted.width,
+  setWidth: (w) => set({ width: Math.max(340, Math.min(720, w)) }),
   setPanelOpen: (v) => set({ panelOpen: v }),
   push: (m) => {
     const msg: ChatMsg = { ...m, id: newId(), ts: Date.now() };
@@ -65,3 +99,7 @@ export function windowedHistory(messages: ChatMsg[]): { role: 'user' | 'assistan
     content: m.action ? `[上一轮生成了画布配置：${m.action.summary}，用户可在面板中采用]` : m.content,
   }));
 }
+
+
+// 变更即落盘（messages/width）
+useAiChat.subscribe((s) => persist({ messages: s.messages, width: s.width }));

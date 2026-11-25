@@ -6,6 +6,7 @@ import { aiConfigured, loadAiConfig } from './aiConfig';
 import { buildChatSystem } from './prompt';
 import { callModel, extractJson } from './generate';
 import { sanitizeCanvasConfig } from '../template';
+import { applyPatchOps, parsePatch, type PatchRequest } from './patch';
 import { useAiChat, windowedHistory } from './chat';
 import { parseFile } from '../../parser/parse';
 import { cleanTable } from '../../parser/clean';
@@ -15,12 +16,21 @@ import { cleanTable } from '../../parser/clean';
  * 面板组件只调这里，不直接碰 API。
  */
 
-/** 从 AI 输出里分辨：动作卡（画布 JSON）还是纯回答 */
-function parseReply(content: string): { kind: 'canvas'; config: ReturnType<typeof sanitizeCanvasConfig> } | { kind: 'text'; text: string } {
+/** 从 AI 输出里分辨：增量 patch / 全量画布 / 纯回答 */
+function parseReply(content: string): { kind: 'patch'; req: PatchRequest; newConfig: ReturnType<typeof sanitizeCanvasConfig> } | { kind: 'canvas'; config: ReturnType<typeof sanitizeCanvasConfig> } | { kind: 'text'; text: string } {
   const jsonText = extractJson(content);
   if (jsonText) {
+    const req = parsePatch(jsonText);
+    if (req) {
+      try {
+        const current = useCanvasStore.getState().config;
+        return { kind: 'patch', req, newConfig: applyPatchOps(current, req.ops) };
+      } catch (e) {
+        return { kind: 'text', text: `增量修改未通过校验：${e instanceof Error ? e.message : String(e)}（未改动画布）` };
+      }
+    }
     try {
-      const parsed = JSON.parse(jsonText) as { blocks?: unknown; version?: unknown };
+      const parsed = JSON.parse(jsonText) as { blocks?: unknown };
       if (parsed && Array.isArray(parsed.blocks)) {
         return { kind: 'canvas', config: sanitizeCanvasConfig(parsed) };
       }
@@ -48,7 +58,7 @@ export async function sendChatMessage(text: string): Promise<void> {
 
   try {
     const { config, sources } = useCanvasStore.getState();
-    const system = buildChatSystem(aiCfg.sendSampleRows, config.dataSources, sources);
+    const system = buildChatSystem(aiCfg.sendSampleRows, config.dataSources, sources, config);
     // 多轮：system + 窗口内历史（刚 push 的用户消息与"思考中"占位不入历史，单独作为当前输入）
     const history = windowedHistory(useAiChat.getState().messages.filter((m) => m.id !== thinking.id).slice(0, -1));
     const userText = [...history, { role: 'user' as const, content: trimmed }].map((m) => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`).join('\n\n');
@@ -61,7 +71,12 @@ export async function sendChatMessage(text: string): Promise<void> {
       if (reply.kind === 'canvas') {
         chat.update(thinking.id, {
           content: `已生成「${reply.config.title}」：${reply.config.blocks.length} 个区块 · ${reply.config.pipeline.nodes.length} 个节点`,
-          action: { config: reply.config, summary: `${reply.config.blocks.length} 区块 / ${reply.config.pipeline.nodes.length} 节点 / ${reply.config.dataSources.length} 数据源` },
+          action: { kind: 'canvas', config: reply.config, summary: `${reply.config.blocks.length} 区块 / ${reply.config.pipeline.nodes.length} 节点 / ${reply.config.dataSources.length} 数据源` },
+        });
+      } else if (reply.kind === 'patch') {
+        chat.update(thinking.id, {
+          content: `增量修改：${reply.req.summary}（${reply.req.ops.length} 处变更）`,
+          action: { kind: 'patch', summary: reply.req.summary, ops: reply.req.ops, newConfig: reply.newConfig },
         });
       } else {
         chat.update(thinking.id, { content: reply.text || '（空回复）' });
@@ -106,9 +121,14 @@ export function adoptAction(msgId: string): void {
   const chat = useAiChat.getState();
   const msg = chat.messages.find((m) => m.id === msgId);
   if (!msg?.action) return;
-  useCanvasStore.getState().applyAiConfig(msg.action.config);
+  if (msg.action.kind === 'canvas') {
+    useCanvasStore.getState().applyAiConfig(msg.action.config);
+    chat.push({ role: 'assistant', content: '已采用该画布（可用 Ctrl+Z 撤销）。想调整哪里，直接说。' });
+  } else {
+    useCanvasStore.getState().applyAiConfig(msg.action.newConfig);
+    chat.push({ role: 'assistant', content: `已应用「${msg.action.summary}」（Ctrl+Z 可撤销）。` });
+  }
   chat.update(msgId, { action: undefined });
-  chat.push({ role: 'assistant', content: '已采用该画布（可用 Ctrl+Z 撤销）。想调整哪里，直接说。' });
 }
 
 /** 放弃动作卡 */

@@ -11,7 +11,7 @@ describe('AI 会话', () => {
 
   it('动作卡消息在历史里压成简述（不重复发大 JSON）', () => {
     const msgs = [
-      { id: 'm1', role: 'assistant' as const, content: '已生成', ts: 1, action: { config: {} as never, summary: '5 区块 / 3 节点' } },
+      { id: 'm1', role: 'assistant' as const, content: '已生成', ts: 1, action: { kind: 'canvas' as const, config: {} as never, summary: '5 区块 / 3 节点' } },
     ];
     const w = windowedHistory(msgs);
     expect(w[0].content).toContain('上一轮生成了画布配置');

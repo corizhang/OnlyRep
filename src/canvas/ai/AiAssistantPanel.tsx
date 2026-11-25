@@ -9,12 +9,13 @@ import type { ChatMsg } from './chat';
  * 参考各家 AI 助手形态：浮层不遮画布，随开随用。
  */
 
-const PANEL_W = 380;
 const PANEL_H = 540;
 
 export default function AiAssistantPanel() {
   const panelOpen = useAiChat((s) => s.panelOpen);
   const setPanelOpen = useAiChat((s) => s.setPanelOpen);
+  const width = useAiChat((s) => s.width);
+  const setWidth = useAiChat((s) => s.setWidth);
   const messages = useAiChat((s) => s.messages);
   const generating = useAiChat((s) => s.generating);
   const unread = useAiChat((s) => s.messages.filter((m) => m.role === 'assistant').length > 0 && !panelOpen);
@@ -38,8 +39,24 @@ export default function AiAssistantPanel() {
       {panelOpen && (
         <div
           className="fixed bottom-5 right-5 z-[1500] flex flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl"
-          style={{ width: PANEL_W, height: PANEL_H }}
+          style={{ width, height: PANEL_H }}
         >
+          {/* 左缘拖拽调宽 */}
+          <div
+            className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-brand/30"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startW = width;
+              const onMove = (ev: PointerEvent): void => setWidth(startW + (startX - ev.clientX));
+              const onUp = (): void => {
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+              };
+              document.addEventListener('pointermove', onMove);
+              document.addEventListener('pointerup', onUp);
+            }}
+          />
           <header className="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-soft px-3">
             <span className="text-[13px]">✨</span>
             <span className="text-[12.5px] font-semibold text-ink">AI 助手</span>
@@ -112,6 +129,7 @@ function Bubble({ msg }: { msg: ChatMsg }) {
         <div className="whitespace-pre-wrap break-words">{msg.content}</div>
         {msg.action && (
           <div className="mt-2 rounded-md border border-brand-line bg-panel p-2">
+            <div className="text-[10px] font-medium text-brand">{msg.action.kind === 'patch' ? '增量修改' : '完整画布'}</div>
             <div className="text-[11px] text-ink-dim">{msg.action.summary}</div>
             <div className="mt-1.5 flex gap-1.5">
               <button
