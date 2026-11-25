@@ -43,6 +43,40 @@ export function renderMarkdown(text: string): ReactNode {
   let listBuf: { ordered: boolean; items: string[] } | null = null;
   let key = 0;
 
+  let tableBuf: string[][] | null = null;
+  const flushTable = (): void => {
+    if (!tableBuf || tableBuf.length === 0) return;
+    const [head, ...body] = tableBuf;
+    out.push(
+      <div key={`tbl${key}`} className="overflow-x-auto">
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            <tr>
+              {head.map((c, i) => (
+                <th key={i} className="border border-line bg-hover px-1.5 py-1 text-left font-semibold">
+                  {renderInline(c, `th${key}_${i}`)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, r) => (
+              <tr key={r} className={r % 2 ? 'bg-soft' : ''}>
+                {row.map((c, i) => (
+                  <td key={i} className="border border-line px-1.5 py-1 align-top">
+                    {renderInline(c, `td${key}_${r}_${i}`)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>,
+    );
+    key += 1;
+    tableBuf = null;
+  };
+
   const flushList = (): void => {
     if (!listBuf) return;
     const items = listBuf.items.map((it, j) => <li key={j}>{renderInline(it, `li${key}_${j}`)}</li>);
@@ -63,6 +97,17 @@ export function renderMarkdown(text: string): ReactNode {
 
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, '');
+    // 表格行（| a | b |；分隔行 |---|---| 跳过）
+    const isTableRow = /^\s*\|.*\|\s*$/.test(line);
+    if (isTableRow) {
+      flushList();
+      if (/^\s*\|[\s:|-]+\|\s*$/.test(line)) continue; // 分隔行
+      const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+      if (!tableBuf) tableBuf = [];
+      tableBuf.push(cells);
+      continue;
+    }
+    flushTable();
     // 代码块围栏
     if (/^```/.test(line.trim())) {
       flushList();
@@ -116,6 +161,7 @@ export function renderMarkdown(text: string): ReactNode {
     out.push(<div key={`p${key}`}>{renderInline(line, `p${key}`)}</div>);
     key += 1;
   }
+  flushTable();
   flushList();
   if (codeBuf !== null) {
     out.push(

@@ -13,6 +13,7 @@ import EmptyGuide from '../components/EmptyGuide';
 import NodeFields, { NODE_TYPE_LABELS } from './NodeFields';
 import DataPreview from './DataPreview';
 import AddNodePanelContent from './AddNodePanel';
+import { useAiChat } from '../ai/chat';
 import { getVal } from '../../parser/clean';
 import { STEP_TYPES, defaultParams } from '../components/StepChainPanel';
 import { createSourceOfKind, createStepNode, spotRightOf } from './nodeOps';
@@ -880,6 +881,18 @@ export default function FlowSheet({ embedded = false }: { embedded?: boolean }) 
                 viewportRect={canvasBounds}
                 node={selected}
                 outIsTable={selected.type === 'source' || outputs[selected.id]?.kind === 'table'}
+                onAskAi={() => {
+                  // 把节点结构化信息发给 AI 助手（用户只需补充想问什么）
+                  const label = NODE_TYPE_LABELS[selected.type] ?? selected.type;
+                  const detail = [
+                    `【引用节点】「${selected.name}」（类型：${label}，id：${selected.id}）`,
+                    `参数：${JSON.stringify(selected.params, null, 1)}`,
+                    selected.inputs.length > 0 ? `上游：${selected.inputs.join('、')}` : '上游：无（源节点）',
+                  ].join('\n');
+                  const chat = useAiChat.getState();
+                  chat.setQuote({ label: `节点「${selected.name}」`, detail });
+                  chat.setPanelOpen(true);
+                }}
                 addMenuOpen={addMenuOpen}
                 onToggleAddMenu={() => {
                   if (selected.type === 'source' || outputs[selected.id]?.kind === 'table') {
@@ -1158,6 +1171,7 @@ function SelectionToolbar({
   onAddDownstream,
   onToggleEnabled,
   onDelete,
+  onAskAi,
 }: {
   theme: NodeTheme;
   screenAnchor: { x: number; y: number } | null;
@@ -1171,6 +1185,7 @@ function SelectionToolbar({
   onAddDownstream: (type: NodeType) => void;
   onToggleEnabled: () => void;
   onDelete: () => void;
+  onAskAi: () => void;
 }) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1289,6 +1304,15 @@ function SelectionToolbar({
           className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${outIsTable ? 'text-brand hover:bg-brand/15' : 'cursor-not-allowed text-[var(--nb-text-faint)] opacity-45'}`}
         >
           <PlusOutlined style={{ fontSize: 13 }} /> 添加
+        </button>
+        <button
+          type="button"
+          aria-label="把此节点发给 AI 助手"
+          title="把此节点发给 AI 助手（问它怎么改）"
+          onClick={onAskAi}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--nb-text-dim)] transition-colors hover:bg-brand/15 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+        >
+          ✨
         </button>
         <span aria-hidden className="mx-0.5 h-5 w-px bg-[var(--nb-pop-border)]" />
         <button type="button" aria-label={node.enabled ? '停用该节点' : '启用该节点'} title={node.enabled ? '停用该节点' : '启用该节点'} onClick={onToggleEnabled} className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 ${node.enabled ? 'text-emerald-500 hover:bg-emerald-500/15' : 'text-[var(--nb-text-dim)] hover:bg-slate-500/15'}`}>

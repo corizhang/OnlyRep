@@ -29,6 +29,9 @@ interface AiChatState {
   generating: boolean;
   panelOpen: boolean;
   width: number;
+  /** 引用节点发给 AI（节点工具条「问 AI」写入；发送时拼进消息） */
+  quote: { label: string; detail: string } | null;
+  setQuote: (q: { label: string; detail: string } | null) => void;
   setWidth: (w: number) => void;
   setPanelOpen: (v: boolean) => void;
   push: (m: Omit<ChatMsg, 'id' | 'ts'>) => ChatMsg;
@@ -77,6 +80,8 @@ export const useAiChat = create<AiChatState>()((set) => ({
   generating: false,
   panelOpen: false,
   width: persisted.width,
+  quote: null,
+  setQuote: (q) => set({ quote: q }),
   setWidth: (w) => set({ width: Math.max(340, Math.min(720, w)) }),
   setPanelOpen: (v) => set({ panelOpen: v }),
   push: (m) => {

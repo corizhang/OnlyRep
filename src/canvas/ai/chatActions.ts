@@ -62,7 +62,9 @@ export async function sendChatMessage(text: string): Promise<void> {
     return;
   }
 
-  chat.push({ role: 'user', content: trimmed });
+  const quote = chat.quote;
+  chat.push({ role: 'user', content: trimmed, attachment: quote ? `🔗 ${quote.label}` : undefined });
+  if (quote) chat.setQuote(null);
   chat.setGenerating(true);
   const thinking = chat.push({ role: 'assistant', content: '思考中…' });
 
@@ -94,16 +96,27 @@ export async function sendChatMessage(text: string): Promise<void> {
     const system = buildChatSystem(aiCfg.sendSampleRows, config.dataSources, sources, config);
     // 多轮：system + 窗口内历史（刚 push 的用户消息与"思考中"占位不入历史，单独作为当前输入）
     const history = windowedHistory(useAiChat.getState().messages.filter((m) => m.id !== thinking.id).slice(0, -1));
-    let userText = [...history, { role: 'user' as const, content: trimmed }].map((m) => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`).join('\n\n');
+    const finalText = quote ? `${quote.detail}\n\n我的问题：${trimmed}` : trimmed;
+    let userText = [...history, { role: 'user' as const, content: finalText }].map((m) => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`).join('\n\n');
 
     // 最多两次尝试：第一次失败后把校验错误回喂，让 AI 自修一次
     let done = false;
     for (let attempt = 0; attempt < 2 && !done; attempt += 1) {
       if (attempt > 0) chat.update(thinking.id, { content: '输出未通过校验，正在让 AI 自修…' });
+      // 流式节流：60ms 刷一次（打字机节奏，避免每个 token 都重渲染）
+      let lastFlush = 0;
+      let pending: string | null = null;
       const res = await callModelStream(aiCfg, system, userText, (full) => {
-        // 流式：实时把正在生成的内容投到气泡（截断防爆长度）
+        pending = full;
+        const now = Date.now();
+        if (now - lastFlush < 60) return;
+        lastFlush = now;
         useAiChat.getState().update(thinking.id, { content: full.length > 4000 ? `${full.slice(0, 4000)}…` : full });
       });
+      if (pending !== null) {
+        const f = pending as string;
+        useAiChat.getState().update(thinking.id, { content: f.length > 4000 ? `${f.slice(0, 4000)}…` : f });
+      }
       if (res.error) {
         chat.update(thinking.id, { content: res.error, failed: res.error !== '已取消' });
         break;

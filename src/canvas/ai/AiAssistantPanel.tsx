@@ -111,15 +111,15 @@ function MessageList({ messages, generating }: { messages: ChatMsg[]; generating
           </div>
         </div>
       )}
-      {messages.map((m) => (
-        <Bubble key={m.id} msg={m} />
+      {messages.map((m, i) => (
+        <Bubble key={m.id} msg={m} streaming={generating && m.role === 'assistant' && i === messages.length - 1} />
       ))}
       <div ref={endRef} />
     </div>
   );
 }
 
-function Bubble({ msg }: { msg: ChatMsg }) {
+function Bubble({ msg, streaming }: { msg: ChatMsg; streaming: boolean }) {
   const isUser = msg.role === 'user';
   const canvasConfig = useCanvasStore((s) => s.config);
   return (
@@ -130,7 +130,10 @@ function Bubble({ msg }: { msg: ChatMsg }) {
         }`}
       >
         {msg.attachment && <div className="mb-1 rounded bg-black/10 px-1.5 py-0.5 text-[10.5px]">📎 {msg.attachment}</div>}
-        <div className="break-words">{isUser ? <div className="whitespace-pre-wrap">{msg.content}</div> : renderMarkdown(humanizeReply(msg.content, canvasConfig))}</div>
+        <div className="break-words">
+          {isUser ? <div className="whitespace-pre-wrap">{msg.content}</div> : renderMarkdown(humanizeReply(msg.content, canvasConfig))}
+          {streaming && <span className="ml-0.5 inline-block h-3.5 w-[7px] animate-pulse rounded-[1px] bg-brand align-[-2px]" />}
+        </div>
         {msg.action && (
           <div className="mt-2 rounded-md border border-brand-line bg-panel p-2">
             <div className="text-[10px] font-medium text-brand">{msg.action.kind === 'patch' ? '增量修改' : '完整画布'}</div>
@@ -160,6 +163,7 @@ function Bubble({ msg }: { msg: ChatMsg }) {
 
 function InputBox({ generating }: { generating: boolean }) {
   const [text, setText] = useState('');
+  const quote = useAiChat((s) => s.quote);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -184,6 +188,14 @@ function InputBox({ generating }: { generating: boolean }) {
           if (f) void attachFile(f);
         }}
       />
+      {quote && (
+        <div className="mb-1.5 flex items-center gap-1 rounded-md border border-brand-line bg-brand-soft px-2 py-1 text-[11px] text-brand">
+          <span className="min-w-0 flex-1 truncate">🔗 {quote.label}</span>
+          <button type="button" onClick={() => useAiChat.getState().setQuote(null)} className="shrink-0 text-ink-faint hover:text-ink">
+            ✕
+          </button>
+        </div>
+      )}
       <div className="flex items-end gap-1.5 rounded-lg border border-line bg-soft px-2 py-1.5 focus-within:border-brand-line">
         <button
           type="button"
