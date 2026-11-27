@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 2,
+  "product": {
+    "name": "TODO",
+    "slug": "todo",
+    "legacyNames": [],
+    "tagline": "TODO",
+    "description": "TODO",
+    "category": "TODO",
+    "status": "development",
+    "platforms": [
+      "Windows"
+    ],
+    "architectures": [
+      "TODO"
+    ]
+  },
+  "repository": {
+    "owner": "onlytools-lab",
+    "name": "todo",
+    "url": "https://github.com/onlytools-lab/todo"
+  },
+  "release": {
+    "tagPrefix": "v",
+    "titleFormat": "{product} v{version}",
+    "assetNaming": "{product}-Setup-v{version}-{arch}.exe",
+    "requireSha256": true,
+    "mirrorDownloads": []
+  },
+  "build": {
+    "commands": {
+      "test": "TODO",
+      "build": "TODO"
+    },
+    "artifactsPath": "TODO"
+  },
+  "documentation": {
+    "language": "zh-CN",
+    "readme": "README.md",
+    "changelog": "CHANGELOG.md"
+  },
+  "verification": {
+    "windowsVersions": [
+      "TODO"
+    ],
+    "architectures": [
+      "TODO"
+    ],
+    "runtimeDependencies": [
+      "TODO"
+    ],
+    "adminPrivilegesRequired": "TODO",
+    "dataStorageAndNetworkBehavior": "TODO"
+  }
+}

@@ -1,0 +1,1 @@
+Read `AGENTS.md` and `onlytools.config.json` before work. Follow their engineering, documentation, Windows packaging, versioning, and release requirements. Never invent product facts or test results.\n

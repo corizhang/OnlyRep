@@ -1,0 +1,1 @@
+Read `AGENTS.md` and `onlytools.config.json` first. They are the canonical ONLYTOOLS requirements. Load the `onlytools-product-engineering` Skill when available. Do not maintain conflicting rules here.\n

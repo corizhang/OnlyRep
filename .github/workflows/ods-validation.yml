@@ -1,0 +1,32 @@
+name: ONLYTOOLS Standard Validation
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'onlytools.config.json'
+      - 'docs/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: ODS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Validate product config
+        if: ${{ hashFiles('onlytools.config.json') != '' }}
+        run: python scripts/ods.py validate-config --config onlytools.config.json
+      - name: Validate README structure
+        if: ${{ hashFiles('onlytools.config.json') != '' && hashFiles('README.md') != '' }}
+        run: python scripts/ods.py validate-readme --readme README.md

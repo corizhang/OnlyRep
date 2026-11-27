@@ -1,0 +1,1 @@
+Use `AGENTS.md` as the canonical instruction source. Read it and `onlytools.config.json` before acting. Apply the ONLYTOOLS Skill when available. Do not publish or push release tags without explicit authorization.\n

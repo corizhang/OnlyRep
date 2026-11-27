@@ -1,0 +1,28 @@
+name: ONLYTOOLS Release Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix, e.g. 1.2.3'
+        required: true
+        type: string
+      notes:
+        description: 'Release Notes file'
+        required: true
+        default: 'RELEASE_NOTES.md'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Validate Release Notes
+        run: python scripts/ods.py validate-release --notes "${{ inputs.notes }}" --version "${{ inputs.version }}"

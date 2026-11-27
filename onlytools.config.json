@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "product": {
+    "name": "OnlyRep",
+    "slug": "onlyrep",
+    "legacyNames": ["RankBoard", "排行榜制作器"],
+    "tagline": "数据可视化日报工作台",
+    "description": "把 Excel 变成一份好看的日报：数据节点负责把表算成数字，日报画布负责把数字摆成版面，一次搭好、换数即出图；内置 AI 助手可对话搭建。全程本地运行，数据不上传任何服务器。",
+    "category": "Productivity",
+    "status": "stable",
+    "platforms": ["Windows"],
+    "architectures": ["x64"]
+  },
+  "repository": {
+    "owner": "onlytools-lab",
+    "name": "onlyrep",
+    "url": "https://github.com/onlytools-lab/onlyrep",
+    "releasesApi": "https://api.github.com/repos/onlytools-lab/onlyrep/releases"
+  },
+  "release": {
+    "tagPrefix": "v",
+    "titleFormat": "{product} v{version}",
+    "assetNaming": "{product}-Setup-v{version}-{arch}.exe",
+    "requireSha256": true,
+    "mirrorDownloads": []
+  },
+  "build": {
+    "commands": {
+      "test": "npm run verify",
+      "build": "npm run tauri:build"
+    },
+    "artifactsPath": "src-tauri/target/release/bundle"
+  },
+  "documentation": {
+    "language": "zh-CN",
+    "readme": "README.md",
+    "changelog": "CHANGELOG.md"
+  },
+  "verification": {
+    "windowsVersions": ["Windows 10", "Windows 11"],
+    "architectures": ["x64"],
+    "runtimeDependencies": ["WebView2 运行时（Windows 10/11 通常内置；缺失时安装包引导下载）"],
+    "adminPrivilegesRequired": "否（免安装单文件与按用户安装均无需管理员权限）",
+    "dataStorageAndNetworkBehavior": "纯本地：项目/模板存本机 SQLite 与应用数据目录，导入文件原始字节随项目保存；无任何遥测或后台联网。唯一主动网络出口是用户在「设置 → AI 助手」自行配置的 OpenAI 兼容端点，且默认只发送数据列结构（列名与类型），数据样本需用户显式开启。"
+  }
+}

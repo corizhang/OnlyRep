@@ -1,7 +1,7 @@
 name: release
 
 # 打标签即发版：git tag vX.Y.Z && git push origin vX.Y.Z
-# 流程：质量门（tsc+单测）→ Windows 构建 Tauri → 自动创建 GitHub Release 并上传全部产物
+# 流程：质量门（tsc+单测）→ ODS 校验 → Windows 构建 Tauri → Release 挂标准化资产 + SHA-256
 on:
   push:
     tags:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   gate:
-    name: 质量门（tsc + 单测）
+    name: 质量门（tsc + 单测 + ODS 校验）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,13 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx vitest run
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: ODS 配置与 README 校验
+        run: |
+          python scripts/ods.py validate-config --config onlytools.config.json
+          python scripts/ods.py validate-readme --readme README.md
 
   build-release:
     name: 构建并发布 Release
@@ -76,17 +83,34 @@ jobs:
           prerelease: false
           args: --bundles nsis,msi
 
-      # tauri-action 只挂 bundle 产物；免安装 exe 与单文件网页版手动补传
-      - name: 准备补充资产
+      # 资产命名统一 ONLYTOOLS 标准：{product}-类型-v{version}-{arch}.后缀
+      # tauri-action 上传的安装包资产名无法定制 → 下载重命名后替换（保留原始上传的历史不动，新资产为标准名）
+      - name: 准备标准化资产
         shell: bash
         run: |
-          cp src-tauri/target/release/onlyrep.exe onlyrep-standalone.exe
-          cp dist/index.html OnlyRep-web-standalone.html
+          VER="${GITHUB_REF_NAME#v}"
+          mkdir -p out
+          NSIS=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+          MSI=$(ls src-tauri/target/release/bundle/msi/*.msi | head -1)
+          cp "$NSIS" "out/OnlyRep-Setup-v${VER}-x64.exe"
+          cp "$MSI" "out/OnlyRep-Setup-v${VER}-x64.msi"
+          cp src-tauri/target/release/onlyrep.exe "out/OnlyRep-Portable-v${VER}-x64.exe"
+          cp dist/index.html "out/OnlyRep-Web-v${VER}.html"
 
-      - name: 上传免安装 exe 与单文件网页版
+      - name: 计算 SHA-256
+        shell: bash
+        run: |
+          cd out
+          python ../scripts/ods.py hash-artifacts * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: 上传标准资产与校验和
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            onlyrep-standalone.exe
-            OnlyRep-web-standalone.html
+            out/OnlyRep-Setup-v*-x64.exe
+            out/OnlyRep-Setup-v*-x64.msi
+            out/OnlyRep-Portable-v*-x64.exe
+            out/OnlyRep-Web-v*.html
+            out/SHA256SUMS.txt
