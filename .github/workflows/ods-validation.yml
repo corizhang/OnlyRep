@@ -36,4 +36,6 @@ jobs:
           python scripts/ods.py validate-version --version "$V"
           python scripts/ods.py validate-changelog --structure-only
       - name: 校验器自测（正反例回归）
-        run: python scripts/test_ods.py
+        run: |
+          python scripts/test_ods.py
+          python scripts/test_finalize_release.py
