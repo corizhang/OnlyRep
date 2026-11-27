@@ -1,0 +1,39 @@
+name: ODS Release Check (Dry Run)
+
+# 发布门禁云端演练：手动输入版本号，只跑检查、不打 Tag、不构建、不创建 Release。
+# 与 release.yml 的 gate 使用同一套 ods.py 校验，保证「演练过 = 发布会过」。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不含 v 前缀，如 0.7.2）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-check:
+    name: 发布门禁五项检查（演练）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: 配置 / README / 版本一致性 / CHANGELOG
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          python scripts/ods.py validate-config --config onlytools.config.json
+          python scripts/ods.py validate-readme --readme README.md
+          python scripts/ods.py validate-version --version "$VER"
+          python scripts/ods.py validate-changelog --version "$VER"
+      - name: Release Notes（必须存在且过校验）
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          NOTES="RELEASE-NOTES-v${VER}.md"
+          test -f "$NOTES" || { echo "::error::缺少发布说明 $NOTES"; exit 1; }
+          python scripts/ods.py validate-release --notes "$NOTES" --version "$VER"

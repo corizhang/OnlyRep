@@ -74,7 +74,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'OnlyRep ${{ github.ref_name }}'
           releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: false
+          releaseDraft: true  # 先 Draft：资产清理与最终清单核验不过则不公开
           prerelease: false
           args: --bundles nsis,msi
 
@@ -110,21 +110,11 @@ jobs:
             out/OnlyRep-Web-v*.html
             out/SHA256SUMS.txt
 
-      # tauri-action 会以默认名重复上传安装包（OnlyRep_X.Y.Z_*）——删除，只留标准名资产
-      - name: 清理默认名重复资产
+      # Draft 收尾：白名单删多余资产 → 最终清单核验 → 全过才 Draft 转正式（失败则 Draft 不公开）
+      - name: 资产收尾与发布
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-        run: |
-          IDS=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/releases/tags/$TAG" \
-            | python -c "import json,sys; [print(a['id']) for a in json.load(sys.stdin)['assets'] if a['name'].startswith('OnlyRep_') and '_x64' in a['name']]")
-          for id in $IDS; do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/releases/assets/$id")
-            if [ "$CODE" != "204" ]; then
-              echo "::error::删除默认名资产 $id 失败（HTTP $CODE）"
-              exit 1
-            fi
-          done
-          echo "cleaned legacy-named assets"
+        run: python scripts/finalize_release.py
