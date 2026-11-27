@@ -6,6 +6,8 @@ on:
       - 'AGENTS.md'
       - 'README.md'
       - 'CHANGELOG.md'
+      - 'package.json'
+      - 'src-tauri/tauri.conf.json'
       - 'onlytools.config.json'
       - 'docs/**'
       - 'scripts/**'
@@ -24,9 +26,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Validate product config
-        if: ${{ hashFiles('onlytools.config.json') != '' }}
-        run: python scripts/ods.py validate-config --config onlytools.config.json
-      - name: Validate README structure
-        if: ${{ hashFiles('onlytools.config.json') != '' && hashFiles('README.md') != '' }}
-        run: python scripts/ods.py validate-readme --readme README.md
+      - name: 配置与 README
+        run: |
+          python scripts/ods.py validate-config --config onlytools.config.json
+          python scripts/ods.py validate-readme --readme README.md
+      - name: 版本一致性（package.json ↔ tauri.conf.json）与 CHANGELOG 结构
+        run: |
+          V=$(python -c "import json;print(json.load(open('package.json'))['version'])")
+          python scripts/ods.py validate-version --version "$V"
+          python scripts/ods.py validate-changelog --structure-only
+      - name: 校验器自测（正反例回归）
+        run: |
+          python scripts/test_ods.py
+          python scripts/test_finalize_release.py
