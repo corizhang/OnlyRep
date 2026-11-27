@@ -10,9 +10,9 @@
 import json, os, sys, urllib.request, urllib.error
 
 PRODUCT = "OnlyRep"
-# 已知的 Tauri 默认命名重复资产模式（OnlyRep_X.Y.Z_x64-setup.exe / _x64_en-US.msi）
-def is_legacy_tauri_asset(name: str) -> bool:
-    return name.startswith(f"{PRODUCT}_") and ("_x64-setup.exe" in name or "_x64_en-US.msi" in name)
+# 已知的 Tauri 默认命名重复资产（精确匹配本版本，防误删其他版本的安装包）
+def legacy_tauri_assets(ver: str, product: str = PRODUCT) -> set:
+    return {f"{product}_{ver}_x64-setup.exe", f"{product}_{ver}_x64_en-US.msi"}
 
 
 class GitHubApi:
@@ -76,7 +76,7 @@ def finalize(api: GitHubApi, tag: str, product: str = PRODUCT) -> int:
         name = a["name"]
         if name in allow:
             continue
-        if not is_legacy_tauri_asset(name):
+        if name not in legacy_tauri_assets(ver, product):
             print(f"::error::发现未知资产 {name}（不在白名单也不是已知 Tauri 默认名）——不自动删除，保持 Draft")
             return 1
         code = api.delete_asset(a["id"])
@@ -100,8 +100,17 @@ def finalize(api: GitHubApi, tag: str, product: str = PRODUCT) -> int:
     print("最终资产清单核验通过：", ", ".join(sorted(names)))
 
     # ⑤ 转正式 + 回读确认
-    api.publish(rel["id"])
-    after = api.get_release(tag)
+    # 注意：PATCH 发出后的异常（如回读网络失败）不代表未公开——工作流失败时请人工核对 Release 实际状态
+    try:
+        api.publish(rel["id"])
+    except Exception as e:
+        print(f"::error::发布请求失败：{e}——Release 可能仍为 Draft，也可能已公开，请人工核对")
+        return 1
+    try:
+        after = api.get_release(tag)
+    except Exception as e:
+        print(f"::warning::发布后回读失败（{e}）——PATCH 已发出，Release 状态需人工核对")
+        return 1
     if after.get("draft"):
         print("::error::PATCH 后 Release 仍为 Draft——发布失败")
         return 1

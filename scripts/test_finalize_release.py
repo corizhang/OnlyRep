@@ -95,6 +95,12 @@ class T(unittest.TestCase):
         api = FakeApi(make_release(), publish_fails=True)
         self.assertEqual(finalize(api, TAG), 1)
 
+    def test_other_version_legacy_name_rejected(self):
+        # 别的版本的 Tauri 默认名不在本次白名单——属未知资产，拒删
+        api = FakeApi(make_release(with_legacy=False, extra=["OnlyRep_0.7.1_x64-setup.exe"]))
+        self.assertEqual(finalize(api, TAG), 1)
+        self.assertEqual(api.deleted, [])
+
     def test_empty_assets_rejected(self):
         api = FakeApi({"id": 1, "draft": True, "tag_name": TAG, "assets": []})
         self.assertEqual(finalize(api, TAG), 1)
