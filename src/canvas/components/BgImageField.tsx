@@ -31,7 +31,15 @@ export default function BgImageField({ value, onPatch }: BgImageFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const mode = value.image ? 'image' : 'color';
+  // 模式是本地状态：切「颜色」不清图（图仍在配置里），切回「图片」原图原设置直接回来；
+  // 有图时默认停在图片模式；外部清图（点「清除」）则跟随回颜色模式
+  const [mode, setMode] = useState<'color' | 'image'>(value.image ? 'image' : 'color');
+  const lastImage = useRef(value.image);
+  if (value.image !== lastImage.current) {
+    lastImage.current = value.image;
+    if (value.image && mode !== 'image') setMode('image');
+    if (!value.image && mode === 'image') setMode('color');
+  }
 
   const pick = async (f: File): Promise<void> => {
     setBusy(true);
@@ -51,13 +59,10 @@ export default function BgImageField({ value, onPatch }: BgImageFieldProps) {
       <Segmented
         size="small"
         value={mode}
-        onChange={(m) => {
-          if (m === 'color') onPatch({ image: '' });
-          else fileRef.current?.click();
-        }}
+        onChange={(m) => setMode(m as 'color' | 'image')}
         options={[
           { value: 'color', label: '颜色' },
-          { value: 'image', label: '图片' },
+          { value: 'image', label: value.image ? '图片 ✓' : '图片' },
         ]}
       />
       <input
@@ -74,7 +79,18 @@ export default function BgImageField({ value, onPatch }: BgImageFieldProps) {
 
       {mode === 'color' && <ColorInput value={value.color} onChange={(v: string) => onPatch({ color: v })} />}
 
-      {mode === 'image' && (
+      {mode === 'image' && !value.image && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+          className="flex h-16 w-full flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-line-strong bg-soft text-ink-dim hover:border-brand-line hover:text-brand disabled:opacity-50"
+        >
+          <span className="text-[13px]">{busy ? '压缩中…' : '＋ 选择图片'}</span>
+          <span className="text-[10px] text-ink-faint">≤5MB，自动压缩</span>
+        </button>
+      )}
+      {mode === 'image' && value.image && (
         <div className="space-y-2 rounded-md border border-line bg-soft p-2">
           <div className="flex items-center gap-2">
             <div className="h-12 w-20 shrink-0 overflow-hidden rounded border border-line bg-panel">
@@ -94,7 +110,7 @@ export default function BgImageField({ value, onPatch }: BgImageFieldProps) {
                 onClick={() => onPatch({ image: '' })}
                 className="rounded px-2 py-0.5 text-[11.5px] text-ink-faint hover:text-danger"
               >
-                清除（回到颜色）
+                清除图片
               </button>
             </div>
             <span className="ml-auto text-[10px] text-ink-faint">{(value.image.length / 1024).toFixed(0)} KB</span>
