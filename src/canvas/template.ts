@@ -94,6 +94,16 @@ export function sanitizeCanvasBlock(raw: unknown, depth = 0): CanvasBlock | null
 }
 
 /** 画布配置清洗（模板导入 / 旧持久化兜底） */
+/** 背景图字段：只放行 data:image/ 前缀且限长（≈1.5MB base64 上限），其余一律清空 */
+const IMAGE_MAX = 2_000_000;
+function sanitizeImageUrl(v: unknown): string {
+  return typeof v === 'string' && v.startsWith('data:image/') && v.length <= IMAGE_MAX ? v : '';
+}
+
+function sanitizeFit(v: unknown): 'cover' | 'contain' | 'repeat' | undefined {
+  return v === 'cover' || v === 'contain' || v === 'repeat' ? v : undefined;
+}
+
 export function sanitizeCanvasConfig(raw: unknown): CanvasConfig {
   const base = createDefaultCanvasConfig();
   if (!isObj(raw)) return base;
@@ -127,6 +137,14 @@ export function sanitizeCanvasConfig(raw: unknown): CanvasConfig {
     gap: clamp(Number(raw.gap), 0, 80, 14),
     pageBg: typeof raw.pageBg === 'string' ? raw.pageBg : '',
     headerBg: typeof raw.headerBg === 'string' ? raw.headerBg : '',
+    headerBgImage: sanitizeImageUrl(raw.headerBgImage),
+    headerBgFit: sanitizeFit(raw.headerBgFit),
+    headerOverlay: typeof raw.headerOverlay === 'string' ? raw.headerOverlay : '',
+    headerOverlayOpacity: raw.headerOverlayOpacity === undefined ? undefined : clamp(Number(raw.headerOverlayOpacity), 0, 1, 0.4),
+    pageBgImage: sanitizeImageUrl(raw.pageBgImage),
+    pageBgFit: sanitizeFit(raw.pageBgFit),
+    pageOverlay: typeof raw.pageOverlay === 'string' ? raw.pageOverlay : '',
+    pageOverlayOpacity: raw.pageOverlayOpacity === undefined ? undefined : clamp(Number(raw.pageOverlayOpacity), 0, 1, 0.4),
     headerHeight: raw.headerHeight === undefined ? undefined : clamp(Number(raw.headerHeight), 0, 400, 110),
     dataSources: dataSources.map((d) => {
       if (d.kind === 'import') return { ...d, fileName: '', sheetName: d.sheetName ?? '' };

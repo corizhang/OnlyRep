@@ -53,9 +53,18 @@ export interface CanvasRendererProps {
 export default function CanvasRenderer({ config, ctx, edit, chrome = false, dropIndex = null }: CanvasRendererProps) {
   const { theme } = ctx;
 
+  const pageFit = config.pageBgFit ?? 'cover';
   const container: CSSProperties = {
     width: config.width,
     background: config.pageBg || theme.pageBg,
+    ...(config.pageBgImage
+      ? {
+          backgroundImage: `url(${config.pageBgImage})`,
+          backgroundSize: pageFit === 'cover' ? 'cover' : pageFit === 'contain' ? 'contain' : 'auto',
+          backgroundRepeat: pageFit === 'repeat' ? 'repeat' : 'no-repeat',
+          backgroundPosition: 'top center',
+        }
+      : {}),
     color: theme.textColor,
     padding: config.padding,
     display: 'flex',
@@ -72,8 +81,9 @@ export default function CanvasRenderer({ config, ctx, edit, chrome = false, drop
   // 头部通栏色带（R4-10 增补）：只给顶部上色，正文保持白底；
   // 高度 0 = 隐藏；config.headerBg 为空时跟随主题 headerBg
   const bandH = config.headerHeight ?? 110;
-  const bandBg = config.headerBg || theme.headerBg || '';
-  const showBand = bandH > 0 && bandBg !== '';
+  const bandBg = config.headerBgImage ? '' : config.headerBg || theme.headerBg || '';
+  const bandFit = config.headerBgFit ?? 'cover';
+  const showBand = bandH > 0 && (bandBg !== '' || Boolean(config.headerBgImage));
 
   return (
     <div id="canvas-export-node" style={container} onClick={() => edit?.onSelect('')}>
@@ -86,9 +96,28 @@ export default function CanvasRenderer({ config, ctx, edit, chrome = false, drop
             left: 0,
             right: 0,
             height: bandH,
-            background: bandBg,
+            background: config.headerBgImage ? undefined : bandBg,
+            ...(config.headerBgImage
+              ? {
+                  backgroundImage: `url(${config.headerBgImage})`,
+                  backgroundSize: bandFit === 'cover' ? 'cover' : bandFit === 'contain' ? 'contain' : 'auto',
+                  backgroundRepeat: bandFit === 'repeat' ? 'repeat' : 'no-repeat',
+                  backgroundPosition: 'top center',
+                }
+              : {}),
             zIndex: 0,
           }}
+        >
+          {config.headerOverlay && (
+            <div style={{ position: 'absolute', inset: 0, background: config.headerOverlay, opacity: config.headerOverlayOpacity ?? 0.4 }} />
+          )}
+        </div>
+      )}
+      {/* 页面蒙版：底图之上的整幅罩层（在色带之下、内容之下） */}
+      {config.pageOverlay && (
+        <div
+          aria-hidden
+          style={{ position: 'absolute', inset: 0, background: config.pageOverlay, opacity: config.pageOverlayOpacity ?? 0.4, zIndex: 0 }}
         />
       )}
       <div

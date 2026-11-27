@@ -8,6 +8,7 @@ import { appStorage } from '../../storage/safeStorage';
 import { isTauri, tauriPersistStorage } from '../../storage/tauriKv';
 import { THEME_LIST } from '../../themes/themes';
 import { Btn, ColorInput, Field, NumberInput, Section, Select, TextInput } from './ui';
+import BgImageField from './BgImageField';
 import { useState } from 'react';
 
 const CANVAS_PERSIST_KEY = K.canvasPersist;
@@ -129,10 +130,47 @@ export default function CanvasSettings({ section = 'canvas' }: { section?: 'canv
               onChange={(v) => patch({ headerHeight: v })}
             />
           </Field>
-          <Field label="头部背景（留空跟随主题）">
-            <ColorInput value={config.headerBg ?? ''} onChange={(v) => patch({ headerBg: v })} />
-          </Field>
         </div>
+        <Field label="头部背景（留空跟随主题）">
+          <BgImageField
+            value={{
+              color: config.headerBg ?? '',
+              image: config.headerBgImage ?? '',
+              fit: config.headerBgFit ?? 'cover',
+              overlay: config.headerOverlay ?? '',
+              overlayOpacity: config.headerOverlayOpacity ?? 0.4,
+            }}
+            onPatch={(p2) => {
+              const mapped: Record<string, unknown> = {};
+              if ('color' in p2) mapped.headerBg = p2.color;
+              if ('image' in p2) mapped.headerBgImage = p2.image;
+              if ('fit' in p2) mapped.headerBgFit = p2.fit;
+              if ('overlay' in p2) mapped.headerOverlay = p2.overlay;
+              if ('overlayOpacity' in p2) mapped.headerOverlayOpacity = p2.overlayOpacity;
+              patch(mapped);
+            }}
+          />
+        </Field>
+        <Field label="页面背景（留空跟随主题底色）">
+          <BgImageField
+            value={{
+              color: config.pageBg ?? '',
+              image: config.pageBgImage ?? '',
+              fit: config.pageBgFit ?? 'cover',
+              overlay: config.pageOverlay ?? '',
+              overlayOpacity: config.pageOverlayOpacity ?? 0.4,
+            }}
+            onPatch={(p2) => {
+              const mapped: Record<string, unknown> = {};
+              if ('color' in p2) mapped.pageBg = p2.color;
+              if ('image' in p2) mapped.pageBgImage = p2.image;
+              if ('fit' in p2) mapped.pageBgFit = p2.fit;
+              if ('overlay' in p2) mapped.pageOverlay = p2.overlay;
+              if ('overlayOpacity' in p2) mapped.pageOverlayOpacity = p2.overlayOpacity;
+              patch(mapped);
+            }}
+          />
+        </Field>
         <p className="text-[11.5px] text-ink-faint">
           主题为「白底正文 + 彩色头部色带」；高度设 0 可隐藏色带（此时标题建议改深色）。
         </p>

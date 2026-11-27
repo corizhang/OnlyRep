@@ -376,6 +376,22 @@ export interface CanvasConfig {
   pageBg: string;
   /** 头部通栏色带背景；''/缺省 = 跟随主题 headerBg */
   headerBg?: string;
+  /** 头部背景图（data URL，上传时压缩）；有图优先于 headerBg 颜色 */
+  headerBgImage?: string;
+  /** 头部背景图填充方式；缺省 cover */
+  headerBgFit?: 'cover' | 'contain' | 'repeat';
+  /** 头部叠加蒙版颜色（'' = 无蒙版） */
+  headerOverlay?: string;
+  /** 头部蒙版透明度 0~1；缺省 0.4 */
+  headerOverlayOpacity?: number;
+  /** 页面底图（data URL）；pageBg 颜色作兜底底色 */
+  pageBgImage?: string;
+  /** 页面底图填充方式；缺省 cover */
+  pageBgFit?: 'cover' | 'contain' | 'repeat';
+  /** 页面叠加蒙版颜色（'' = 无蒙版） */
+  pageOverlay?: string;
+  /** 页面蒙版透明度 0~1；缺省 0.4 */
+  pageOverlayOpacity?: number;
   /** 头部色带高度 px；0 = 隐藏色带。缺省 110 */
   headerHeight?: number;
   dataSources: DataSource[];
