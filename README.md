@@ -3,7 +3,7 @@
 > 把 Excel 变成一份好看的日报：**数据节点**负责把表算成数字，**日报画布**负责把数字摆成版面，**AI 助手**负责一句话替你搭好。一次搭好、换数即出图。
 > 全程本地运行，数据不上传任何服务器；提供桌面应用（Windows）与单文件网页两种形态。
 
-![License](https://img.shields.io/badge/license-private-blue) ![Version](https://img.shields.io/badge/version-0.7.0-blue) ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Web-lightgrey)
+![License](https://img.shields.io/badge/license-private-blue) ![Release](https://img.shields.io/github/v/release/onlytools-lab/onlyrep?display_name=tag&label=version) ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Web-lightgrey)
 
 **曾用名**：RankBoard（排行榜制作器），v0.6.0 起统一更名 OnlyRep（历史 Release 资产保留）。
 

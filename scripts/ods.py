@@ -59,6 +59,45 @@ def release(notes,version):
     print(f"Release Notes structure OK for v{version}")
     return 0
 
+def version_check(version, pkg_path="package.json", tauri_path="src-tauri/tauri.conf.json"):
+    """三方版本一致性：传入版本 ↔ package.json ↔ tauri.conf.json"""
+    errors=[]
+    if not SEMVER.fullmatch(version): errors.append("invalid SemVer version")
+    pkg=read_json(pkg_path)
+    if pkg.get("version")!=version: errors.append(f"package.json version {pkg.get('version')} != {version}")
+    tauri=read_json(tauri_path)
+    tv=tauri.get("version") or tauri.get("package",{}).get("version")
+    if tv!=version: errors.append(f"tauri.conf.json version {tv} != {version}")
+    if errors:
+        print("\n".join("ERROR: "+e for e in errors)); return 1
+    print(f"Version consistency OK: {version} (tag/package.json/tauri.conf.json)")
+    return 0
+
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+def changelog_check(path, version, config_path="onlytools.config.json"):
+    """CHANGELOG 发布闭环：正式章节存在且有日期有内容、Release 链接存在、Unreleased 比较链接指向当前版本"""
+    errors=[]
+    p=Path(path)
+    if not p.exists(): print("ERROR: CHANGELOG missing"); return 1
+    body=p.read_text(encoding="utf-8")
+    c=read_json(config_path); repo=c.get("repository",{}).get("url","").rstrip("/")
+    m=re.search(rf"(?ms)^## \[{re.escape(version)}\](?: - (\S+))?\s*(.*?)(?=^## \[|\Z)",body)
+    if not m:
+        errors.append(f"CHANGELOG section [{version}] not found")
+    else:
+        date, content = m.group(1), m.group(2).strip()
+        if not date or not DATE_RE.fullmatch(date): errors.append(f"[{version}] section has no valid date (YYYY-MM-DD)")
+        if not content or "###" not in content: errors.append(f"[{version}] section has no categorized changes")
+    if repo:
+        if f"{repo}/releases/tag/v{version}" not in body: errors.append(f"release link for v{version} missing")
+        if f"{repo}/compare/v{version}...HEAD" not in body: errors.append(f"[Unreleased] compare link not pointing to v{version}")
+    if PH.findall(body): errors.append("unresolved template placeholders")
+    if errors:
+        print("\n".join("ERROR: "+e for e in errors)); return 1
+    print(f"CHANGELOG OK for v{version}")
+    return 0
+
 def hashes(paths):
     failed=False
     for item in paths:
@@ -108,6 +147,8 @@ def main():
     x=s.add_parser("validate-config"); x.add_argument("--config",required=True)
     x=s.add_parser("validate-readme"); x.add_argument("--readme",default="README.md")
     x=s.add_parser("validate-release"); x.add_argument("--notes",required=True); x.add_argument("--version",required=True)
+    x=s.add_parser("validate-version"); x.add_argument("--version",required=True)
+    x=s.add_parser("validate-changelog"); x.add_argument("--changelog",default="CHANGELOG.md"); x.add_argument("--version",required=True)
     x=s.add_parser("hash-artifacts"); x.add_argument("artifacts",nargs="+")
     x=s.add_parser("release-notes"); x.add_argument("--config",default="onlytools.config.json"); x.add_argument("--changelog",default="CHANGELOG.md"); x.add_argument("--version",required=True); x.add_argument("--output",default="RELEASE_NOTES.md")
     a=p.parse_args()
@@ -115,6 +156,8 @@ def main():
         if a.cmd=="validate-config": return config(a.config)
         if a.cmd=="validate-readme": return readme(a.readme)
         if a.cmd=="validate-release": return release(a.notes,a.version)
+        if a.cmd=="validate-version": return version_check(a.version)
+        if a.cmd=="validate-changelog": return changelog_check(a.changelog,a.version)
         if a.cmd=="hash-artifacts": return hashes(a.artifacts)
         if a.cmd=="release-notes": return draft(a.config,a.changelog,a.version,a.output)
     except Exception as e: print("ERROR:",e); return 1

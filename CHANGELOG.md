@@ -4,13 +4,21 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-27
+
 ### Added
+- 头部/页面背景图支持：上传自动压缩（≤5MB/≤1800px）、缩略预览、填充方式（铺满裁切/完整适应/平铺）、叠加蒙版（颜色+透明度）
 - 引入 ONLYTOOLS Standard：AGENTS.md / CLAUDE.md / CODEX.md / GEMINI.md 跨代理工程规范、onlytools.config.json 产品元数据、ods.py 校验工具、验证与发布门禁工作流
 - 导出图片成功横幅恢复「打开文件夹」按钮（桌面端）
 
 ### Changed
 - README 按 ONLYTOOLS 规范重构（功能特性/系统要求/下载与安装/快速开始/数据与隐私/问题反馈/许可证必备章节）
 - CHANGELOG 启用 Keep a Changelog 分类
+- 发布资产命名标准化（OnlyRep-Setup/Portable/Web-v{version}-x64.*）并附 SHA256SUMS.txt
+
+### Fixed
+- 背景图配置误点「颜色」导致图片丢失需重新上传（切换只切视图，清除需显式按钮）
+- 修复 ods.py release-notes 起草器正则转义过量
 
 ## [0.7.0] - 2026-11-25
 
@@ -49,7 +57,8 @@
 ### Changed
 - 界面整体视觉升级（顶栏/检查器/节点卡片）
 
-[Unreleased]: https://github.com/onlytools-lab/onlyrep/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/onlytools-lab/onlyrep/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/onlytools-lab/onlyrep/releases/tag/v0.7.1
 [0.7.0]: https://github.com/onlytools-lab/onlyrep/releases/tag/v0.7.0
 [0.6.0]: https://github.com/onlytools-lab/onlyrep/releases/tag/v0.6.0
 [0.5.0]: https://github.com/onlytools-lab/onlyrep/releases/tag/v0.5.0

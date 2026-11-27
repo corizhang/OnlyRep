@@ -26,10 +26,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: ODS 配置与 README 校验
+      - name: ODS 五道发布门禁（缺任一项即拒绝发布）
+        env:
+          VER: ${{ github.ref_name }}
         run: |
+          V="${VER#v}"
           python scripts/ods.py validate-config --config onlytools.config.json
           python scripts/ods.py validate-readme --readme README.md
+          python scripts/ods.py validate-version --version "$V"
+          python scripts/ods.py validate-changelog --version "$V"
+          NOTES="RELEASE-NOTES-${VER}.md"
+          test -f "$NOTES" || { echo "::error::缺少发布说明 $NOTES（先写发布说明再打 tag）"; exit 1; }
+          python scripts/ods.py validate-release --notes "$NOTES" --version "$V"
 
   build-release:
     name: 构建并发布 Release
@@ -49,26 +57,13 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
 
-      - name: 校验 tag 与 package.json 版本一致
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG=$(node -p "require('./package.json').version")
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::tag v$TAG 与 package.json 版本 $PKG 不一致"
-            exit 1
-          fi
-
       - name: 读取发布说明（RELEASE-NOTES-<tag>.md）
         id: notes
         shell: bash
         run: |
           F="RELEASE-NOTES-${GITHUB_REF_NAME}.md"
-          if [ -f "$F" ]; then
-            { echo 'body<<EOF'; cat "$F"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
-          else
-            echo 'body=详见提交记录' >> "$GITHUB_OUTPUT"
-          fi
+          # gate 已强制该文件存在且通过校验，这里直读
+          { echo 'body<<EOF'; cat "$F"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
 
       # tauri-action：执行 npm run tauri:build（自动先跑 beforeBuildCommand=vite build），
       # 创建 Release 并自动上传 NSIS/MSI 安装包
@@ -126,6 +121,10 @@ jobs:
           IDS=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/releases/tags/$TAG" \
             | python -c "import json,sys; [print(a['id']) for a in json.load(sys.stdin)['assets'] if a['name'].startswith('OnlyRep_') and '_x64' in a['name']]")
           for id in $IDS; do
-            curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/releases/assets/$id" > /dev/null
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/releases/assets/$id")
+            if [ "$CODE" != "204" ]; then
+              echo "::error::删除默认名资产 $id 失败（HTTP $CODE）"
+              exit 1
+            fi
           done
           echo "cleaned legacy-named assets"
